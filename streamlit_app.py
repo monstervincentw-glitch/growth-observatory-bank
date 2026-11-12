@@ -9,16 +9,14 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
-from bank_layout import header, layout_style, status_line, strategy_comparison
+from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout_style,
+                         readable_table, sidebar_brand, status_line, strategy_comparison, trend_chart)
 from sheets_data import BASE, check, fetch_rows, parse_rows, read_gzip
 from taiwan_fund_research import render as render_taiwan_fund_research
 
-st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide")
+st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide", initial_sidebar_state="auto")
 
 MARKETS = {"美股": "US", "台股": "TW"}
-LIGHTS = {"rates": "利率", "conditions": "金融條件", "inflation": "通膨"}
-DECISION = {"non_red": "未達紅燈門檻", "red": "已達紅燈門檻", "unknown": "風險判定待確認"}
-STATES = {0: "未觸發", 1: "紅燈", None: "未知"}
 FACTORS = {"growth": "營收年增", "acceleration": "成長加速度", "operating": "營益率",
            "cashflow": "營業現金流率", "value": "同產業 P/S"}
 PLANS = {"A": "買入持有", "B": "紅燈全部退出", "C": "紅燈減碼 50%", "D": "紅燈轉入防禦資產"}
@@ -59,7 +57,7 @@ def load_archive():
 def stamp(value):
     if not value:
         return "待核對"
-    return datetime.fromisoformat(value.replace("Z","+00:00")).astimezone(ZoneInfo("Asia/Taipei")).strftime("%Y/%m/%d %H:%M")
+    return datetime.fromisoformat(value.replace("Z","+00:00")).astimezone(ZoneInfo("Asia/Taipei")).strftime("%Y-%m-%d %H:%M")
 
 def percent(value):
     return "—" if value is None or pd.isna(value) else f"{value:.2%}"
@@ -67,8 +65,8 @@ def percent(value):
 def number(value):
     return "—" if value is None else f"{value:,.2f}"
 
-def table(records, widths=None):
-    st.dataframe(pd.DataFrame(records), hide_index=True, column_config=widths)
+def table(records, *, label="研究資料"):
+    readable_table(pd.DataFrame(records), label=label)
 
 def csv_button(label, data, name, key=None):
     st.download_button(label, pd.DataFrame(data).to_csv(index=False).encode("utf-8-sig"), name,
@@ -82,20 +80,7 @@ def report_bytes(name):
 def report_file(label, name):
     st.download_button(label, report_bytes(name), name, on_click="ignore", key=name)
 
-def funding(macro):
-    dot = {0: " bank-dot-clear", 1: " bank-dot-alert", None: ""}
-    lights = "".join(
-        f'<div class="bank-light"><span class="bank-dot{dot[macro["categoryStates"][key]]}"></span>'
-        f'<strong>{label}</strong><span>{STATES[macro["categoryStates"][key]]}</span></div>'
-        for key, label in LIGHTS.items()
-    )
-    st.html(f'<div class="bank-lights">{lights}</div>')
-    low, high = macro["scoreRange"]
-    score = str(low) if low == high else f"{low}–{high}"
-    st.write(f"**{score}／3　{DECISION[macro['decision']]}**")
-    st.caption(f"行情 {macro['marketAsOf']} · 總經版本 {macro.get('macro_vintage_date') or '待核對'} · 計算 {stamp(macro.get('calculatedAt'))}")
-    if macro.get("warning"):
-        st.warning(macro["warning"])
+def funding_details(macro):
     with st.expander("總經數值、變動與資料版本"):
         rows = []
         for series, label, value, change in [
@@ -106,19 +91,18 @@ def funding(macro):
             info = macro["seriesMeta"].get(series,{})
             rows.append({"細項":label,"數值":macro.get(value),"變動或年化":macro.get(change),
                          "觀測日期":info.get("observationDate"),"版本日期":info.get("vintageDate"),"來源":series})
-        table(rows)
+        table(rows, label="資金溫度資料版本")
         st.caption("利率、金融條件、通膨各至多一分。最低分已達 2 為紅燈，最高分低於 2 則未達門檻，其他為未知。")
 
 def markets(market, block, signal_available):
     stocks = block["stocks"]
     by_rank = sorted(stocks, key=lambda s: s["researchRank"]["rank"] if s["researchRank"] else 1000)
-    with st.container(border=True):
-        st.subheader("全球資金溫度")
-        funding(block["macro"])
+    funding_dashboard(block["macro"], stamp(block["macro"].get("calculatedAt")), signal_available)
     c = st.columns(3)
-    c[0].metric("研究池", len(stocks))
-    c[1].metric("有分數的研究候選", sum(s["researchRank"] is not None for s in stocks))
-    c[2].metric("最後完成收盤", block["macro"]["marketAsOf"])
+    c[0].metric("研究池", len(stocks), border=True)
+    c[1].metric("有分數的研究候選", sum(s["researchRank"] is not None for s in stocks), border=True)
+    c[2].metric("最後完成收盤", block["macro"]["marketAsOf"], border=True)
+    funding_details(block["macro"])
     scope = st.segmented_control("顯示範圍", ["研究候選","全部研究池","主策略正式候選","背離長抱候選"], default="研究候選", key=f"scope-{market}")
     options = st.columns([2,1,1])
     query = options[0].text_input("搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
@@ -153,7 +137,23 @@ def markets(market, block, signal_available):
     if not rows:
         st.info("目前篩選條件沒有符合的標的。")
         return
-    table(rows)
+    st.subheader("研究候選與分數")
+    main_columns = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增", "正式訊號"]
+    detail_columns = ["代號", "單季營收年增", "營益率", "營業現金流率", "P/S", "財報期", "申報日", "資料品質"]
+    page_size = 20
+    page_key = f"stocks-page-{market}"
+    start = min(st.session_state.get(page_key, 0), (len(rows) - 1) // page_size * page_size)
+    with st.container(horizontal=True, gap="small", vertical_alignment="center"):
+        st.write(f"{start + 1}–{min(start + page_size, len(rows))} ／ {len(rows)} 檔")
+        if len(rows) > page_size:
+            st.button("上一頁", key=f"stocks-prev-{market}", disabled=start == 0,
+                      on_click=st.session_state.__setitem__, args=(page_key, start - page_size))
+            st.button("下一頁", key=f"stocks-next-{market}", disabled=start + page_size >= len(rows),
+                      on_click=st.session_state.__setitem__, args=(page_key, start + page_size))
+    visible_rows = pd.DataFrame(rows[start:start + page_size])
+    readable_table(visible_rows[main_columns], label="市場研究候選", layout="market")
+    with st.expander("本頁候選的財報與資料品質"):
+        readable_table(visible_rows[detail_columns], label="候選財報與資料品質")
     csv_button("匯出目前篩選 CSV",rows,f"{market}-research.csv",f"export-{market}")
     stock = st.selectbox("查看單檔分數、財報與行情",selected_stocks,
         format_func=lambda x: f"{x['symbol']} · {x['name']}",key=f"detail-{market}")
@@ -174,7 +174,7 @@ def markets(market, block, signal_available):
     if stock["history"]:
         history = pd.DataFrame(stock["history"]).rename(columns={"close":"調整收盤"})
         history["date"] = pd.to_datetime(history["date"])
-        st.line_chart(history,x="date",y="調整收盤")
+        trend_chart(history.rename(columns={"date": "日期"}), "日期", ["調整收盤"], ylabel="調整收盤", height=315)
 
 def market_picker(column):
     return MARKETS[column.segmented_control("市場", list(MARKETS), default="美股", key="bank-market") or "美股"]
@@ -188,7 +188,7 @@ def backtest(research, nav):
     st.subheader("A／B 歷史淨值")
     curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
     curve["日期"] = pd.to_datetime(curve["日期"])
-    st.line_chart(curve, x="日期", y=["A", "B"], height=280)
+    trend_chart(curve, "日期", ["A", "B"], ylabel="淨值倍數")
     st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
     if market=="TW":
         st.warning("台股 2016–2026 起跑組為研究版。現有封存驗收沒有確認符合公告時點、財報版本及成交證據的可信起始年。")
@@ -223,8 +223,8 @@ def legacy_backtest(market):
         if market=="US":
             benchmark=pd.read_csv(BytesIO(report_bytes("us-primary-vs-qqq-2006-2026.csv")))
             st.subheader("美股主策略與 QQQ")
-            st.line_chart(benchmark.rename(columns={"total_return":"主策略","qqq_return":"QQQ"}),
-                x="year",y=["主策略","QQQ"])
+            trend_chart(benchmark.rename(columns={"year": "起始年", "total_return": "主策略", "qqq_return": "QQQ"}),
+                        "起始年", ["主策略", "QQQ"], ylabel="累積報酬", value_format=".0%", year_axis=True)
             st.caption("各點為不同年度獨立起跑至共同終點的累積報酬。")
             report_file("主策略與 QQQ 比較 CSV","us-primary-vs-qqq-2006-2026.csv")
             report_file("資金紅燈全清比較 CSV","funding-exit-comparison-2016-2026.csv")
@@ -263,7 +263,6 @@ def advisor(research):
         candidates=[r for r in research["advisor"] if r["symbol"]==product]
         years=sorted({r["start_year"] for r in candidates})
         cohort=st.selectbox("投資起始年",years,key=f"advisor-year-{product}",width=138)
-        event=st.selectbox("事件回撤比較", list(WINDOWS), format_func=WINDOWS.get, width=188)
     selected=[r for r in candidates if r["start_year"]==cohort]
     comparison = pd.DataFrame(selected).rename(columns={
         "variant": "方案", "cumulative": "累積報酬", "cagr": "CAGR", "mdd": "最大回撤"
@@ -277,21 +276,28 @@ def advisor(research):
             "高點至回本（天）":r["peak_to_recovery_calendar_days"],"成本／初始資金":percent(r["transaction_cost_initial_fraction"]),
             "買入次數":r["buy_count"],"賣出次數":r["sell_count"]} for r in selected])
     st.subheader("事件回撤")
+    event = st.segmented_control("事件回撤比較", list(WINDOWS), format_func=WINDOWS.get,
+                                 default="GFC", key="advisor-event") or "GFC"
     events=[r for r in research["windows"] if r["symbol"]==product and r["start_year"]==cohort and str(r["window"])==str(event)]
     if events:
+        event_drawdown_chart(pd.DataFrame(events), "variant", "window_mdd", WINDOWS[event])
         table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"起日":r["first"],"迄日":r["last"],
             "部分區間":r["partial"],"事件報酬":percent(r["strategy_return"]),"最大回撤":percent(r["window_mdd"]),
-            "紅燈交易日":r["red_sessions"]} for r in events])
+            "紅燈交易日":r["red_sessions"]} for r in events], label="ETF／基金事件回撤")
     else:
         st.caption("此起跑年度在該事件沒有研究區間。")
     st.subheader("新台幣 1,000 萬元模擬組合")
     st.caption("2006 年起投，SPY 40%、QQQ 20%、AGG 30%、IEF 10%，計入匯率。")
     options=list(dict.fromkeys(r["window"] for r in research["example"]))
     example=st.selectbox("台幣組合市場事件",options,format_func=lambda x: WINDOWS.get(str(x),str(x)))
+    example_rows = [r for r in research["example"] if r["window"] == example]
+    if example_rows:
+        event_drawdown_chart(pd.DataFrame(example_rows), "variant", "drawdown",
+                             WINDOWS.get(str(example), str(example)), value_label="模擬組合最大回撤")
     table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"高點日":r["peak_date"],"高點淨值":number(r["peak_twd"]),
         "低點日":r["trough_date"],"低點淨值":number(r["trough_twd"]),"虧損":number(r["loss_twd"]),
         "回撤":percent(r["drawdown"]),"同額虧損":number(-r["drawdown"]*10_000_000),"回本日":r["recovery_date"],
-        "低點至回本（日）":r["days_trough_to_recovery"]} for r in research["example"] if r["window"]==example])
+        "低點至回本（日）":r["days_trough_to_recovery"]} for r in example_rows], label="台幣模擬組合事件回撤")
     for label,name in [("各商品／年度完整 CSV","advisor-by-year.csv"),("事件比較 CSV","advisor-events.csv"),
         ("事件模擬成交與成本 CSV","advisor-event-fills.csv"),("台幣組合事件 CSV","advisor-twd-events.csv")]:
         report_file(label,name)
@@ -329,22 +335,8 @@ def records(data, source, batch):
 """)
     report_file("下載研究驗收紀錄","phase1-acceptance.md")
 
-layout_style()
-data, batch, source = snapshot()
-research, baseline, nav = load_archive()
-with st.container(key="bank-shell"):
-    header()
-    with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center", gap="small"):
-        status_line(source, data["markets"]["US"]["macro"]["marketAsOf"],
-                    data["markets"]["TW"]["macro"]["marketAsOf"], data["historyThrough"])
-        st.button("重新讀取資料", on_click=snapshot.clear)
-    page = st.segmented_control("研究功能", ["市場觀測", "主策略回測", "策略模擬", "顧問風控", "更新紀錄與規則"],
-                                default="市場觀測", selection_mode="single", label_visibility="collapsed",
-                                key="bank-page") or "市場觀測"
 
-if source != "Google Sheets":
-    st.warning("本次 Sheets 讀取未通過。畫面標示目前採用的最後成功快照或封存備援。")
-if page=="市場觀測":
+def market_page():
     market = market_picker(st)
     block = data["markets"][market]
     market_date = datetime.fromisoformat(block["macro"]["marketAsOf"]).date()
@@ -353,11 +345,9 @@ if page=="市場觀測":
     failed_since_publish = bool(attempt and attempt["market"]==market and attempt["status"]=="failed" and
         attempt.get("at","") > block["macro"].get("lastMarketPublishedAt",""))
     markets(market,block,source=="Google Sheets" and 0<=age<=5 and not failed_since_publish)
-elif page=="主策略回測":
-    backtest(research,nav)
-elif page=="策略模擬":
-    tracking(data,baseline)
-elif page=="顧問風控":
+
+
+def advisor_page():
     with st.container(horizontal=True, gap="small"):
         advisor_page = st.segmented_control("顧問風控研究", ["原 14 項 ETF／基金／債券", "台灣可申購共同基金"],
                                             default="原 14 項 ETF／基金／債券", label_visibility="collapsed",
@@ -369,5 +359,27 @@ elif page=="顧問風控":
         render_taiwan_fund_research(fund_view)
     else:
         advisor(research)
-else:
-    records(data,source,batch)
+
+
+layout_style()
+sidebar_brand()
+data, batch, source = snapshot()
+research, baseline, nav = load_archive()
+page = st.navigation([
+    st.Page(market_page, title="市場觀測", icon=":material/monitoring:", default=True),
+    st.Page(lambda: backtest(research, nav), title="主策略回測", icon=":material/timeline:", url_path="backtest"),
+    st.Page(lambda: tracking(data, baseline), title="策略模擬", icon=":material/stacked_line_chart:", url_path="simulation"),
+    st.Page(advisor_page, title="顧問風控", icon=":material/shield:", url_path="advisor"),
+    st.Page(lambda: records(data, source, batch), title="更新紀錄與規則", icon=":material/history:", url_path="updates"),
+], expanded=True)
+
+with st.container(key="bank-content"):
+    header(page.title)
+    status, refresh = st.columns([5, 1], vertical_alignment="center")
+    with status:
+        status_line(source, data["markets"]["US"]["macro"]["marketAsOf"],
+                    data["markets"]["TW"]["macro"]["marketAsOf"], data["historyThrough"])
+    refresh.button("重新讀取資料", on_click=snapshot.clear)
+    if source != "Google Sheets":
+        st.warning("本次 Sheets 讀取未通過。畫面標示目前採用的最後成功快照或封存備援。")
+    page.run()

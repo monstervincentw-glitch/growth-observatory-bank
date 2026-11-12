@@ -6,7 +6,7 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
-from bank_layout import fund_heading, readable_table, strategy_comparison
+from bank_layout import event_drawdown_chart, fund_heading, readable_table, strategy_comparison
 
 ARCHIVE = Path(__file__).resolve().parent / "data" / "taiwan-fund-research.json.gz"
 NAME = "基金完整中文名稱"
@@ -46,13 +46,11 @@ def export(frame, label, filename, key):
                        filename, "text/csv", key=key, on_click="ignore")
 
 
-def show_table(frame, percentage=()):
+def show_table(frame, percentage=(), *, label="基金研究資料"):
     view = frame.copy()
     if "方案" in view:
         view["方案"] = view["方案"].map(PLANS)
-    for column in percentage:
-        view[column] = view[column].map(lambda val: f"{val:.2%}" if pd.notna(val) else "—")
-    st.dataframe(view, hide_index=True)
+    readable_table(view, percentage, label=label)
 
 
 def rankings(data):
@@ -154,8 +152,8 @@ def render(view):
     fund_catalog(visible)
 
     st.subheader("市場事件回撤")
-    event_col, _ = st.columns([1, 3])
-    event = event_col.selectbox("基金市場事件", list(EVENTS), format_func=EVENTS.__getitem__, key="tw-fund-event")
+    event = st.segmented_control("基金市場事件", list(EVENTS), format_func=EVENTS.__getitem__,
+                                 default="GFC", key="tw-fund-event") or "GFC"
     history = data["events"]
     history = history[history["ISIN"].eq(isin)].copy()
     history.insert(0, NAME, item[NAME])
@@ -163,8 +161,9 @@ def render(view):
     if selected.empty:
         st.caption("此起跑年度在該事件沒有可用區間。")
     else:
+        event_drawdown_chart(selected, "方案", "事件最大回撤", EVENTS[event])
         show_table(selected[["方案", "區間起日", "區間迄日", "部分區間", "事件報酬", "事件最大回撤", "紅燈日數"]],
-                   ["事件報酬", "事件最大回撤"])
+                   ["事件報酬", "事件最大回撤"], label="共同基金事件回撤")
     export(history, "市場事件回撤 CSV", f"{isin}-event-drawdowns.csv", "tw-fund-event-download")
 
     st.subheader("不同年度起跑比較")
