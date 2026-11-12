@@ -268,7 +268,7 @@ def advisor(research):
         "高點至回本（天）":r["peak_to_recovery_calendar_days"],"成本／初始資金":percent(r["transaction_cost_initial_fraction"]),
         "買入次數":r["buy_count"],"賣出次數":r["sell_count"]} for r in selected])
     event=st.selectbox("事件回撤比較", list(WINDOWS), format_func=WINDOWS.get)
-    events=[r for r in research["windows"] if r["symbol"]==product and r["start_year"]==cohort and r["window"]==event]
+    events=[r for r in research["windows"] if r["symbol"]==product and r["start_year"]==cohort and str(r["window"])==str(event)]
     if events:
         table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"起日":r["first"],"迄日":r["last"],
             "部分區間":r["partial"],"事件報酬":percent(r["strategy_return"]),"最大回撤":percent(r["window_mdd"]),
