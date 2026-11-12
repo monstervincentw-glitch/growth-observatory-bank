@@ -1,5 +1,8 @@
 import gzip
+import json
+from urllib.request import urlopen
 from datetime import datetime
+from io import BytesIO
 from threading import Lock
 from zoneinfo import ZoneInfo
 
@@ -85,9 +88,13 @@ def csv_button(label, data, name, key=None):
     st.download_button(label, pd.DataFrame(data).to_csv(index=False).encode("utf-8-sig"), name,
         mime="text/csv", key=key, on_click="ignore")
 
-def report_file(label, name):
+def report_bytes(name):
     file = BASE / "reports" / (name + ".gz")
-    st.download_button(label, gzip.decompress(file.read_bytes()), name, on_click="ignore", key=name)
+    compressed = file.read_bytes() if file.exists() else b"".join(part.read_bytes() for part in sorted(file.parent.glob(file.name + ".part*")))
+    return gzip.decompress(compressed)
+
+def report_file(label, name):
+    st.download_button(label, report_bytes(name), name, on_click="ignore", key=name)
 
 def funding(macro):
     lights = "".join(f'<div class="light"><span class="dot s{macro["categoryStates"][key]}"></span>'
@@ -123,13 +130,22 @@ def markets(market, block):
     c[1].metric("有分數的研究候選", sum(s["researchRank"] is not None for s in stocks))
     c[2].metric("最後完成收盤", block["macro"]["marketAsOf"])
     scope = st.segmented_control("顯示範圍", ["研究候選","全部研究池","主策略正式候選","背離長抱候選"], default="研究候選", key=f"scope-{market}")
-    query = st.text_input("搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
+    options = st.columns([2,1,1])
+    query = options[0].text_input("搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
+    industry = options[1].selectbox("產業",["全部", *sorted({s["industry"] for s in stocks if s.get("industry")})],key=f"industry-{market}")
+    order = options[2].selectbox("排序",["研究排名","營收成長","126 日回撤"],key=f"sort-{market}")
     def visible(stock):
         scope_ok = {"研究候選": bool(stock["researchRank"]), "全部研究池": True,
                     "主策略正式候選": stock["evaluation"].get("primary"),
                     "背離長抱候選": stock["evaluation"].get("buy_hold")}.get(scope, True)
-        return scope_ok and query in " ".join(str(stock.get(k) or "") for k in ("symbol","name","industry")).casefold()
+        return scope_ok and (industry=="全部" or stock.get("industry")==industry) and query in " ".join(str(stock.get(k) or "") for k in ("symbol","name","industry")).casefold()
     selected_stocks = list(filter(visible, by_rank))
+    if order!="研究排名":
+        field = ("financial","revenue_growth") if order=="營收成長" else ("features","drawdown_126")
+        def sort_key(stock):
+            value = stock[field[0]].get(field[1])
+            return (value is None, 0 if value is None else (-value if order=="營收成長" else value))
+        selected_stocks.sort(key=sort_key)
     rows = []
     for stock in selected_stocks:
         rank = stock["researchRank"] or {}
@@ -161,6 +177,8 @@ def markets(market, block):
         st.warning(stock.get("sourceWarning") or stock["sourceError"])
     if e.get("reasons"):
         st.caption("｜".join(e["reasons"]))
+    technical = stock["features"]
+    st.caption(f"126 日回撤 {percent(technical.get('drawdown_126'))} · 63 日相對報酬 {percent(technical.get('relative_63'))} · 可用交易日 {technical.get('history_sessions','—')}")
     if stock["history"]:
         history = pd.DataFrame(stock["history"]).rename(columns={"close":"調整收盤"})
         history["date"] = pd.to_datetime(history["date"])
@@ -185,6 +203,35 @@ def backtest(market, research, nav):
     report_file("年度回測比較 CSV","us-ab.csv" if market=="US" else "tw-ab-research.csv")
     if market=="US":
         report_file("2006 發布時點敏感度 CSV","us-2006-release-delay.csv")
+    legacy_backtest(market)
+
+def legacy_backtest(market):
+    with st.expander("歷史研究存檔、比較基準與逐筆出場"):
+        old = read_gzip("data/legacy-research.json.gz")
+        basis = st.selectbox("美股回測版本",["拆股尺度修正版","同條件原算法"]) if market=="US" else None
+        key = "usOriginal" if basis=="同條件原算法" else market.lower()
+        st.caption("封存研究使用當代研究樣本，有存活者與選樣偏誤。美股同條件原算法保留拆股尺度限制。台股早期財報不足組只列資料品質。")
+        table([{"起始年":r["cohort_year"],"主策略累積":percent(None if r.get("partial") else r["primary_total_return"]),
+            "背離長抱累積":percent(None if r.get("partial") else r["buy_hold_total_return"]),
+            "主策略最大回撤":percent(None if r.get("partial") else r["primary_max_drawdown"]),
+            "背離長抱最大回撤":percent(None if r.get("partial") else r["buy_hold_max_drawdown"]),
+            "資料判讀":r["coverage_note"]} for r in old[key]])
+        table([{"代號":r["symbol"],"訊號日":r["signalDate"],"成交日":r["exitDate"],
+            "淨報酬":percent(r["returnNet"]),"出場原因":r["reason"],"總經版本":r["macroVintage"]}
+            for r in old["exitExamples"] if r["market"]==market])
+        if market=="US":
+            benchmark=pd.read_csv(BytesIO(report_bytes("us-primary-vs-qqq-2006-2026.csv")))
+            st.subheader("美股主策略與 QQQ")
+            st.line_chart(benchmark.rename(columns={"total_return":"主策略","qqq_return":"QQQ"}),
+                x="year",y=["主策略","QQQ"])
+            st.caption("各點為不同年度獨立起跑至共同終點的累積報酬。")
+            report_file("主策略與 QQQ 比較 CSV","us-primary-vs-qqq-2006-2026.csv")
+            report_file("資金紅燈全清比較 CSV","funding-exit-comparison-2016-2026.csv")
+            report_file("資金紅燈出場事件 CSV","funding-exit-events-2016-2026.csv")
+        for label,name in [("完整互動回測報告 HTML","growth-backtest-2016-2026.html"),
+            ("歷年比較 CSV","comparison-summary-2016-2026.csv"),("逐筆出場稽核 CSV","exit-audits-2016-2026.csv"),
+            ("出場案例證據 JSON","exit-examples-evidence.json"),("舊報告對照 CSV","prior-run-reconciliation.csv")]:
+            report_file(label,name)
 
 def tracking(market, snapshot_data, baseline):
     block = snapshot_data["markets"][market]
@@ -238,9 +285,25 @@ def advisor(research):
         ("事件模擬成交與成本 CSV","advisor-event-fills.csv"),("台幣組合事件 CSV","advisor-twd-events.csv")]:
         report_file(label,name)
 
+@st.cache_data(ttl=90, show_spinner=False)
+def latest_runner_attempt():
+    url = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/research-data/attempt.json"
+    try:
+        with urlopen(url, timeout=5) as response:
+            attempt = json.loads(response.read(30_000))
+    except (OSError, ValueError):
+        return None
+    return attempt if attempt.get("market") in ("US","TW") and attempt.get("status") in ("published","same_close","failed") else None
+
 def records(data, source, batch):
     st.write(f"**來源** {source}　**批次** {batch or '封存備援'}")
     st.write(f"**同步驗收標記** {data['qa']}")
+    attempt = latest_runner_attempt()
+    if attempt:
+        result = {"same_close":"同一收盤，保留快照","failed":"來源更新失敗","published":"研究批次已發布"}[attempt["status"]]
+        st.write(f"**最近雲端收盤工作** {attempt['market']} · {result} · {stamp(attempt.get('at'))}")
+        if attempt["status"] == "failed":
+            st.warning("最近一次更新未通過。頁面沿用已核對快照。")
     for label,market in MARKETS.items():
         block=data["markets"][market]
         macro=block["macro"]

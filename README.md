@@ -8,7 +8,7 @@
 
 - GitHub main 部署至 Streamlit Community Cloud。入口是 streamlit_app.py，Python 套件由 requirements.txt 安裝。公開頁面只包含共用研究。
 - Streamlit 後端從 data/sheets-url.txt 所設定的 Apps Script 唯讀介面讀取 bank_snapshot。也可在 Streamlit Secrets 設定 google_service_account，以 Viewer 分享研究試算表並使用 Sheets API。
-- Apps Script 的公開介面只讀指定的 bank_snapshot 範圍。私有 MVP 網址與封存的六個 MVP 分頁可供原測試使用。
+- Apps Script 的公開介面只讀指定的 bank_snapshot 範圍。私人 MVP 部署固定於原版。六個既有分頁沿用原格式，同一批次更新候選、燈號與來源日期，並保留測試標記、回測和顧問結果。
 - bank_snapshot 包含版本、分段數、SHA-256 與經 gzip 壓縮的研究資料。讀取端驗證完整批次、研究池、燈號與評分。bank_runs 保存更新嘗試。
 - 研究回測與顧問報告沿用 2026-11-04 已驗證封存輸出。台股歷史結果屬研究版。策略模擬部位是封存模擬帳戶，延伸日期僅估值。
 
