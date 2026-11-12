@@ -1,5 +1,4 @@
 export type Market='US'|'TW';
-export type Strategy='primary'|'buy_hold';
 export interface Financial {
  financial_status:string; revenue_growth:number|null;quarterly_growth:number|null;operating_margin:number|null;cfo_margin:number|null;revenue_ttm:number|null;
  growth_acceleration?:number|null;shares?:number|null;shares_date?:string|null;shares_filed?:string|null;latest_period?:string|null;max_input_filed?:string|null;prior_release_growth?:number|null;prior_release_margin?:number|null;
@@ -11,5 +10,3 @@ export type RiskFlag=0|1|null;
 export type MacroDecision='non_red'|'red'|'unknown';
 export interface Macro {status:string;macro_stress:number|null;cpi_yoy:number|null;fed_funds:number|null;real_yield:number|null;financial_conditions:number|null;macro_vintage_date:string;observedAt:string;marketAsOf?:string;ruleVersion?:string;calculatedAt?:string;lastSuccessfulAt?:string;lastMarketPublishedAt?:string;marketComplete?:boolean;marketSourceError?:string|null;sourceError?:string;legacyStress?:number;categories?:{rates:boolean;conditions:boolean;inflation:boolean};categoryStates?:{rates:RiskFlag;conditions:RiskFlag;inflation:RiskFlag};scoreRange?:[number,number];decision?:MacroDecision;lastDecisionAt?:string;seriesMeta?:Record<string,{observationDate:string;vintageDate:string;publicationAt:string|null;publicationSource?:string;availableBy:string;acquiredAt:string}>;[key:string]:unknown;}
 export interface Evaluation {fundamental:boolean;filingVerified:boolean;funding:boolean;tradable:boolean;divergence:boolean;fresh:boolean;primary:boolean;buy_hold:boolean;reasons:string[];fundamentalReasons:string[];}
-export interface Portfolio {id:string;owner_id:string;name:string;market:Market;strategy:Strategy;currency:string;start_date:string;initial_capital:string;created_at:string;}
-export interface Holding {id:string;owner_id:string;instrument_key:string;market:Market;strategy:Strategy;entry_date:string;entry_price:string|null;quantity:string|null;note:string;baseline:string;created_at:string;closed_at:string|null;portfolio_id?:string|null;entry_cost?:string|null;exit_date?:string|null;exit_price?:string|null;exit_cost?:string|null;}

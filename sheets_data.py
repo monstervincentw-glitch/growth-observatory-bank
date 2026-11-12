@@ -80,7 +80,9 @@ def fetch_rows(public_csv_url, service_account=None):
     if not public_csv_url:
         raise ValueError("未設定 Sheets 讀取網址")
     target = urlparse(public_csv_url)
-    if target.scheme != "https" or target.hostname != "docs.google.com" or not target.path.startswith("/spreadsheets/d/e/") or not target.path.endswith("/pub"):
+    valid_publish = target.hostname == "docs.google.com" and target.path.startswith("/spreadsheets/d/e/") and target.path.endswith("/pub")
+    valid_script = target.hostname == "script.google.com" and re.fullmatch(r"/macros/s/[A-Za-z0-9_-]+/exec", target.path)
+    if target.scheme != "https" or not (valid_publish or valid_script):
         raise ValueError("Sheets 發布網址不符")
     with urlopen(public_csv_url, timeout=15) as response:
         raw = response.read(2_000_000)

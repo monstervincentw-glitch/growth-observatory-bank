@@ -1,5 +1,6 @@
 import gzip
 from datetime import datetime
+from threading import Lock
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -37,6 +38,10 @@ WINDOWS = {"GFC": "2008 金融海嘯", "COVID": "2020 疫情", "2022": "2022 升
 PCT_ADVISOR = ["cumulative","cagr","mdd","worst_year_return","transaction_cost_initial_fraction",
                "strategy_return","window_mdd","drawdown"]
 
+@st.cache_resource
+def last_sheet_snapshot():
+    return Lock(), {}
+
 @st.cache_data(ttl=90, show_spinner=False)
 def snapshot():
     config_path = BASE / "data/sheets-url.txt"
@@ -47,8 +52,15 @@ def snapshot():
         account = None
     try:
         data, batch = parse_rows(fetch_rows(csv_url, account))
+        lock, last = last_sheet_snapshot()
+        with lock:
+            last.update(data=data, batch=batch)
         return data, batch, "Google Sheets"
     except (OSError, KeyError, ValueError, TypeError, ImportError):
+        lock, last = last_sheet_snapshot()
+        with lock:
+            if last:
+                return last["data"], last["batch"], "Sheets 上次成功快取"
         return check(read_gzip("data/snapshot.json.gz")), None, "封存備援"
 
 @st.cache_data(show_spinner=False)
@@ -250,7 +262,7 @@ data, batch, source = snapshot()
 research, baseline, nav = load_archive()
 st.caption(f"來源 {source}　·　美股 {data['markets']['US']['macro']['marketAsOf']}　·　台股 {data['markets']['TW']['macro']['marketAsOf']}　·　完整回測 {data['historyThrough']}")
 if source != "Google Sheets":
-    st.warning("目前顯示隨站保存的最後驗證快照。即時 Sheets 讀取待確認。")
+    st.warning("本次 Sheets 讀取未通過。畫面標示目前採用的最後成功快照或封存備援。")
 page=st.radio("研究功能",["市場觀測","主策略回測","策略模擬","顧問風控","更新紀錄與規則"],horizontal=True,label_visibility="collapsed")
 if page in ("市場觀測","主策略回測","策略模擬"):
     market=MARKETS[st.segmented_control("市場",list(MARKETS),default="美股") or "美股"]

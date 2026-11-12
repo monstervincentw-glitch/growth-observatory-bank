@@ -8,7 +8,7 @@ const publicFields = {
   finance: ['financial_status','revenue_growth','quarterly_growth','growth_acceleration','operating_margin','cfo_margin','revenue_ttm','shares','shares_date','shares_filed','latest_period','max_input_filed','financial_age_days','fundamental_release_key','financial_event_date','date_basis','prior_release_growth','prior_release_margin'],
   features: ['history_sessions','dollar_volume','drawdown_126','relative_63','market_cap_estimate','price_sales'],
   evaluation: ['fundamental','filingVerified','funding','tradable','divergence','fresh','primary','buy_hold'],
-  macro: ['status','ruleVersion','marketAsOf','macro_vintage_date','observedAt','calculatedAt','macro_stress','decision','lastDecisionAt','lastMarketPublishedAt','marketComplete','lastAttemptAt','cpi_yoy','cpi_3m_annualized','real_yield','real_yield_90d_change','fed_funds','fed_funds_90d_change','financial_conditions','financial_conditions_90d_change'],
+  macro: ['status','ruleVersion','marketAsOf','macro_vintage_date','observedAt','calculatedAt','macro_stress','legacyStress','decision','lastDecisionAt','lastMarketPublishedAt','marketComplete','lastAttemptAt','cpi_yoy','cpi_3m_annualized','real_yield','real_yield_90d_change','fed_funds','fed_funds_90d_change','financial_conditions','financial_conditions_90d_change'],
   evidence: ['period','releaseKey','publishedAt','verifiedThrough','source'],
   jobs: ['market','status','total','updated','failed','created_at','updated_at','retained','fallback'],
 };
