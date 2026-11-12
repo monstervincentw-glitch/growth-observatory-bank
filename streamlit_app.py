@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
-from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout_style, market_metrics,
+from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout_style,
                          readable_table, sidebar_brand, status_line, strategy_comparison, trend_chart)
 from sheets_data import BASE, check, fetch_rows, parse_rows, read_gzip
 from taiwan_fund_research import render as render_taiwan_fund_research
@@ -82,6 +82,8 @@ def report_file(label, name):
 
 def funding_details(macro):
     with st.expander("總經數值、變動與資料版本"):
+        vintage = macro.get("macro_vintage_date") or "待核對"
+        st.caption(f"收盤 {macro['marketAsOf']} · 總經版本 {vintage} · 計算 {stamp(macro.get('calculatedAt'))}（台北時間）")
         rows = []
         for series, label, value, change in [
             ("FEDFUNDS","聯邦基金利率","fed_funds","fed_funds_90d_change"),
@@ -97,13 +99,7 @@ def funding_details(macro):
 def markets(market, block, signal_available):
     stocks = block["stocks"]
     by_rank = sorted(stocks, key=lambda s: s["researchRank"]["rank"] if s["researchRank"] else 1000)
-    funding_dashboard(block["macro"], stamp(block["macro"].get("calculatedAt")), signal_available)
-    market_metrics([
-        ("研究池", len(stocks)),
-        ("有分數的研究候選", sum(s["researchRank"] is not None for s in stocks)),
-        ("最後完成收盤", block["macro"]["marketAsOf"]),
-    ])
-    funding_details(block["macro"])
+    funding_dashboard(block["macro"])
     scope_control, search_control, industry_control, order_control = st.columns([3.45, 1.65, 1, 1], vertical_alignment="bottom")
     scope = scope_control.segmented_control("顯示範圍", ["研究候選","全部研究池","主策略正式候選","背離長抱候選"],
                                             default="研究候選", key=f"scope-{market}")
@@ -137,6 +133,7 @@ def markets(market, block, signal_available):
     if not signal_available:
         st.warning("目前保留可核對的研究排名，正式訊號待更新。")
     if not rows:
+        funding_details(block["macro"])
         st.info("目前篩選條件沒有符合的標的。")
         return
     main_columns = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增", "正式訊號"]
@@ -157,6 +154,7 @@ def markets(market, block, signal_available):
     with st.expander("本頁候選的財報與資料品質"):
         readable_table(visible_rows[detail_columns], label="候選財報與資料品質")
     csv_button("匯出目前篩選 CSV",rows,f"{market}-research.csv",f"export-{market}")
+    funding_details(block["macro"])
     stock = st.selectbox("查看單檔分數、財報與行情",selected_stocks,
         format_func=lambda x: f"{x['symbol']} · {x['name']}",key=f"detail-{market}")
     f,e=stock["financial"],stock["evaluation"]

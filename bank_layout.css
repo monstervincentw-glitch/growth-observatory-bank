@@ -21,26 +21,28 @@
 }
 .bank-sidebar-brand {
   padding: .75rem .15rem;
-  border-bottom: 1px solid #D8DFE9;
-  color: var(--bank-ink);
+  border-bottom: 1px solid #3B4B62;
+  color: #F3F6FB;
 }
 .bank-sidebar-brand span, .bank-sidebar-brand small { display: block; }
-.bank-sidebar-brand span { font-size: 1.12rem; font-weight: 700; }
-.bank-sidebar-brand small { margin-top: .26rem; color: var(--bank-muted); }
-[data-testid="stSidebar"]:has(.bank-sidebar-brand) { border-inline-end: 1px solid #D8DFE9; }
-[data-testid="stSidebarNav"] a {
+.bank-sidebar-brand span { font-size: 1.12rem; font-weight: 750; }
+.bank-sidebar-brand small { margin-top: .26rem; color: #B7C5D8; }
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a {
   min-height: 2.65rem;
   padding-block: .48rem;
   border-inline-start: 3px solid transparent;
   font-weight: 600;
-  color: #303849;
+  color: #C4D0E1;
 }
-[data-testid="stSidebarNav"] a[aria-current="page"] {
-  border-inline-start-color: #947341;
-  background: #ECE3D4;
-  color: #533F25;
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a[aria-current="page"] {
+  border-inline-start-color: #D8B885;
+  background: #32445B;
+  color: #F4DDBA;
 }
-[data-testid="stSidebarNav"] a:focus-visible { outline: 2px solid #947341; outline-offset: -2px; }
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a:focus-visible {
+  outline: 2px solid #D8B885;
+  outline-offset: -2px;
+}
 
 .bank-hero {
   display: flex;
@@ -55,7 +57,7 @@
   color: var(--bank-ink);
 }
 .bank-hero span { color: var(--bank-deep-gold); font-size: .84rem; font-weight: 650; }
-.bank-hero h1, .bank-funding h2, .bank-card-heading h3, .bank-fund-heading h3 {
+.bank-hero h1, .bank-funding h2, .bank-fund-heading h3 {
   margin: 0;
   padding: 0;
   line-height: 1.3;
@@ -74,72 +76,62 @@
 .bank-status span { white-space: nowrap; }
 .bank-status b { color: var(--bank-ink); }
 
-.bank-funding {
-  padding: .7rem .85rem;
-  border: 1px solid var(--bank-rule);
-  border-radius: .64rem;
-  background: rgba(255, 255, 255, .72);
+.bank-funding { margin-block: .55rem .25rem; }
+.bank-funding h2 { margin-bottom: .48rem; font-size: 1rem; color: var(--bank-ink); }
+.bank-funding-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .85rem;
+  align-items: start;
 }
-.bank-funding-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: .22rem .7rem;
-  margin-bottom: .52rem;
-}
-.bank-funding h2 { font-size: 1.26rem; color: var(--bank-ink); }
-.bank-funding-head div { color: var(--bank-muted); font-size: .8rem; }
-.bank-funding-head b { color: var(--bank-ink); white-space: nowrap; }
-
-.bank-funding-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .58rem; }
 .bank-funding-card {
-  --card-background: rgba(116, 130, 151, .10);
-  --card-border: #CED5DF;
-  --card-accent: #738095;
-  --card-status-ink: #475466;
-  --card-badge: #E4E9F0;
+  --card-background: rgba(133, 156, 187, .17);
+  --card-border: #D9E2EF;
+  --card-status-ink: #45546E;
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: .38rem;
-  padding: .58rem .67rem;
   border: 1px solid var(--card-border);
-  border-top: 3px solid var(--card-accent);
-  border-radius: .5rem;
+  border-radius: .75rem;
   background: var(--card-background);
   color: var(--bank-ink);
 }
 .bank-funding-card-clear {
-  --card-background: rgba(145, 173, 205, .14);
-  --card-border: #C8D6E7;
-  --card-accent: #748BAA;
-  --card-status-ink: #345779;
-  --card-badge: #DFE9F5;
+  --card-background: rgba(97, 167, 125, .19);
+  --card-border: #CDDFD5;
+  --card-status-ink: #205944;
 }
 .bank-funding-card-triggered {
-  --card-background: rgba(183, 107, 100, .13);
-  --card-border: #E1C7C6;
-  --card-accent: #B76B64;
-  --card-status-ink: #823D39;
-  --card-badge: #F3E0DE;
+  --card-background: rgba(195, 108, 101, .19);
+  --card-border: #E8CAC7;
+  --card-status-ink: #853F3B;
 }
-.bank-card-heading {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: .22rem .4rem;
-}
-.bank-card-heading h3 { font-size: 1rem; color: var(--bank-ink); }
-.bank-card-heading strong {
-  padding: .12rem .34rem;
-  border-radius: .25rem;
-  background: var(--card-badge);
+.bank-funding-card summary {
+  position: relative;
+  display: block;
+  padding: .65rem .9rem;
+  min-height: 7rem;
+  border-radius: inherit;
+  list-style: none;
+  cursor: pointer;
   color: var(--card-status-ink);
-  font-size: .78rem;
-  font-weight: 700;
 }
+.bank-funding-card summary::-webkit-details-marker { display: none; }
+.bank-funding-card summary::after {
+  content: "";
+  position: absolute;
+  inset: 1rem .95rem auto auto;
+  width: .42rem;
+  height: .42rem;
+  border-block-start: 1.5px solid currentColor;
+  border-inline-end: 1.5px solid currentColor;
+  transform: rotate(45deg);
+}
+.bank-funding-card[open] summary::after { transform: rotate(135deg); }
+.bank-funding-card summary:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
+.bank-card-name, .bank-funding-card summary strong, .bank-funding-card small { display: block; }
+.bank-card-name { font-size: .86rem; font-weight: 650; }
+.bank-funding-card summary strong { font-size: 1.44rem; line-height: 1.3; }
+.bank-funding-card small { margin-top: .32rem; color: #4C5C6F; font-size: .72rem; line-height: 1.4; }
+.bank-card-detail { padding: .65rem .9rem; border-top: 1px solid var(--card-border); }
 .bank-funding-card .bank-readings {
   display: grid;
   grid-auto-flow: column;
@@ -161,55 +153,8 @@
   line-height: 1.21;
 }
 .bank-reading-change { color: var(--bank-muted); font-size: .74rem; font-weight: 500; white-space: nowrap; }
-.bank-funding-card p { margin: 0; color: var(--bank-ink); font-size: .79rem; line-height: 1.32; }
-.bank-funding-card small { margin-top: auto; color: var(--bank-muted); font-size: .75rem; line-height: 1.32; }
 .bank-funding-card small b { color: var(--bank-ink); font-weight: 600; }
-
-.bank-risk {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: .25rem .85rem;
-  margin-top: .52rem;
-  padding: .29rem .64rem;
-  border: 1px solid #DED0B9;
-  border-inline-start: 3px solid #947341;
-  border-radius: .4rem;
-  background: rgba(197, 164, 109, .12);
-}
-.bank-risk-red { border-inline-start-color: #B76B64; }
-.bank-risk-red .bank-risk-action strong { color: #823D39; }
-.bank-risk-score { display: flex; align-items: baseline; gap: .34rem; color: var(--bank-ink); }
-.bank-risk-score > span { font-size: .8rem; font-weight: 650; }
-.bank-risk-score strong { font-size: 1.5rem; line-height: 1.15; }
-.bank-risk-score small { font-size: .81rem; }
-.bank-risk-action { display: flex; flex-wrap: wrap; align-items: baseline; gap: .12rem .55rem; }
-.bank-risk-action strong { font-size: .86rem; color: var(--bank-deep-gold); }
-.bank-risk-action span { font-size: .81rem; color: var(--bank-ink); }
 .bank-funding-note { margin: .27rem 0 0; color: var(--bank-muted); font-size: .77rem; }
-
-.st-key-bank-content .bank-market-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: .58rem;
-  margin: 0;
-  padding: 0;
-}
-.bank-market-metrics > div {
-  padding: .5rem .72rem;
-  border: 1px solid var(--bank-rule);
-  border-radius: .5rem;
-  background: rgba(232, 237, 244, .57);
-}
-.bank-market-metrics dt { color: var(--bank-muted); font-size: .8rem; line-height: 1.25; }
-.bank-market-metrics dd {
-  margin: .18rem 0 0;
-  color: var(--bank-ink);
-  font-size: 1.55rem;
-  font-weight: 650;
-  line-height: 1.2;
-  overflow-wrap: anywhere;
-}
 .st-key-bank-content [data-testid="stCaptionContainer"] { color: var(--bank-muted); }
 .st-key-bank-content [data-testid="stPopoverButton"] {
   min-height: 2rem;
@@ -269,12 +214,11 @@
   .st-key-bank-content { margin-top: -1.45rem; }
   .bank-hero { padding: .55rem .75rem; }
   .bank-hero h1 { font-size: 1.25rem; }
-  .bank-funding { padding: .7rem; }
-  .st-key-bank-content .bank-market-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .bank-market-metrics > div:last-child { grid-column: 1 / -1; }
-  .bank-funding-cards { grid-template-columns: minmax(0, 1fr); }
-  .bank-funding-card { padding: .62rem .7rem; }
   .bank-status span { white-space: normal; }
+}
+@media (max-width: 850px) {
+  .bank-funding-cards { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+  .bank-funding-card summary { min-height: auto; }
 }
 @container bank-table (max-width: 640px) {
   .bank-table table, .bank-table tbody { display: block; }

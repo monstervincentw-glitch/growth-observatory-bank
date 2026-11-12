@@ -9,11 +9,11 @@ borderColor = "#CBD3E0"
 showWidgetBorder = true
 
 [theme.sidebar]
-backgroundColor = "#F1F4F8"
-secondaryBackgroundColor = "#E8EDF4"
-textColor = "#303849"
-primaryColor = "#71562F"
-borderColor = "#D8DFE9"
+backgroundColor = "#182940"
+secondaryBackgroundColor = "#32445B"
+textColor = "#E9EFF8"
+primaryColor = "#F4DDBA"
+borderColor = "#3B4B62"
 
 [browser]
 gatherUsageStats = false

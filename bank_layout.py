@@ -29,12 +29,7 @@ FUNDING_INDICATORS = (
         ("CPIAUCSL", "近 3 個月年化", "cpi_3m_annualized", ".2%", "", None, "", ""),
     )),
 )
-FUNDING_STATE = {0: ("clear", "未觸發"), 1: ("triggered", "已觸發"), None: ("unknown", "未知／資料不足")}
-FUNDING_SUMMARY = {
-    "non_red": ("未達 2 項門檻", "資金面通過，進場仍須符合個股與策略條件"),
-    "red": ("已達 2 項門檻", "停止新買，主策略依規則退出"),
-    "unknown": ("2 項門檻待確認", "暫停新買，等待可核對的資金判定"),
-}
+FUNDING_STATE = {0: ("clear", "未觸發"), 1: ("triggered", "已觸發"), None: ("unknown", "未知")}
 NUMERIC_TEXT = r"[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?"
 
 
@@ -60,17 +55,12 @@ def status_line(source, us, tw, through):
     st.html(f'<div class="bank-status" aria-label="資料來源及截止日">{items}</div>')
 
 
-def market_metrics(items):
-    metrics = "".join(f"<div><dt>{escape(label)}</dt><dd>{escape(str(value))}</dd></div>" for label, value in items)
-    st.html(f'<dl class="bank-market-metrics" aria-label="市場摘要">{metrics}</dl>')
-
-
 def display_value(value, spec, suffix):
     return "—" if value is None or pd.isna(value) else f"{value:{spec}}{suffix}"
 
 
-def funding_dashboard(macro, calculated_at, signal_available):
-    """Show published values and statuses with their source dates."""
+def funding_dashboard(macro):
+    """Show the published states with readings available on expansion."""
     cards = []
     for key, label, rule, series in FUNDING_INDICATORS:
         kind, status = FUNDING_STATE[macro["categoryStates"][key]]
@@ -91,29 +81,18 @@ def funding_dashboard(macro, calculated_at, signal_available):
             f"{name} {date}" if len(dates) > 1 else date for name, date in dates.values()
         )
         cards.append(
-            f'<article class="bank-funding-card bank-funding-card-{kind}">'
-            f'<div class="bank-card-heading"><h3>{label}</h3><strong>{status}</strong></div>'
+            f'<details class="bank-funding-card bank-funding-card-{kind}">'
+            f'<summary><span class="bank-card-name">{label}</span><strong>{status}</strong>'
+            f'<small>{rule}</small></summary><div class="bank-card-detail">'
             f'<dl class="bank-readings">{"".join(readings)}</dl>'
-            f'<p>{rule}</p><small>資料日 <b>{escape(dated)}</b></small></article>'
+            f'<small>資料日 <b>{escape(dated)}</b></small></div></details>'
         )
-    low, high = macro["scoreRange"]
-    score = str(low) if low == high else f"{low}–{high}"
-    decision = macro["decision"]
-    threshold, action = FUNDING_SUMMARY[decision]
-    if not signal_available:
-        action = "暫停新買，正式訊號待更新"
-    vintage = macro.get("macro_vintage_date") or "待核對"
     warning = macro.get("warning")
     note = f'<p class="bank-funding-note" role="status">{escape(warning)}</p>' if warning else ""
     st.html(
         '<section class="bank-funding" aria-label="全球資金溫度">'
-        '<div class="bank-funding-head"><h2>全球資金溫度</h2>'
-        f'<div>收盤 <b>{escape(macro["marketAsOf"])}</b> · 總經版本 <b>{escape(vintage)}</b>'
-        f' · 計算 <b>{escape(calculated_at)}</b>（台北時間）</div></div>'
+        '<h2>全球資金溫度</h2>'
         f'<div class="bank-funding-cards">{"".join(cards)}</div>'
-        f'<div class="bank-risk bank-risk-{decision}">'
-        f'<div class="bank-risk-score"><span>風險分數</span><strong>{escape(score)}<small> / 3</small></strong></div>'
-        f'<div class="bank-risk-action"><strong>{threshold}</strong><span>{action}</span></div></div>'
         f'{note}</section>'
     )
 
