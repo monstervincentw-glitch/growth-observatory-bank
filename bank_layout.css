@@ -1,6 +1,6 @@
 /* Selectors are limited to markup and container keys owned by the bank app. */
 .st-key-bank-shell {
-  margin-top: -2.75rem;
+  margin-top: -2rem;
 }
 .bank-hero {
   box-sizing: border-box;
@@ -138,7 +138,7 @@
 .bank-table-strategies td:first-child { font-weight: 600; }
 .bank-table-strategies td:last-child { color: #833b2b; }
 @media (max-width: 640px) {
-  .st-key-bank-shell { margin-top: -2.5rem; }
+  .st-key-bank-shell { margin-top: -2.1rem; }
   .bank-hero { padding: .65rem .8rem; }
   .bank-hero h1 { font-size: 1.3rem; }
   .bank-hero p { font-size: .82rem; }
