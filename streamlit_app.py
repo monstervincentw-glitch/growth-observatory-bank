@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 
 from sheets_data import BASE, check, fetch_rows, parse_rows, read_gzip
+from taiwan_fund_research import render as render_taiwan_fund_research
 
 st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide")
 st.markdown("""<style>
@@ -346,8 +347,7 @@ elif page=="策略模擬":
 elif page=="顧問風控":
     advisor_page=st.radio("顧問風控研究",["原 14 項 ETF／基金／債券","台灣可申購共同基金"],horizontal=True)
     if advisor_page=="台灣可申購共同基金":
-        from taiwan_fund_research import render
-        render()
+        render_taiwan_fund_research()
     else:
         advisor(research)
 else:
