@@ -34,6 +34,8 @@ def load_research():
         for key in ("catalog", "performance", "events", "compare", "rank", "common")
     }
     frames["events"]["事件代碼"] = frames["events"]["事件代碼"].astype(str)
+    vitax = pd.read_csv(ARCHIVE.with_name("vitax-common-periods.csv"))
+    frames["common"] = pd.concat([frames["common"], vitax], ignore_index=True)
     return data["end"], frames, data["expansion"]
 
 
@@ -69,9 +71,9 @@ def rankings(data):
     show_table(view[[NAME, "ISIN", *metrics, "CAGR名次", "最大回撤名次", "回撤改善名次", "風控效率名次"]],
                ["CAGR", "累積報酬", "最大回撤", "相較A回撤改善"])
     export(view, "目前排名 CSV", "taiwan-fund-period-ranking.csv", "tw-fund-rank-download")
-    with st.expander("HYG、JNK、FSPTX 與既有研究對照"):
+    with st.expander("VITAX、FSPTX、HYG、JNK 與既有研究對照"):
         reference = common[common["基準日"].eq(start) & common["方案"].eq(method)]
-        benchmarks = reference[reference["ISIN"].isin(["HYG", "JNK", "FSPTX"])]
+        benchmarks = reference[reference["ISIN"].isin(["VITAX", "FSPTX", "HYG", "JNK"])]
         st.caption("原顧問基準以同日匯率換算台幣。基準的現金部位為美元，台灣基金以台幣持有現金。")
         show_table(benchmarks[[NAME, "ISIN", "基準日", "結束日", *metrics]],
                    ["CAGR", "累積報酬", "最大回撤", "相較A回撤改善"])
