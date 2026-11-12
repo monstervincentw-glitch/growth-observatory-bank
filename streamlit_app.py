@@ -344,6 +344,11 @@ elif page=="主策略回測":
 elif page=="策略模擬":
     tracking(market,data,baseline)
 elif page=="顧問風控":
-    advisor(research)
+    advisor_page=st.radio("顧問風控研究",["原 14 項 ETF／基金／債券","台灣可申購共同基金"],horizontal=True)
+    if advisor_page=="台灣可申購共同基金":
+        from taiwan_fund_research import render
+        render()
+    else:
+        advisor(research)
 else:
     records(data,source,batch)
