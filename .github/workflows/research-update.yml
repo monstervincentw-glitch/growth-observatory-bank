@@ -1,0 +1,54 @@
+name: 收盤研究更新
+on:
+  schedule:
+    - cron: '17 22 * * 1-5'
+    - cron: '27 13 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      market:
+        description: '市場'
+        type: choice
+        options: [US, TW]
+        required: true
+permissions:
+  contents: write
+concurrency:
+  group: research-publish
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Load last verified batch
+        shell: bash
+        run: |
+          if git ls-remote --exit-code origin refs/heads/research-data >/dev/null; then
+            git fetch --depth=1 origin research-data
+            git show FETCH_HEAD:release.json > /tmp/research-prior.json
+          else
+            node engine/seed.mjs /tmp/research-prior.json
+          fi
+      - name: Calculate and validate research
+        env:
+          MARKET: ${{ inputs.market || (github.event.schedule == '17 22 * * 1-5' && 'US' || 'TW') }}
+        run: node engine/update.mjs "$MARKET" /tmp/research-prior.json /tmp/research-release.json
+      - name: Publish result without changing the app branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git ls-remote --exit-code origin refs/heads/research-data >/dev/null; then
+            git worktree add -b research-data /tmp/research-publish FETCH_HEAD
+          else
+            git worktree add --detach /tmp/research-publish HEAD
+            git -C /tmp/research-publish switch --orphan research-data
+          fi
+          cp /tmp/research-release.json /tmp/research-publish/release.json
+          git -C /tmp/research-publish add release.json
+          git -C /tmp/research-publish commit -m "Record close research run"
+          git -C /tmp/research-publish push origin HEAD:refs/heads/research-data
+          node -e 'if (require("/tmp/research-release.json").attempt.status === "failed") process.exitCode = 1'
