@@ -9,26 +9,11 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
+from bank_layout import header, layout_style, status_line, strategy_comparison
 from sheets_data import BASE, check, fetch_rows, parse_rows, read_gzip
 from taiwan_fund_research import render as render_taiwan_fund_research
 
 st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide")
-st.markdown("""<style>
-:root{--ink:#142938;--muted:#586a76;--border:#dbe5e8;--mint:#e8f3ef;--teal:#17664d}
-.stApp{color:var(--ink);background:#f4f7f7}
-.block-container{max-width:1360px;padding-top:2.3rem}
-[data-testid="stMetric"]{border:1px solid var(--border);padding:.85rem 1rem;background:#fff;border-radius:.7rem}
-h1,h2,h3{letter-spacing:-.035em}
-.bank-hero{background:#102c32;border-radius:16px;color:#fff;padding:24px 28px;margin-bottom:16px}
-.bank-hero h1{color:#fff;margin:0;font-size:clamp(1.55rem,4vw,2.8rem);padding:0}
-.bank-hero p{margin:.5rem 0 0;color:#cce3da}
-.lights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:1rem 0}
-.light{padding:12px 6px;text-align:center;background:#fff;border:1px solid var(--border);border-radius:.7rem}
-.dot{display:block;margin:0 auto 7px;width:27px;height:27px;border-radius:50%;background:#728390}
-.dot.s1{background:#bf4b47}.dot.s0{background:#258264}
-.light small{display:block;color:var(--muted)}
-@media(max-width:660px){.block-container{padding:1.25rem .8rem 3rem}.bank-hero{padding:18px}.light{font-size:.86rem}}
-</style>""", unsafe_allow_html=True)
 
 MARKETS = {"美股": "US", "台股": "TW"}
 LIGHTS = {"rates": "利率", "conditions": "金融條件", "inflation": "通膨"}
@@ -83,7 +68,7 @@ def number(value):
     return "—" if value is None else f"{value:,.2f}"
 
 def table(records, widths=None):
-    st.dataframe(pd.DataFrame(records), hide_index=True, width="stretch", column_config=widths)
+    st.dataframe(pd.DataFrame(records), hide_index=True, column_config=widths)
 
 def csv_button(label, data, name, key=None):
     st.download_button(label, pd.DataFrame(data).to_csv(index=False).encode("utf-8-sig"), name,
@@ -98,9 +83,13 @@ def report_file(label, name):
     st.download_button(label, report_bytes(name), name, on_click="ignore", key=name)
 
 def funding(macro):
-    lights = "".join(f'<div class="light"><span class="dot s{macro["categoryStates"][key]}"></span>'
-        f'<strong>{label}</strong><small>{STATES[macro["categoryStates"][key]]}</small></div>' for key,label in LIGHTS.items())
-    st.markdown(f'<div class="lights">{lights}</div>', unsafe_allow_html=True)
+    dot = {0: " bank-dot-clear", 1: " bank-dot-alert", None: ""}
+    lights = "".join(
+        f'<div class="bank-light"><span class="bank-dot{dot[macro["categoryStates"][key]]}"></span>'
+        f'<strong>{label}</strong><span>{STATES[macro["categoryStates"][key]]}</span></div>'
+        for key, label in LIGHTS.items()
+    )
+    st.html(f'<div class="bank-lights">{lights}</div>')
     low, high = macro["scoreRange"]
     score = str(low) if low == high else f"{low}–{high}"
     st.write(f"**{score}／3　{DECISION[macro['decision']]}**")
@@ -187,26 +176,35 @@ def markets(market, block, signal_available):
         history["date"] = pd.to_datetime(history["date"])
         st.line_chart(history,x="date",y="調整收盤")
 
-def backtest(market, research, nav):
+def market_picker(column):
+    return MARKETS[column.segmented_control("市場", list(MARKETS), default="美股", key="bank-market") or "美股"]
+
+
+def backtest(research, nav):
+    with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
+        market = market_picker(st)
+        rows = research[market.lower()]
+        year = st.selectbox("歷史淨值起始年", [r["start_year"] for r in reversed(rows)], key=f"curve-{market}", width=152)
+    st.subheader("A／B 歷史淨值")
+    curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
+    curve["日期"] = pd.to_datetime(curve["日期"])
+    st.line_chart(curve, x="日期", y=["A", "B"], height=280)
+    st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
     if market=="TW":
         st.warning("台股 2016–2026 起跑組為研究版。現有封存驗收沒有確認符合公告時點、財報版本及成交證據的可信起始年。")
     else:
         st.info("2006 起跑可同時參考發布時點延後情境。早期金融條件採信用利差代理，存在發布時點限制。")
-        table([{**row,"cumulative":percent(row["cumulative"]),"cagr":percent(row["cagr"]),"max_drawdown":percent(row["max_drawdown"])} for row in research["usDelay"]])
-    rows = research[market.lower()]
+        with st.expander("2006 發布時點敏感度"):
+            table([{**row,"cumulative":percent(row["cumulative"]),"cagr":percent(row["cagr"]),"max_drawdown":percent(row["max_drawdown"])} for row in research["usDelay"]])
     table([{"起始年":r["start_year"],"A 累積":percent(r["A_cumulative"]),"B 累積":percent(r["B_cumulative"]),
         "A CAGR":percent(r["A_cagr"]),"B CAGR":percent(r["B_cagr"]),"A 最大回撤":percent(r["A_max_drawdown"]),
         "B 最大回撤":percent(r["B_max_drawdown"]),"B 額外買入":r["B_extras"]} for r in rows])
-    year=st.selectbox("歷史淨值起始年", [r["start_year"] for r in reversed(rows)],key=f"curve-{market}")
-    curve=pd.DataFrame(nav[market][str(year)],columns=["日期","A","B"])
-    curve["日期"]=pd.to_datetime(curve["日期"])
-    st.line_chart(curve,x="日期",y=["A","B"])
-    st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
     csv_button("匯出每月歷史淨值",curve,f"{market}-{year}-nav.csv",f"nav-{market}")
     report_file("年度回測比較 CSV","us-ab.csv" if market=="US" else "tw-ab-research.csv")
     if market=="US":
         report_file("2006 發布時點敏感度 CSV","us-2006-release-delay.csv")
     legacy_backtest(market)
+
 
 def legacy_backtest(market):
     with st.expander("歷史研究存檔、比較基準與逐筆出場"):
@@ -236,9 +234,11 @@ def legacy_backtest(market):
             ("出場案例證據 JSON","exit-examples-evidence.json"),("舊報告對照 CSV","prior-run-reconciliation.csv")]:
             report_file(label,name)
 
-def tracking(market, snapshot_data, baseline):
+def tracking(snapshot_data, baseline):
+    with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
+        market = market_picker(st)
+        year=st.selectbox("策略起始年", sorted({p["year"] for p in baseline[market]},reverse=True),key=f"mark-{market}", width=152)
     block = snapshot_data["markets"][market]
-    year=st.selectbox("策略起始年", sorted({p["year"] for p in baseline[market]},reverse=True),key=f"mark-{market}")
     marks=block["marks"].get(str(year))
     st.info(f"最後完整模擬 {baseline['date']}。靜態估值日 {marks['date'] if marks else '待核對'}。封存後採相同還原價格序列，部位與現金固定。")
     plans = []
@@ -257,18 +257,26 @@ def tracking(market, snapshot_data, baseline):
     st.caption(f"最近訊號計算 {stamp(block['signalAt'])} · {('USD' if market=='US' else 'TWD')}")
 
 def advisor(research):
-    st.caption("封存至 2026-11-04。早期信用利差代理與發布時點存在限制。共同基金採可得淨值，銀行申贖截止時間及費用依通路而異。")
     products=sorted({x["symbol"] for x in research["advisor"]})
-    product=st.selectbox("研究商品",products,index=products.index("QQQ"))
-    candidates=[r for r in research["advisor"] if r["symbol"]==product]
-    years=sorted({r["start_year"] for r in candidates})
-    cohort=st.selectbox("投資起始年",years,key=f"advisor-year-{product}")
+    with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
+        product=st.selectbox("研究商品",products,index=products.index("QQQ"),width=132)
+        candidates=[r for r in research["advisor"] if r["symbol"]==product]
+        years=sorted({r["start_year"] for r in candidates})
+        cohort=st.selectbox("投資起始年",years,key=f"advisor-year-{product}",width=138)
+        event=st.selectbox("事件回撤比較", list(WINDOWS), format_func=WINDOWS.get, width=188)
     selected=[r for r in candidates if r["start_year"]==cohort]
-    table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"累積":percent(r["cumulative"]),"CAGR":percent(r["cagr"]),
-        "最大回撤":percent(r["mdd"]),"最差年度":r["worst_year"],"最差年報酬":percent(r["worst_year_return"]),
-        "高點至回本（天）":r["peak_to_recovery_calendar_days"],"成本／初始資金":percent(r["transaction_cost_initial_fraction"]),
-        "買入次數":r["buy_count"],"賣出次數":r["sell_count"]} for r in selected])
-    event=st.selectbox("事件回撤比較", list(WINDOWS), format_func=WINDOWS.get)
+    comparison = pd.DataFrame(selected).rename(columns={
+        "variant": "方案", "cumulative": "累積報酬", "cagr": "CAGR", "mdd": "最大回撤"
+    })
+    st.subheader("A／B／C／D 績效比較")
+    strategy_comparison(comparison, {code: f"{code} {name}" for code, name in PLANS.items()})
+    st.caption("封存至 2026-11-04。早期信用利差代理與發布時點存在限制。共同基金採可得淨值，銀行申贖截止時間及費用依通路而異。")
+    with st.expander("各策略明細"):
+        table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"累積":percent(r["cumulative"]),"CAGR":percent(r["cagr"]),
+            "最大回撤":percent(r["mdd"]),"最差年度":r["worst_year"],"最差年報酬":percent(r["worst_year_return"]),
+            "高點至回本（天）":r["peak_to_recovery_calendar_days"],"成本／初始資金":percent(r["transaction_cost_initial_fraction"]),
+            "買入次數":r["buy_count"],"賣出次數":r["sell_count"]} for r in selected])
+    st.subheader("事件回撤")
     events=[r for r in research["windows"] if r["symbol"]==product and r["start_year"]==cohort and str(r["window"])==str(event)]
     if events:
         table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"起日":r["first"],"迄日":r["last"],
@@ -321,18 +329,23 @@ def records(data, source, batch):
 """)
     report_file("下載研究驗收紀錄","phase1-acceptance.md")
 
-st.markdown('<header class="bank-hero"><h1>成長股觀測站</h1><p>銀行版 · 美股與台股研究、策略回測與顧問風控</p></header>', unsafe_allow_html=True)
-if st.button("重新讀取資料"):
-    snapshot.clear()
+layout_style()
 data, batch, source = snapshot()
 research, baseline, nav = load_archive()
-st.caption(f"來源 {source}　·　美股 {data['markets']['US']['macro']['marketAsOf']}　·　台股 {data['markets']['TW']['macro']['marketAsOf']}　·　完整回測 {data['historyThrough']}")
+with st.container(key="bank-shell"):
+    header()
+    with st.container(horizontal=True, horizontal_alignment="distribute", vertical_alignment="center", gap="small"):
+        status_line(source, data["markets"]["US"]["macro"]["marketAsOf"],
+                    data["markets"]["TW"]["macro"]["marketAsOf"], data["historyThrough"])
+        st.button("重新讀取資料", on_click=snapshot.clear)
+    page = st.segmented_control("研究功能", ["市場觀測", "主策略回測", "策略模擬", "顧問風控", "更新紀錄與規則"],
+                                default="市場觀測", selection_mode="single", label_visibility="collapsed",
+                                key="bank-page") or "市場觀測"
+
 if source != "Google Sheets":
     st.warning("本次 Sheets 讀取未通過。畫面標示目前採用的最後成功快照或封存備援。")
-page=st.radio("研究功能",["市場觀測","主策略回測","策略模擬","顧問風控","更新紀錄與規則"],horizontal=True,label_visibility="collapsed")
-if page in ("市場觀測","主策略回測","策略模擬"):
-    market=MARKETS[st.segmented_control("市場",list(MARKETS),default="美股") or "美股"]
 if page=="市場觀測":
+    market = market_picker(st)
     block = data["markets"][market]
     market_date = datetime.fromisoformat(block["macro"]["marketAsOf"]).date()
     age = (datetime.now(ZoneInfo("Asia/Taipei")).date() - market_date).days
@@ -341,13 +354,19 @@ if page=="市場觀測":
         attempt.get("at","") > block["macro"].get("lastMarketPublishedAt",""))
     markets(market,block,source=="Google Sheets" and 0<=age<=5 and not failed_since_publish)
 elif page=="主策略回測":
-    backtest(market,research,nav)
+    backtest(research,nav)
 elif page=="策略模擬":
-    tracking(market,data,baseline)
+    tracking(data,baseline)
 elif page=="顧問風控":
-    advisor_page=st.radio("顧問風控研究",["原 14 項 ETF／基金／債券","台灣可申購共同基金"],horizontal=True)
+    with st.container(horizontal=True, gap="small"):
+        advisor_page = st.segmented_control("顧問風控研究", ["原 14 項 ETF／基金／債券", "台灣可申購共同基金"],
+                                            default="原 14 項 ETF／基金／債券", label_visibility="collapsed",
+                                            key="bank-advisor-page")
+        if advisor_page == "台灣可申購共同基金":
+            fund_view = st.segmented_control("基金研究功能", ["基金查詢", "同期間排名"], default="基金查詢",
+                                             label_visibility="collapsed", key="tw-fund-mode")
     if advisor_page=="台灣可申購共同基金":
-        render_taiwan_fund_research()
+        render_taiwan_fund_research(fund_view)
     else:
         advisor(research)
 else:

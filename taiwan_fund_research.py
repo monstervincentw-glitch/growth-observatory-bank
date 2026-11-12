@@ -6,6 +6,8 @@ from pathlib import Path
 import pandas as pd
 import streamlit as st
 
+from bank_layout import fund_heading, readable_table, strategy_comparison
+
 ARCHIVE = Path(__file__).resolve().parent / "data" / "taiwan-fund-research.json.gz"
 NAME = "基金完整中文名稱"
 EVENTS = {
@@ -59,80 +61,101 @@ def rankings(data):
     st.subheader("同期間排名")
     st.caption("同一基準日收盤重新定基，保留該日原有部位。每個子基金以一個主要級別參與排名。")
     dates = sorted(rank["基準日"].unique(), reverse=True)
-    start = st.selectbox("共同比較基準日", dates, key="tw-fund-common-start")
+    date_col, category_col, plan_col, metric_col = st.columns([1, 1.25, 1.2, 1.25], gap="small")
+    start = date_col.selectbox("共同比較基準日", dates, key="tw-fund-common-start")
     period = rank[rank["基準日"].eq(start)]
     categories = [category for category in CATEGORIES if category in set(period["分類"])]
-    category = st.selectbox("排名基金類別", categories, key="tw-fund-rank-category")
-    method = st.selectbox("排名方案", list(PLANS), format_func=PLANS.__getitem__, key="tw-fund-rank-method")
+    category = category_col.selectbox("排名基金類別", categories, key="tw-fund-rank-category")
+    method = plan_col.selectbox("排名方案", list(PLANS), format_func=PLANS.__getitem__, key="tw-fund-rank-method")
     metrics = ["CAGR", "累積報酬", "最大回撤", "相較A回撤改善", "CAGR除以回撤絕對值"]
-    metric = st.selectbox("排名指標", metrics, key="tw-fund-rank-metric")
+    metric = metric_col.selectbox("排名指標", metrics, key="tw-fund-rank-metric")
     view = period[period["分類"].eq(category) & period["方案"].eq(method)].sort_values(metric, ascending=False)
     st.caption(f"共同結束日 {period['結束日'].iloc[0]} · 本組 {len(view)} 檔。回撤改善正值代表跌幅較買入持有小。")
-    show_table(view[[NAME, "ISIN", *metrics, "CAGR名次", "最大回撤名次", "回撤改善名次", "風控效率名次"]],
-               ["CAGR", "累積報酬", "最大回撤", "相較A回撤改善"])
+    readable_table(view[[NAME, "ISIN", *metrics, "CAGR名次", "最大回撤名次", "回撤改善名次", "風控效率名次"]],
+                   ["CAGR", "累積報酬", "最大回撤", "相較A回撤改善"], label="同期間排名")
     export(view, "目前排名 CSV", "taiwan-fund-period-ranking.csv", "tw-fund-rank-download")
     with st.expander("VITAX、FSPTX、HYG、JNK 與既有研究對照"):
         reference = common[common["基準日"].eq(start) & common["方案"].eq(method)]
         benchmarks = reference[reference["ISIN"].isin(["VITAX", "FSPTX", "HYG", "JNK"])]
         st.caption("原顧問基準以同日匯率換算台幣。基準的現金部位為美元，台灣基金以台幣持有現金。")
-        show_table(benchmarks[[NAME, "ISIN", "基準日", "結束日", *metrics]],
-                   ["CAGR", "累積報酬", "最大回撤", "相較A回撤改善"])
+        readable_table(benchmarks[[NAME, "ISIN", "基準日", "結束日", *metrics]],
+                       ["CAGR", "累積報酬", "最大回撤", "相較A回撤改善"], label="同期間基準")
         export(reference, "同期間完整對照 CSV", "taiwan-fund-period-comparison.csv", "tw-fund-common-download")
 
 
-def render():
+def fund_catalog(visible):
+    with st.expander(f"基金名錄（{len(visible)} 檔）"):
+        readable_table(visible[[NAME, "基金公司", "分類", "級別與配息政策", "幣別", "級別避險", "ISIN", "主要比較級別", "回測驗證狀態"]],
+                       label="基金名錄")
+        export(visible, "基金名錄 CSV", "taiwan-fund-catalog.csv", "tw-fund-catalog-download")
+
+
+def fund_source(item):
+    with st.expander("銀行淨值期間與商品連結"):
+        st.caption(f"銀行淨值期間 {item['銀行NAV起日']} 至 {item['銀行NAV迄日']} · 成立日 {item['成立日']}")
+        st.link_button("銀行正式商品資料", item["銀行產品頁"])
+
+
+def render(view):
     through, data, summary = load_research()
-    st.subheader("台灣可申購共同基金")
-    st.caption(f"封存至 {through} · 新臺幣帳戶 · 摩根、聯博 {summary['primary']} 個主要級別，新增 {summary['new_verified']} 檔已驗證。")
-    view = st.radio("基金研究功能", ["基金查詢", "同期間排名"], horizontal=True, key="tw-fund-mode")
     if view == "同期間排名":
+        st.caption(f"封存至 {through} · 新臺幣帳戶 · 摩根、聯博 {summary['primary']} 個主要級別，新增 {summary['new_verified']} 檔已驗證。")
         rankings(data)
         return
-    category = st.multiselect("基金分類", CATEGORIES, default=CATEGORIES, key="tw-fund-category")
-    query = st.text_input("搜尋完整中文基金名稱或 ISIN", key="tw-fund-search").strip()
-    catalog = data["catalog"]
-    issuer = st.multiselect("基金公司", ["摩根", "聯博", "既有其他基金"], default=["摩根", "聯博", "既有其他基金"], key="tw-fund-issuer")
-    company = catalog["基金公司"].replace("", "既有其他基金")
-    visible = catalog[catalog["分類"].isin(category) & company.isin(issuer)]
-    if query:
-        visible = visible[
-            visible[NAME].str.contains(query, case=False, regex=False)
-            | visible["ISIN"].str.contains(query, case=False, regex=False)
-        ]
-    if visible.empty:
-        st.info("目前篩選沒有符合的基金。")
-        return
-    show_table(visible[[NAME, "基金公司", "分類", "級別與配息政策", "幣別", "級別避險", "ISIN", "主要比較級別", "回測驗證狀態"]])
-    export(visible, "基金名錄 CSV", "taiwan-fund-catalog.csv", "tw-fund-catalog-download")
 
-    labels = visible.set_index("ISIN")[NAME].to_dict()
-    isin = st.selectbox("查看基金", list(labels), format_func=labels.__getitem__, key="tw-fund-product")
-    item = visible.loc[visible["ISIN"].eq(isin)].iloc[0]
-    st.markdown(f"#### {item[NAME]}")
-    st.caption(f"{item['級別與配息政策']} · {item['幣別']} · {isin} · {item['回測驗證狀態']}")
-    st.caption(f"銀行淨值期間 {item['銀行NAV起日']} 至 {item['銀行NAV迄日']} · 成立日 {item['成立日']}")
-    st.link_button("銀行正式商品資料", item["銀行產品頁"])
-    performance = data["performance"].loc[data["performance"]["ISIN"].eq(isin)].copy()
+    with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
+        query = st.text_input("搜尋基金", placeholder="完整中文名稱或 ISIN", key="tw-fund-search", width=208).strip()
+        issuers = ["摩根", "聯博", "既有其他基金"]
+        with st.popover("基金篩選"):
+            category = st.multiselect("基金分類", CATEGORIES, default=CATEGORIES, key="tw-fund-category")
+            issuer = st.multiselect("基金公司", issuers, default=issuers, key="tw-fund-issuer")
+        catalog = data["catalog"]
+        company = catalog["基金公司"].replace("", "既有其他基金")
+        visible = catalog[catalog["分類"].isin(category) & company.isin(issuer)]
+        if query:
+            visible = visible[
+                visible[NAME].str.contains(query, case=False, regex=False)
+                | visible["ISIN"].str.contains(query, case=False, regex=False)
+            ]
+        if visible.empty:
+            st.info("目前篩選沒有符合的基金。")
+            return
+
+        isin = st.selectbox("查看基金（ISIN）", visible["ISIN"].tolist(), key="tw-fund-product", width=164)
+        item = visible.loc[visible["ISIN"].eq(isin)].iloc[0]
+        performance = data["performance"].loc[data["performance"]["ISIN"].eq(isin)].copy()
+        if not performance.empty:
+            years = sorted(performance["起始年"].unique())
+            year = st.selectbox("投資起始年", years, key=f"tw-fund-year-{isin}", width=138)
+    fund_heading(item[NAME], f"{item['級別與配息政策']} · {item['幣別']} · {isin} · {item['回測驗證狀態']}")
     if performance.empty:
         st.info(item["注意事項"])
+        fund_source(item)
+        fund_catalog(visible)
         return
+
+    performance.insert(0, NAME, item[NAME])
+    cohort = performance[performance["起始年"].eq(year)]
+    st.subheader("A／B／C／D 績效比較")
+    strategy_comparison(cohort, PLANS)
     if item["注意事項"]:
         st.info(item["注意事項"])
-    performance.insert(0, NAME, item[NAME])
-    years = sorted(performance["起始年"].unique())
-    year = st.selectbox("基金投資起始年", years, key=f"tw-fund-year-{isin}")
-    st.markdown("##### A／B／C／D 績效比較")
-    cohort = performance[performance["起始年"].eq(year)]
-    columns = ["方案", "起始日", "結束日", "累積報酬", "CAGR", "最大回撤", "回本日", "高點至回本日數"]
-    percentage = ["累積報酬", "CAGR", "最大回撤"]
-    if cohort["最差年度"].notna().any():
-        columns += ["最差年度", "最差年度報酬", "最差年度為部分區間", "買入次數", "賣出次數", "直接成本TWD"]
-        percentage.append("最差年度報酬")
-    show_table(cohort[columns], percentage)
-    export(performance, "年度回測績效 CSV", f"{isin}-annual-performance.csv", "tw-fund-perf-download")
+    st.caption(f"封存至 {through} · 新臺幣帳戶 · 摩根、聯博 {summary['primary']} 個主要級別，新增 {summary['new_verified']} 檔已驗證。")
 
-    st.markdown("##### 市場事件回撤")
-    event = st.selectbox("基金市場事件", list(EVENTS), format_func=EVENTS.__getitem__, key="tw-fund-event")
+    with st.expander("各策略明細與年度績效 CSV"):
+        columns = ["方案", "起始日", "結束日", "累積報酬", "CAGR", "最大回撤", "回本日", "高點至回本日數"]
+        percentage = ["累積報酬", "CAGR", "最大回撤"]
+        if cohort["最差年度"].notna().any():
+            columns += ["最差年度", "最差年度報酬", "最差年度為部分區間", "買入次數", "賣出次數", "直接成本TWD"]
+            percentage.append("最差年度報酬")
+        show_table(cohort[columns], percentage)
+        export(performance, "年度回測績效 CSV", f"{isin}-annual-performance.csv", "tw-fund-perf-download")
+    fund_source(item)
+    fund_catalog(visible)
+
+    st.subheader("市場事件回撤")
+    event_col, _ = st.columns([1, 3])
+    event = event_col.selectbox("基金市場事件", list(EVENTS), format_func=EVENTS.__getitem__, key="tw-fund-event")
     history = data["events"]
     history = history[history["ISIN"].eq(isin)].copy()
     history.insert(0, NAME, item[NAME])
@@ -144,7 +167,7 @@ def render():
                    ["事件報酬", "事件最大回撤"])
     export(history, "市場事件回撤 CSV", f"{isin}-event-drawdowns.csv", "tw-fund-event-download")
 
-    st.markdown("##### 不同年度起跑比較")
+    st.subheader("不同年度起跑比較")
     st.caption("各年度從該基金第一個可用淨值日獨立起跑，統一於封存日結束。")
     with st.expander("展開各年度 A／B／C／D 比較"):
         show_table(performance[["起始年", "方案", "累積報酬", "CAGR", "最大回撤"]],

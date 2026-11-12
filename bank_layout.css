@@ -1,0 +1,175 @@
+/* Selectors are limited to markup and container keys owned by the bank app. */
+.st-key-bank-shell {
+  margin-top: -2.75rem;
+}
+.bank-hero {
+  box-sizing: border-box;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: .15rem 1rem;
+  padding: 1.1rem 1.2rem;
+  border-radius: .65rem;
+  background: #12392f;
+  color: #fff;
+}
+.bank-hero h1, .bank-fund-heading h3 {
+  margin: 0;
+  padding: 0;
+  line-height: 1.35;
+  letter-spacing: normal;
+  overflow-wrap: anywhere;
+}
+.bank-hero h1 {
+  font-size: 1.55rem;
+  color: #fff;
+}
+.bank-hero p {
+  margin: 0;
+  color: #e0f0e9;
+  font-size: .94rem;
+}
+.bank-hero p span {
+  margin-inline: .15rem;
+}
+.bank-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .22rem .85rem;
+  color: #314b42;
+  font-size: .88rem;
+  line-height: 1.45;
+}
+.bank-status span {
+  white-space: nowrap;
+}
+.bank-lights {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .5rem;
+}
+.bank-light {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: .2rem .45rem;
+  padding: .45rem .6rem;
+  border: 1px solid #d8e3de;
+  border-radius: .45rem;
+  background: #fff;
+  color: #263f36;
+  font-size: .9rem;
+}
+.bank-dot {
+  width: .65rem;
+  height: .65rem;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #697775;
+}
+.bank-dot-clear { background: #227352; }
+.bank-dot-alert { background: #a63d36; }
+.bank-fund-heading {
+  padding: .55rem .8rem;
+  border-left: 3px solid #17664d;
+  border-radius: .25rem;
+  background: #e9f1ed;
+  color: #153b30;
+}
+.bank-fund-heading h3 {
+  font-size: clamp(1rem, 2.5vw, 1.26rem);
+  color: #153b30;
+}
+.bank-fund-disclosure {
+  display: block;
+  margin-top: .15rem;
+  color: #315248;
+  font-size: .86rem;
+  font-weight: 500;
+}
+.bank-fund-heading p {
+  margin: .22rem 0 0;
+  font-size: .88rem;
+  color: #34534a;
+  overflow-wrap: anywhere;
+}
+.bank-table {
+  max-width: 100%;
+  max-height: 30rem;
+  overflow: auto;
+  border: 1px solid #d3e1da;
+  border-radius: .55rem;
+  background: #fff;
+  color: #19332a;
+}
+.bank-table table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: .9rem;
+  line-height: 1.42;
+  font-variant-numeric: tabular-nums;
+}
+.bank-table th, .bank-table td {
+  padding: .52rem .62rem;
+  border-bottom: 1px solid #e3eae6;
+  vertical-align: top;
+  text-align: left;
+}
+.bank-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #e5efe9;
+  color: #193d30;
+}
+.bank-table tbody tr:nth-child(even) td { background: #f6f9f7; }
+.bank-table tbody tr:last-child td { border-bottom: 0; }
+.bank-table-named td:first-child {
+  width: 35%;
+  min-width: 12rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.bank-table-strategies th:not(:first-child), .bank-table-strategies td:not(:first-child) {
+  text-align: right;
+  white-space: nowrap;
+}
+.bank-table-strategies td:first-child { font-weight: 600; }
+.bank-table-strategies td:last-child { color: #833b2b; }
+@media (max-width: 640px) {
+  .st-key-bank-shell { margin-top: -2.5rem; }
+  .bank-hero { padding: .65rem .8rem; }
+  .bank-hero h1 { font-size: 1.3rem; }
+  .bank-hero p { font-size: .82rem; }
+  .bank-status { width: min(14rem, calc(100vw - 10.5rem)); gap: .14rem .5rem; }
+  .bank-light { padding: .38rem; font-size: .8rem; }
+  .bank-table th, .bank-table td { padding: .45rem .37rem; }
+  .bank-table-strategies table { font-size: .81rem; }
+  .bank-table-named thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    clip-path: inset(50%);
+  }
+  .bank-table-named table, .bank-table-named tbody { display: block; }
+  .bank-table-named tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: .35rem .45rem;
+    border-bottom: 1px solid #d3e1da;
+  }
+  .bank-table-named tr:nth-child(even) { background: #f6f9f7; }
+  .bank-table-named td { border: 0; overflow-wrap: anywhere; }
+  .bank-table-named td:first-child {
+    grid-column: 1 / -1;
+    width: auto;
+    min-width: 0;
+  }
+  .bank-table-named td:not(:first-child)::before {
+    display: block;
+    content: attr(data-label);
+    color: #41594f;
+    font-size: .74rem;
+  }
+}
