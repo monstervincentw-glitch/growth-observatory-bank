@@ -46,7 +46,7 @@ def export(frame, label, filename, key):
                        filename, "text/csv", key=key, on_click="ignore")
 
 
-def show_table(frame, percentage=(), *, label="基金研究資料"):
+def show_table(frame, percentage=(), *, label):
     view = frame.copy()
     if "方案" in view:
         view["方案"] = view["方案"].map(PLANS)
@@ -146,7 +146,7 @@ def render(view):
         if cohort["最差年度"].notna().any():
             columns += ["最差年度", "最差年度報酬", "最差年度為部分區間", "買入次數", "賣出次數", "直接成本TWD"]
             percentage.append("最差年度報酬")
-        show_table(cohort[columns], percentage)
+        show_table(cohort[columns], percentage, label="基金各策略明細")
         export(performance, "年度回測績效 CSV", f"{isin}-annual-performance.csv", "tw-fund-perf-download")
     fund_source(item)
     fund_catalog(visible)
@@ -170,7 +170,7 @@ def render(view):
     st.caption("各年度從該基金第一個可用淨值日獨立起跑，統一於封存日結束。")
     with st.expander("展開各年度 A／B／C／D 比較"):
         show_table(performance[["起始年", "方案", "累積報酬", "CAGR", "最大回撤"]],
-                   ["累積報酬", "CAGR", "最大回撤"])
+                   ["累積報酬", "CAGR", "最大回撤"], label="基金年度比較")
     compare = data["compare"].loc[data["compare"]["ISIN"].eq(isin)].copy()
     compare.insert(0, NAME, item[NAME])
     export(compare, "與買入持有同日起跑比較 CSV", f"{isin}-same-start-comparison.csv", "tw-fund-compare-download")

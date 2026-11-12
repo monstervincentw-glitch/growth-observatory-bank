@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 import streamlit as st
 
-from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout_style,
+from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout_style, market_metrics,
                          readable_table, sidebar_brand, status_line, strategy_comparison, trend_chart)
 from sheets_data import BASE, check, fetch_rows, parse_rows, read_gzip
 from taiwan_fund_research import render as render_taiwan_fund_research
@@ -65,7 +65,7 @@ def percent(value):
 def number(value):
     return "—" if value is None else f"{value:,.2f}"
 
-def table(records, *, label="研究資料"):
+def table(records, *, label):
     readable_table(pd.DataFrame(records), label=label)
 
 def csv_button(label, data, name, key=None):
@@ -92,22 +92,24 @@ def funding_details(macro):
             rows.append({"細項":label,"數值":macro.get(value),"變動或年化":macro.get(change),
                          "觀測日期":info.get("observationDate"),"版本日期":info.get("vintageDate"),"來源":series})
         table(rows, label="資金溫度資料版本")
-        st.caption("利率、金融條件、通膨各至多一分。最低分已達 2 為紅燈，最高分低於 2 則未達門檻，其他為未知。")
+        st.caption("利率、金融條件、通膨各至多一分。最低分已達 2 則觸發，最高分低於 2 則未達門檻，其他為未知。")
 
 def markets(market, block, signal_available):
     stocks = block["stocks"]
     by_rank = sorted(stocks, key=lambda s: s["researchRank"]["rank"] if s["researchRank"] else 1000)
     funding_dashboard(block["macro"], stamp(block["macro"].get("calculatedAt")), signal_available)
-    c = st.columns(3)
-    c[0].metric("研究池", len(stocks), border=True)
-    c[1].metric("有分數的研究候選", sum(s["researchRank"] is not None for s in stocks), border=True)
-    c[2].metric("最後完成收盤", block["macro"]["marketAsOf"], border=True)
+    market_metrics([
+        ("研究池", len(stocks)),
+        ("有分數的研究候選", sum(s["researchRank"] is not None for s in stocks)),
+        ("最後完成收盤", block["macro"]["marketAsOf"]),
+    ])
     funding_details(block["macro"])
-    scope = st.segmented_control("顯示範圍", ["研究候選","全部研究池","主策略正式候選","背離長抱候選"], default="研究候選", key=f"scope-{market}")
-    options = st.columns([2,1,1])
-    query = options[0].text_input("搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
-    industry = options[1].selectbox("產業",["全部", *sorted({s["industry"] for s in stocks if s.get("industry")})],key=f"industry-{market}")
-    order = options[2].selectbox("排序",["研究排名","營收成長","126 日回撤"],key=f"sort-{market}")
+    scope_control, search_control, industry_control, order_control = st.columns([3.45, 1.65, 1, 1], vertical_alignment="bottom")
+    scope = scope_control.segmented_control("顯示範圍", ["研究候選","全部研究池","主策略正式候選","背離長抱候選"],
+                                            default="研究候選", key=f"scope-{market}")
+    query = search_control.text_input("搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
+    industry = industry_control.selectbox("產業",["全部", *sorted({s["industry"] for s in stocks if s.get("industry")})],key=f"industry-{market}")
+    order = order_control.selectbox("排序",["研究排名","營收成長","126 日回撤"],key=f"sort-{market}")
     def visible(stock):
         scope_ok = {"研究候選": bool(stock["researchRank"]), "全部研究池": True,
                     "主策略正式候選": signal_available and stock["evaluation"].get("primary"),
@@ -137,13 +139,13 @@ def markets(market, block, signal_available):
     if not rows:
         st.info("目前篩選條件沒有符合的標的。")
         return
-    st.subheader("研究候選與分數")
     main_columns = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增", "正式訊號"]
     detail_columns = ["代號", "單季營收年增", "營益率", "營業現金流率", "P/S", "財報期", "申報日", "資料品質"]
     page_size = 20
     page_key = f"stocks-page-{market}"
     start = min(st.session_state.get(page_key, 0), (len(rows) - 1) // page_size * page_size)
     with st.container(horizontal=True, gap="small", vertical_alignment="center"):
+        st.subheader("研究候選與分數", anchor=False)
         st.write(f"{start + 1}–{min(start + page_size, len(rows))} ／ {len(rows)} 檔")
         if len(rows) > page_size:
             st.button("上一頁", key=f"stocks-prev-{market}", disabled=start == 0,
@@ -163,7 +165,7 @@ def markets(market, block, signal_available):
         st.write(f"**#{rank['rank']}　{rank['score']:.2f} 分** · 同業 {rank['detail']['industrySize']} 檔")
         table([{"因子":FACTORS[p["key"]],"原始值":number(p["value"]) if p["key"]=="value" else percent(p["value"]),
             "百分位":percent(p["percentile"]),"權重":percent(p["weight"]),
-            "貢獻分":round(p["weight"]*p["percentile"]*100,2)} for p in rank["detail"]["parts"]])
+            "貢獻分":round(p["weight"]*p["percentile"]*100,2)} for p in rank["detail"]["parts"]], label="單檔評分")
     st.caption(f"財報期 {f.get('latest_period') or '待核對'} · 首次／最近可核對觀測 {stamp(stock.get('financialObservedAt'))} · 行情來源 {stock.get('priceSource') or '待核對'}")
     if stock.get("sourceWarning") or stock.get("sourceError"):
         st.warning(stock.get("sourceWarning") or stock["sourceError"])
@@ -176,8 +178,9 @@ def markets(market, block, signal_available):
         history["date"] = pd.to_datetime(history["date"])
         trend_chart(history.rename(columns={"date": "日期"}), "日期", ["調整收盤"], ylabel="調整收盤", height=315)
 
-def market_picker(column):
-    return MARKETS[column.segmented_control("市場", list(MARKETS), default="美股", key="bank-market") or "美股"]
+def market_picker(column, *, label_visibility="visible"):
+    return MARKETS[column.segmented_control("市場", list(MARKETS), default="美股", key="bank-market",
+                                            label_visibility=label_visibility) or "美股"]
 
 
 def backtest(research, nav):
@@ -195,10 +198,10 @@ def backtest(research, nav):
     else:
         st.info("2006 起跑可同時參考發布時點延後情境。早期金融條件採信用利差代理，存在發布時點限制。")
         with st.expander("2006 發布時點敏感度"):
-            table([{**row,"cumulative":percent(row["cumulative"]),"cagr":percent(row["cagr"]),"max_drawdown":percent(row["max_drawdown"])} for row in research["usDelay"]])
+            table([{**row,"cumulative":percent(row["cumulative"]),"cagr":percent(row["cagr"]),"max_drawdown":percent(row["max_drawdown"])} for row in research["usDelay"]], label="2006 發布時點敏感度")
     table([{"起始年":r["start_year"],"A 累積":percent(r["A_cumulative"]),"B 累積":percent(r["B_cumulative"]),
         "A CAGR":percent(r["A_cagr"]),"B CAGR":percent(r["B_cagr"]),"A 最大回撤":percent(r["A_max_drawdown"]),
-        "B 最大回撤":percent(r["B_max_drawdown"]),"B 額外買入":r["B_extras"]} for r in rows])
+        "B 最大回撤":percent(r["B_max_drawdown"]),"B 額外買入":r["B_extras"]} for r in rows], label="年度回測比較")
     csv_button("匯出每月歷史淨值",curve,f"{market}-{year}-nav.csv",f"nav-{market}")
     report_file("年度回測比較 CSV","us-ab.csv" if market=="US" else "tw-ab-research.csv")
     if market=="US":
@@ -216,10 +219,10 @@ def legacy_backtest(market):
             "背離長抱累積":percent(None if r.get("partial") else r["buy_hold_total_return"]),
             "主策略最大回撤":percent(None if r.get("partial") else r["primary_max_drawdown"]),
             "背離長抱最大回撤":percent(None if r.get("partial") else r["buy_hold_max_drawdown"]),
-            "資料判讀":r["coverage_note"]} for r in old[key]])
+            "資料判讀":r["coverage_note"]} for r in old[key]], label="歷史研究比較")
         table([{"代號":r["symbol"],"訊號日":r["signalDate"],"成交日":r["exitDate"],
             "淨報酬":percent(r["returnNet"]),"出場原因":r["reason"],"總經版本":r["macroVintage"]}
-            for r in old["exitExamples"] if r["market"]==market])
+            for r in old["exitExamples"] if r["market"]==market], label="逐筆出場")
         if market=="US":
             benchmark=pd.read_csv(BytesIO(report_bytes("us-primary-vs-qqq-2006-2026.csv")))
             st.subheader("美股主策略與 QQQ")
@@ -251,8 +254,8 @@ def tracking(snapshot_data, baseline):
         with st.expander(f"{p['variant']} 版核心／額外模擬部位"):
             marked={x["symbol"]:x["markedValue"] for x in mark["positions"]} if mark else {}
             table([{"代號":x["symbol"],"分類":"核心" if x["role"]=="core" else "額外","封存市值":number(x["value"]),
-                "靜態市值":number(marked.get(x["symbol"]))} for x in p["positions"]])
-    table(plans)
+                "靜態市值":number(marked.get(x["symbol"]))} for x in p["positions"]], label=f"{p['variant']} 版模擬部位")
+    table(plans, label="策略估值")
     csv_button("匯出策略估值 CSV",plans,f"{market}-{year}-tracking.csv",f"track-{market}")
     st.caption(f"最近訊號計算 {stamp(block['signalAt'])} · {('USD' if market=='US' else 'TWD')}")
 
@@ -274,7 +277,7 @@ def advisor(research):
         table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"累積":percent(r["cumulative"]),"CAGR":percent(r["cagr"]),
             "最大回撤":percent(r["mdd"]),"最差年度":r["worst_year"],"最差年報酬":percent(r["worst_year_return"]),
             "高點至回本（天）":r["peak_to_recovery_calendar_days"],"成本／初始資金":percent(r["transaction_cost_initial_fraction"]),
-            "買入次數":r["buy_count"],"賣出次數":r["sell_count"]} for r in selected])
+            "買入次數":r["buy_count"],"賣出次數":r["sell_count"]} for r in selected], label="各策略明細")
     st.subheader("事件回撤")
     event = st.segmented_control("事件回撤比較", list(WINDOWS), format_func=WINDOWS.get,
                                  default="GFC", key="advisor-event") or "GFC"
@@ -326,7 +329,7 @@ def records(data, source, batch):
         macro=block["macro"]
         st.write(f"**{label}**　收盤 {macro['marketAsOf']} · 發布 {stamp(macro.get('lastMarketPublishedAt'))} · {macro['ruleVersion']}")
     table([{"市場":j["market"],"狀態":j["status"],"處理數":j.get("updated"),"失敗數":j.get("failed"),
-        "沿用數":j.get("retained"),"備援數":j.get("fallback"),"更新時間":stamp(j.get("updated_at"))} for j in data["jobs"]])
+        "沿用數":j.get("retained"),"備援數":j.get("fallback"),"更新時間":stamp(j.get("updated_at"))} for j in data["jobs"]], label="收盤工作紀錄")
     st.markdown("""### 策略規則
 - **主策略 A** 最多十檔核心。**B** 在核心補滿後，從已通過原始進場條件的候選中加買，分數須嚴格超過當日核心最高分。每筆以當時淨值 10% 為目標，額外部位與核心共用出場規則。
 - **基本面門檻** TTM 營收年增至少 10%、最新單季營收不年減、營益率和營業現金流率為正。依原版納入財報時效與相較前次財報惡化條件。
@@ -337,7 +340,7 @@ def records(data, source, batch):
 
 
 def market_page():
-    market = market_picker(st)
+    market = market_picker(market_controls, label_visibility="collapsed")
     block = data["markets"][market]
     market_date = datetime.fromisoformat(block["macro"]["marketAsOf"]).date()
     age = (datetime.now(ZoneInfo("Asia/Taipei")).date() - market_date).days
@@ -375,7 +378,10 @@ page = st.navigation([
 
 with st.container(key="bank-content"):
     header(page.title)
-    status, refresh = st.columns([5, 1], vertical_alignment="center")
+    if page.title == "市場觀測":
+        status, market_controls, refresh = st.columns([5, 1, 1.2], vertical_alignment="center")
+    else:
+        status, refresh = st.columns([5, 1], vertical_alignment="center")
     with status:
         status_line(source, data["markets"]["US"]["macro"]["marketAsOf"],
                     data["markets"]["TW"]["macro"]["marketAsOf"], data["historyThrough"])

@@ -10,23 +10,32 @@ import pandas as pd
 import streamlit as st
 
 STYLE = Path(__file__).with_name("bank_layout.css")
-INK = "#2d3930"
-GRID = "#e6dfd1"
-PLOT = "#fffdf8"
-SERIES = ["#286253", "#9a621b", "#50588a", "#943e48"]
+INK = "#303849"
+GRID = "#DFE5EE"
+PLOT = "#FFFFFF"
+SERIES = ["#48698C", "#947341", "#657286", "#B76B64"]
 
+# Values and their units come from the same published macro snapshot as the detail table.
 FUNDING_INDICATORS = (
-    ("rates", "利率", "90 日實質利率升逾 0.50 個百分點，或政策利率升逾 0.25 個百分點。",
-     (("DFII10", "實質"), ("FEDFUNDS", "政策"))),
-    ("conditions", "金融條件", "NFCI 高於 0，或 90 日升逾 0.25 指數點。", (("NFCI", "NFCI"),)),
-    ("inflation", "通膨", "CPI 年增逾 4%，且近 3 個月年化高於年增率。", (("CPIAUCSL", "CPI"),)),
+    ("rates", "利率", "90 日實質利率升逾 0.50 個百分點，或政策利率升逾 0.25 個百分點。", (
+        ("DFII10", "實質殖利率", "real_yield", ".2f", "%", "real_yield_90d_change", "+.2f", " 個百分點"),
+        ("FEDFUNDS", "政策利率", "fed_funds", ".2f", "%", "fed_funds_90d_change", "+.2f", " 個百分點"),
+    )),
+    ("conditions", "金融條件", "NFCI 高於 0，或 90 日升逾 0.25 指數點。", (
+        ("NFCI", "NFCI 指數", "financial_conditions", ".3f", "", "financial_conditions_90d_change", "+.3f", " 點"),
+    )),
+    ("inflation", "通膨", "CPI 年增逾 4%，且近 3 個月年化高於年增率。", (
+        ("CPIAUCSL", "CPI 年增", "cpi_yoy", ".2%", "", None, "", ""),
+        ("CPIAUCSL", "近 3 個月年化", "cpi_3m_annualized", ".2%", "", None, "", ""),
+    )),
 )
-LIGHT_STATE = {0: ("clear", "未觸發"), 1: ("red", "觸發"), None: ("unknown", "未知／資料不足")}
+FUNDING_STATE = {0: ("clear", "未觸發"), 1: ("triggered", "已觸發"), None: ("unknown", "未知／資料不足")}
 FUNDING_SUMMARY = {
-    "non_red": ("未達 2 燈門檻", "資金面通過，進場仍須符合個股與策略條件"),
-    "red": ("已達 2 燈門檻", "停止新買，主策略依規則退出"),
-    "unknown": ("2 燈門檻待確認", "暫停新買，等待可核對的資金判定"),
+    "non_red": ("未達 2 項門檻", "資金面通過，進場仍須符合個股與策略條件"),
+    "red": ("已達 2 項門檻", "停止新買，主策略依規則退出"),
+    "unknown": ("2 項門檻待確認", "暫停新買，等待可核對的資金判定"),
 }
+NUMERIC_TEXT = r"[+-]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?%?"
 
 
 def layout_style():
@@ -51,20 +60,41 @@ def status_line(source, us, tw, through):
     st.html(f'<div class="bank-status" aria-label="資料來源及截止日">{items}</div>')
 
 
+def market_metrics(items):
+    metrics = "".join(f"<div><dt>{escape(label)}</dt><dd>{escape(str(value))}</dd></div>" for label, value in items)
+    st.html(f'<dl class="bank-market-metrics" aria-label="市場摘要">{metrics}</dl>')
+
+
+def display_value(value, spec, suffix):
+    return "—" if value is None or pd.isna(value) else f"{value:{spec}}{suffix}"
+
+
 def funding_dashboard(macro, calculated_at, signal_available):
-    """Describe the published decision and its observation dates."""
+    """Show published values and statuses with their source dates."""
     cards = []
     for key, label, rule, series in FUNDING_INDICATORS:
-        kind, status = LIGHT_STATE[macro["categoryStates"][key]]
-        dates = " · ".join(
-            f"{name} {macro['seriesMeta'].get(code, {}).get('observationDate') or '待核對'}"
-            for code, name in series
+        kind, status = FUNDING_STATE[macro["categoryStates"][key]]
+        readings = []
+        dates = {}
+        for code, name, field, spec, suffix, change, change_spec, change_suffix in series:
+            value = display_value(macro.get(field), spec, suffix)
+            movement = ""
+            if change:
+                delta = display_value(macro.get(change), change_spec, change_suffix)
+                movement = f'<span class="bank-reading-change">90 日 {escape(delta)}</span>'
+            date = macro["seriesMeta"].get(code, {}).get("observationDate") or "待核對"
+            dates.setdefault(code, (name, date))
+            readings.append(
+                f'<div><dt>{name}</dt><dd>{escape(value)}{movement}</dd></div>'
+            )
+        dated = " · ".join(
+            f"{name} {date}" if len(dates) > 1 else date for name, date in dates.values()
         )
         cards.append(
-            f'<article class="bank-light bank-light-{kind}">'
-            f'<div class="bank-light-status"><span class="bank-dot" aria-hidden="true"></span>'
-            f'<div><h3>{label}</h3><strong>{status}</strong></div></div>'
-            f'<p>{rule}</p><small>最近資料　{escape(dates)}</small></article>'
+            f'<article class="bank-funding-card bank-funding-card-{kind}">'
+            f'<div class="bank-card-heading"><h3>{label}</h3><strong>{status}</strong></div>'
+            f'<dl class="bank-readings">{"".join(readings)}</dl>'
+            f'<p>{rule}</p><small>資料日 <b>{escape(dated)}</b></small></article>'
         )
     low, high = macro["scoreRange"]
     score = str(low) if low == high else f"{low}–{high}"
@@ -80,7 +110,7 @@ def funding_dashboard(macro, calculated_at, signal_available):
         '<div class="bank-funding-head"><h2>全球資金溫度</h2>'
         f'<div>收盤 <b>{escape(macro["marketAsOf"])}</b> · 總經版本 <b>{escape(vintage)}</b>'
         f' · 計算 <b>{escape(calculated_at)}</b>（台北時間）</div></div>'
-        f'<div class="bank-lights">{"".join(cards)}</div>'
+        f'<div class="bank-funding-cards">{"".join(cards)}</div>'
         f'<div class="bank-risk bank-risk-{decision}">'
         f'<div class="bank-risk-score"><span>風險分數</span><strong>{escape(score)}<small> / 3</small></strong></div>'
         f'<div class="bank-risk-action"><strong>{threshold}</strong><span>{action}</span></div></div>'
@@ -99,8 +129,32 @@ def fund_heading(name, details):
             f'<p>{escape(details)}</p></div>')
 
 
+def ordered_rows(frame, label):
+    """Sort only the table view and keep the original ordering by default."""
+    with st.popover(f"排序｜{label}"):
+        column = st.selectbox("排序欄位", [None, *frame.columns],
+                              format_func=lambda value: "原始順序" if value is None else str(value),
+                              key=f"table-column-{label}")
+        direction = st.segmented_control("排序方向", ["由小到大", "由大到小"], default="由小到大",
+                                         key=f"table-order-{label}")
+    ascending = direction != "由大到小"
+    if column is None:
+        return frame
+    values = frame[column]
+    if pd.api.types.is_numeric_dtype(values.dtype):
+        return frame.sort_values(column, ascending=ascending, kind="stable", na_position="last")
+    visible = values.astype("string").str.strip().replace({"—": pd.NA, "": pd.NA})
+    if visible.dropna().str.fullmatch(NUMERIC_TEXT).all():
+        visible = pd.to_numeric(visible.str.replace(",", "").str.removesuffix("%"))
+    else:
+        visible = visible.str.casefold()
+    return frame.sort_values(column, ascending=ascending, kind="stable", na_position="last", key=lambda _: visible)
+
+
 def readable_table(frame, percentages=(), *, label, layout="standard"):
     """Render aligned, wrap-enabled cells and retain exact numeric values in tooltips."""
+    if layout != "market" and len(frame) > 1:
+        frame = ordered_rows(frame, label)
     numeric_columns = {
         col for col in frame if col in percentages or pd.api.types.is_numeric_dtype(frame[col].dtype)
         or frame[col].dropna().map(lambda value: isinstance(value, str) and bool(re.fullmatch(r"[+-]?\d+(?:\.\d+)?%", value))).any()
@@ -153,7 +207,7 @@ def styled(chart, height):
     return (chart.properties(height=height)
             .configure(background=PLOT, font="sans-serif", padding=12)
             .configure_axis(labelFontSize=13, titleFontSize=13, labelColor=INK, titleColor=INK,
-                            labelPadding=7, gridColor=GRID, domainColor="#a29783", tickColor="#a29783")
+                            labelPadding=7, gridColor=GRID, domainColor="#69768A", tickColor="#69768A")
             .configure_legend(labelFontSize=14, titleFontSize=13, labelColor=INK, titleColor=INK,
                               symbolStrokeWidth=3, padding=8)
             .configure_view(stroke=None))
