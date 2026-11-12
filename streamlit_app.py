@@ -119,7 +119,7 @@ def funding(macro):
         table(rows)
         st.caption("利率、金融條件、通膨各至多一分。最低分已達 2 為紅燈，最高分低於 2 則未達門檻，其他為未知。")
 
-def markets(market, block):
+def markets(market, block, signal_available):
     stocks = block["stocks"]
     by_rank = sorted(stocks, key=lambda s: s["researchRank"]["rank"] if s["researchRank"] else 1000)
     with st.container(border=True):
@@ -136,8 +136,8 @@ def markets(market, block):
     order = options[2].selectbox("排序",["研究排名","營收成長","126 日回撤"],key=f"sort-{market}")
     def visible(stock):
         scope_ok = {"研究候選": bool(stock["researchRank"]), "全部研究池": True,
-                    "主策略正式候選": stock["evaluation"].get("primary"),
-                    "背離長抱候選": stock["evaluation"].get("buy_hold")}.get(scope, True)
+                    "主策略正式候選": signal_available and stock["evaluation"].get("primary"),
+                    "背離長抱候選": signal_available and stock["evaluation"].get("buy_hold")}.get(scope, True)
         return scope_ok and (industry=="全部" or stock.get("industry")==industry) and query in " ".join(str(stock.get(k) or "") for k in ("symbol","name","industry")).casefold()
     selected_stocks = list(filter(visible, by_rank))
     if order!="研究排名":
@@ -157,7 +157,9 @@ def markets(market, block):
             "P/S":stock["features"].get("price_sales"),"財報期":f.get("latest_period"),
             "申報日":f.get("max_input_filed") or f.get("filingEvidence",{}).get("publishedAt"),
             "資料品質":"待核對" if stock.get("sourceError") or not stock["integrity"] else "已核對",
-            "正式訊號":"主策略" if e.get("primary") else "背離長抱" if e.get("buy_hold") else "—"})
+            "正式訊號":("主策略" if e.get("primary") else "背離長抱" if e.get("buy_hold") else "—") if signal_available else "待更新"})
+    if not signal_available:
+        st.warning("目前保留可核對的研究排名，正式訊號待更新。")
     if not rows:
         st.info("目前篩選條件沒有符合的標的。")
         return
@@ -330,7 +332,13 @@ page=st.radio("研究功能",["市場觀測","主策略回測","策略模擬","�
 if page in ("市場觀測","主策略回測","策略模擬"):
     market=MARKETS[st.segmented_control("市場",list(MARKETS),default="美股") or "美股"]
 if page=="市場觀測":
-    markets(market,data["markets"][market])
+    block = data["markets"][market]
+    market_date = datetime.fromisoformat(block["macro"]["marketAsOf"]).date()
+    age = (datetime.now(ZoneInfo("Asia/Taipei")).date() - market_date).days
+    attempt = latest_runner_attempt()
+    failed_since_publish = bool(attempt and attempt["market"]==market and attempt["status"]=="failed" and
+        attempt.get("at","") > block["macro"].get("lastMarketPublishedAt",""))
+    markets(market,block,source=="Google Sheets" and 0<=age<=5 and not failed_since_publish)
 elif page=="主策略回測":
     backtest(market,research,nav)
 elif page=="策略模擬":
