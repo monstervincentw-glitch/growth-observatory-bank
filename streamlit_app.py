@@ -92,11 +92,12 @@ def funding_details(macro):
         table(rows, label="資金溫度資料版本")
         st.caption("利率、金融條件、通膨各至多一分。最低分已達 2 則觸發，最高分低於 2 則未達門檻，其他為未知。")
 
-def markets(market, block, signal_available, market_reason=None):
+def markets(market, block, signal_available, latest_quotes=None):
     stocks = block["stocks"]
+    quotes=(latest_quotes or {}).get("quotes",{})
     by_rank = sorted(stocks, key=lambda s: s["researchRank"]["rank"] if s["researchRank"] else 1000)
     funding_dashboard(block["macro"])
-    states = {stock["key"]: candidate_status(stock, block["macro"], signal_available, market_reason)
+    states = {stock["key"]: candidate_status(stock, block["macro"], signal_available)
               for stock in stocks}
     scope_control, search_control, industry_control, order_control = st.columns([1.4, 1.4, 1, 1], vertical_alignment="bottom")
     scope = scope_control.selectbox("顯示範圍", SCOPES, key=f"scope-{market}")
@@ -122,22 +123,26 @@ def markets(market, block, signal_available, market_reason=None):
         rank = stock["researchRank"] or {}
         f, e = stock["financial"], stock["evaluation"]
         state = states[stock["key"]]
+        quote=quotes.get(stock["symbol"],{})
+        price=quote if quote.get("priceDate","")>=stock["priceDate"] else stock
+        # The displayed ranking and candidate flags belong to the formal batch.
+        observed=(price.get("research") or {}).get("financial",{})
         rows.append({"排名":rank.get("rank"),"代號":stock["symbol"],"公司":stock["name"],"產業":stock.get("industry"),
-            "總分":round(rank["score"],2) if rank else None,"收盤":stock["close"],"行情日":stock["priceDate"],
+            "總分":round(rank["score"],2) if rank else None,"收盤":price["close"],"行情日":price["priceDate"],
             "TTM 營收年增":percent(f.get("revenue_growth")),"單季營收年增":percent(f.get("quarterly_growth")),
             "營益率":percent(f.get("operating_margin")),"營業現金流率":percent(f.get("cfo_margin")),
             "P/S":stock["features"].get("price_sales"),"財報期":f.get("latest_period"),
             "申報日":f.get("max_input_filed") or f.get("filingEvidence",{}).get("publishedAt"),
             "資料品質":"待核對" if stock.get("sourceError") or not stock["integrity"] else "已核對",
+            "最新可用財報期":observed.get("latest_period"),
+            "最新可用財報營收年增":percent(observed.get("revenue_growth")),
             "主策略正式訊號":("符合正式條件" if e["primary"] else "—") if signal_available else "待驗證",
             "背離研究":"符合" if state["research"] else "—",
             "背離正式狀態":state["label"],"背離阻擋原因":"｜".join(state["reasons"])})
-    if not signal_available:
-        st.warning("目前保留可核對的研究排名，正式訊號待更新。")
     if not rows:
         funding_details(block["macro"])
         if scope == FORMAL and not signal_available:
-            st.info(market_reason or "正式訊號待驗證，請查看資料狀態。")
+            st.caption("正式訊號待驗證。")
         elif scope == FORMAL and not formal_count:
             st.info("本批沒有符合背離正式買入條件的標的。可切換至背離研究候選查看逐檔原因。")
         else:
@@ -145,7 +150,7 @@ def markets(market, block, signal_available, market_reason=None):
         return
     main_columns = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增",
                     "背離正式狀態" if scope in (RESEARCH, FORMAL, PENDING) else "主策略正式訊號"]
-    detail_columns = ["代號", "單季營收年增", "營益率", "營業現金流率", "P/S", "財報期", "申報日", "資料品質"]
+    detail_columns = ["代號", "單季營收年增", "營益率", "營業現金流率", "P/S", "財報期", "申報日", "資料品質", "最新可用財報期", "最新可用財報營收年增"]
     if scope in (RESEARCH, FORMAL, PENDING):
         detail_columns += ["背離研究", "背離正式狀態", "背離阻擋原因"]
     page_size = 20
@@ -200,6 +205,35 @@ def fetch_published(path):
     if len(raw)>2_000_000:
         raise ValueError("績效資料超過大小限制")
     return json.loads(raw)
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def market_prices(market):
+    try:
+        base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/research-data/"
+        with urlopen(Request(f"{base}market-prices/{market}/latest.json", headers={"Cache-Control":"no-cache"}), timeout=5) as response:
+            raw = response.read(200_001)
+        if len(raw)>200_000:
+            return None
+        payload=json.loads(raw)
+        if payload["schema"]!=1 or payload["market"]!=market or payload["status"] not in ("PRICES_VERIFIED","PARTIAL_PRICES"):
+            return None
+        if any(row["priceDate"]!=payload["day"] or not isinstance(row["close"],(int,float)) or row["close"]<=0
+               for row in payload["quotes"].values()):
+            return None
+        return payload
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def conditional_marks(market):
+    try:
+        result=fetch_published(f"primary-marks/{market}/latest.json")
+        if result["schema"]==1 and result["market"]==market and result["status"]=="CONDITIONAL_FIXED_HOLDINGS":
+            return result
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
 
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -259,6 +293,11 @@ def backtest(research, nav):
     else:
         st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
     marks = (data or {}).get("markets", {}).get(market, {}).get("marks", {}).get(str(year))
+    estimate=conditional_marks(market)
+    if estimate and str(year) in estimate["years"] and (not marks or estimate["through"]>=marks["date"]):
+        marks={"date":estimate["through"],"portfolios":estimate["years"][str(year)]}
+    if live:
+        marks=None
     if marks:
         selected = next(row for row in rows if row["start_year"] == year)
         block = []
@@ -267,7 +306,7 @@ def backtest(research, nav):
             original = (selected[f"{variant}_cumulative"] + 1) * (100_000 if market == "US" else 3_000_000)
             block.append({"方案": variant, "持倉估值": number(row["value"]),
                           "相對封存日變動": percent(row["value"] / original - 1)})
-        st.caption(f"持倉估值 {marks['date']} · 策略回測 2026-11-04 · 依封存部位及已驗證收盤價")
+        st.caption(f"條件式持倉估值 {marks['date']} · 策略回測 2026-11-04 · 封存持股與現金固定")
         table(block, label="封存持股最新估值")
     status=performance_status().get(market,{})
     if status.get('status') == 'WAITING_FOR_CONTINUITY':
@@ -322,6 +361,9 @@ def tracking(snapshot_data, baseline):
         year=st.selectbox("策略起始年", sorted({p["year"] for p in baseline[market]},reverse=True),key=f"mark-{market}", width=152)
     block = snapshot_data["markets"][market]
     marks=block["marks"].get(str(year))
+    estimate=conditional_marks(market)
+    if estimate and str(year) in estimate["years"] and (not marks or estimate["through"]>=marks["date"]):
+        marks={"date":estimate["through"],"portfolios":estimate["years"][str(year)]}
     st.info(f"最後完整模擬 {baseline['date']}。靜態估值日 {marks['date'] if marks else '待核對'}。封存後採相同還原價格序列，部位與現金固定。")
     plans = []
     for p in [row for row in baseline[market] if row["year"]==year]:
@@ -441,7 +483,7 @@ def runner_attempts():
                 attempt = json.loads(response.read(262_145))
             attempts = {attempt["market"]: attempt}
         for market, record in attempts.items():
-            if market not in ("US", "TW") or record["market"] != market or record["status"] not in ("published", "same_close", "failed"):
+            if market not in ("US", "TW") or record["market"] != market or record["status"] not in ("published", "same_close", "failed", "quotes_only"):
                 raise ValueError("更新紀錄格式錯誤")
             if datetime.fromisoformat(record["at"]).tzinfo is None:
                 raise ValueError("更新紀錄時間缺少時區")
@@ -460,15 +502,13 @@ def update_status(state):
         if info.get("reason"):
             count = sum(e.get("code") == "MISSING_FILING_EVIDENCE" for e in errors)
             if count:
-                summaries.append(f"{label}資料待驗證（{count} 檔財報）；正式新買入訊號暫停，沿用 {last_date}")
+                summaries.append(f"{label}資料待驗證（{count} 檔財報），沿用上一個已驗證策略批次。")
             elif info.get("marketWide"):
                 summaries.append(f"{label}資料待驗證；沿用 {last_date}")
             else:
                 summaries.append(f"{label}資料待驗證；沿用 {last_date}")
     if summaries:
         st.caption("⚠️ " + "｜".join(summaries))
-    else:
-        st.caption("✓ 美股、台股研究資料維持最近已驗證批次")
     with st.expander("資料更新狀態與錯誤明細", expanded=False):
         for market, info in state["markets"].items():
             label = "美股" if market == "US" else "台股"
@@ -479,6 +519,9 @@ def update_status(state):
                 st.caption("同一收盤日或休市，沒有新資料需要處理；不是全部股票更新失敗。")
             else:
                 st.caption(f"預期 {count(expected)} · 成功 {count(info.get('succeeded'))} · 失敗 {count(info.get('failed'))} · 未處理 {count(info.get('notAttempted'))}")
+            quote=market_prices(market)
+            if quote:
+                st.caption(f"已驗證行情 {quote['day']} · {len(quote['quotes'])} 檔")
             if not info.get("reason"):
                 continue
             errors = info.get("errors") or []
@@ -502,6 +545,12 @@ def update_status(state):
 def current_update_state():
     attempts, issue = runner_attempts()
     entry = {"snapshot": data, "batch": batch, "checksum": research_state["checksum"]} if data else None
+    # A successful price-only run preserves the previous strategy batch.
+    for market, attempt in attempts.items():
+        if attempt["status"] == "quotes_only":
+            attempts[market] = attempt | {"status":"failed"}
+        elif (attempt.get("unresolvedFailure") or {}).get("status") == "quotes_only":
+            attempts[market] = attempt | {"unresolvedFailure":attempt["unresolvedFailure"] | {"status":"failed"}}
     return health(entry, research_state["source"], research_state["issue"] or issue, attempts=attempts)
 
 
@@ -509,6 +558,8 @@ def clear_research_caches():
     advisor_performance.clear()
     performance_status.clear()
     primary_performance.clear()
+    conditional_marks.clear()
+    market_prices.clear()
     snapshot.clear()
     runner_attempts.clear()
 
@@ -519,7 +570,7 @@ def records(data, source, batch):
     update_status(current_update_state())
     attempts, _ = runner_attempts()
     for attempt in attempts.values():
-        result = {"same_close":"同一收盤，保留快照","failed":"來源更新失敗","published":"研究批次已發布"}[attempt["status"]]
+        result = {"same_close":"同一收盤，保留快照","failed":"來源更新失敗","published":"研究批次已發布","quotes_only":"行情已發布，策略批次待驗證"}[attempt["status"]]
         st.write(f"**最近雲端收盤工作** {attempt['market']} · {result} · {stamp(attempt.get('at'))}")
         if attempt["status"] == "failed":
             st.warning("最近一次更新未通過。頁面沿用已核對快照。")
@@ -545,7 +596,7 @@ def market_page():
     if data is None:
         return
     block = data["markets"][market]
-    markets(market, block, state["markets"][market]["usable"], state["markets"][market]["reason"])
+    markets(market, block, state["markets"][market]["usable"], market_prices(market))
 
 
 def advisor_page():

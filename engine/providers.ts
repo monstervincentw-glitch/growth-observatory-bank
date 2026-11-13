@@ -168,7 +168,7 @@ export function confirmedInactive(instrument:Instrument,cutoff:string):Instrumen
   priceSource:'Yahoo／FinMind 最後成交核對',sourceWarning:summary,marketEvent:{effectiveDate,summary,source}};
 }
 
-export async function refreshInstrument(old:Instrument,context:RefreshContext,reuseFinancial=false,cachedBars:Bar[]=[],diagnostic?:(type:string)=>Diagnostic):Promise<Instrument & {_bars?:Bar[]}>{
+export async function refreshInstrument(old:Instrument,context:RefreshContext,reuseFinancial=false,cachedBars:Bar[]=[],diagnostic?:(type:string)=>Diagnostic,retainQuoteOnFinancialError=false):Promise<Instrument & {_bars?:Bar[],_financialError?:string}>{
  const inactive=confirmedInactive(old,context.cutoff);if(inactive)return inactive;
  if(context.cutoff<old.priceDate)throw new Error(`更新截止日${context.cutoff}落後既有收盤${old.priceDate}，拒絕覆寫較新的資料`);
  if(sameCloseReusable(old,context.cutoff))return{...old,sourceError:null,lastAttemptAt:new Date().toISOString(),sourceWarning:old.sourceError?`保留同一收盤日已成功驗證快照；前次重抓異常：${old.sourceError}`:old.sourceWarning,priceValidation:{cutoff:context.cutoff,validatedAt:old.priceValidation?.validatedAt||old.observedAt,mode:'same_close_snapshot'}};
@@ -193,11 +193,16 @@ export async function refreshInstrument(old:Instrument,context:RefreshContext,re
  if(context.marketDates){const valid=new Set(context.marketDates);bars=bars.filter(b=>valid.has(b.date));}
  const validated=validateBars(bars);bars=requireClose(validated.bars,context.cutoff);
  let financial:Financial={...old.financial};
+ let financialError:string|undefined;
  if(!reuseFinancial){
   try{
   if(old.market==='US')financial=secFinancial(await readJSON(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(old.cik).padStart(10,'0')}.json`,{'User-Agent':'GrowthObservatory/1.0 personal financial research'},diagnostic?.('financial')),bars.at(-1)!.date);
   else{const start=iso(ms(context.cutoff)-1400*dayms);const [income,cash]=await finishRequests([finmind('TaiwanStockFinancialStatements',old.symbol,start,context.cutoff,diagnostic?.('financial')),finmind('TaiwanStockCashFlowsStatement',old.symbol,start,context.cutoff,diagnostic?.('financial'))] as const);financial=twFinancial(income,cash,bars.at(-1)!.date);}
-  }catch(error){throw Object.assign(new Error('財報來源：'+(error instanceof Error?error.message:String(error))),{dataType:'financial'});}
+  }catch(error){
+   const message='財報來源：'+(error instanceof Error?error.message:String(error));
+   if(!retainQuoteOnFinancialError)throw Object.assign(new Error(message),{dataType:'financial'});
+   financialError=message;
+  }
  }
  if(old.market==='TW'&&old.financial.filingEvidence?.releaseKey===financial.fundamental_release_key)
   financial.filingEvidence=old.financial.filingEvidence;
@@ -207,7 +212,7 @@ export async function refreshInstrument(old:Instrument,context:RefreshContext,re
  const features:{[key:string]:any}=priceFeatures(bars,context.benchmarks[old.benchmark]||context.benchmarks[old.market==='US'?'QQQ':'0052']);
  if(old.market==='US'){features.market_cap_estimate=finite(financial.shares)?financial.shares*bars.at(-1)!.close:null;features.price_sales=finite(features.market_cap_estimate)&&financial.revenue_ttm?features.market_cap_estimate/financial.revenue_ttm:null;}
  const stamp=new Date().toISOString();
- const result={...old,priceDate:bars.at(-1)!.date,close:bars.at(-1)!.close,history:bars.slice(-90).map(b=>({date:b.date,close:b.adjClose})),features:features as any,financial,observedAt:stamp,financialObservedAt:reuseFinancial?old.financialObservedAt:stamp,sourceError:null,integrity:true,priceSource,sourceWarning:[...(primaryError?[`主來源未完整，已由備援核對：${primaryError}`]:[]),...validated.warnings].join('；')||null,lastAttemptAt:stamp,priceValidation:{cutoff:context.cutoff,validatedAt:stamp,mode:priceSource==='Yahoo'?'source_verified':'fallback_verified'},_bars:bars.slice(-320)};
+ const result={...old,priceDate:bars.at(-1)!.date,close:bars.at(-1)!.close,history:bars.slice(-90).map(b=>({date:b.date,close:b.adjClose})),features:features as any,financial,observedAt:stamp,financialObservedAt:reuseFinancial||financialError?old.financialObservedAt:stamp,sourceError:null,integrity:true,priceSource,sourceWarning:[...(primaryError?[`主來源未完整，已由備援核對：${primaryError}`]:[]),...validated.warnings].join('；')||null,lastAttemptAt:stamp,priceValidation:{cutoff:context.cutoff,validatedAt:stamp,mode:priceSource==='Yahoo'?'source_verified':'fallback_verified'},_bars:bars.slice(-320),_financialError:financialError};
  if(result.priceDate!==context.cutoff)throw new Error(`個股收盤資料尚未到齊：${result.priceDate} / ${context.cutoff}`);
  return result;
 }

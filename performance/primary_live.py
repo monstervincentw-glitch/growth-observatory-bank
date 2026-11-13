@@ -35,9 +35,12 @@ def load_archive(inputs, market, days):
     by_day = {}
     for date in days:
         path = folder/f'{date.date()}.json'
+        if not path.exists():
+            path = inputs/'observed-primary-inputs'/market/f'{date.date()}.json'
         if path.exists():
             data = json.loads(path.read_text())
-            if data['market']!=market or data['cutoff']!=str(date.date()) or data['status']!='RESEARCH_VERIFIED':
+            if (data['market']!=market or data['cutoff']!=str(date.date()) or
+                    data['status'] not in ('RESEARCH_VERIFIED','POINT_IN_TIME_INPUT_VERIFIED')):
                 raise ValueError(f'{market} {date.date()}: invalid archive identity')
             by_day[date] = data
     return by_day
@@ -61,11 +64,20 @@ def point_in_time(archive, market):
         else:
             proof = f.get('filingEvidence') or {}
             close = datetime.fromisoformat(day+'T13:30:00+08:00')
-            valid = (proof.get('period')==f.get('latest_period') and
-                     proof.get('releaseKey')==f.get('fundamental_release_key') and
-                     bool(proof.get('source','').startswith('https://')) and
-                     bool(proof.get('publishedAt') and proof.get('verifiedThrough')) and
-                     datetime.fromisoformat(proof['publishedAt'])<=close<=datetime.fromisoformat(proof['verifiedThrough']))
+            version=stock.get('financialVersion')
+            if version:
+                first=datetime.fromisoformat(version['firstVerifiedAt'])
+                earliest=datetime.fromisoformat(version['eligibleFrom'])
+                official=version.get('officialPublishedAt')
+                valid=(version['period']==f.get('latest_period') and version['source']=='FinMind' and
+                       earliest<=close and (earliest==first or
+                       (official and earliest==datetime.fromisoformat(official) and version.get('officialSource'))))
+            else:
+                valid = (proof.get('period')==f.get('latest_period') and
+                         proof.get('releaseKey')==f.get('fundamental_release_key') and
+                         bool(proof.get('source','').startswith('https://')) and
+                         bool(proof.get('publishedAt') and proof.get('verifiedThrough')) and
+                         datetime.fromisoformat(proof['publishedAt'])<=close<=datetime.fromisoformat(proof['verifiedThrough']))
         if not valid or not stock['bars'] or stock['bars'][-1]['date']!=day:
             missing.append(symbol)
     return missing
@@ -91,7 +103,9 @@ def prices_and_rows(archive, day, market, macro, cfg, engine, scale_by_symbol):
             row['financial_event_date']=pd.Timestamp(f['max_input_filed'])+pd.Timedelta(days=cfg['fundamental_lag_days'])
             row['tradable']=bool(stock['evaluation']['tradable'])
         else:
-            event = pd.Timestamp(f['filingEvidence']['publishedAt']).tz_convert('Asia/Taipei').tz_localize(None).normalize()
+            version=stock.get('financialVersion')
+            available=version['eligibleFrom'] if version else f['filingEvidence']['publishedAt']
+            event = pd.Timestamp(available).tz_convert('Asia/Taipei').tz_localize(None).normalize()
             row.update(financial_event_date=event,financial_age_days=(day-event).days,
                 fundamental_release_key=f'{symbol}-{pd.Timestamp(f["latest_period"]).to_period("Q")}',
                 tradable=bool(stock['evaluation']['tradable']))
@@ -115,6 +129,11 @@ def prices_and_rows(archive, day, market, macro, cfg, engine, scale_by_symbol):
 
 def evaluate_market(inputs, release, output, market):
     cutoff = release['snapshot']['markets'][market]['macro']['marketAsOf']
+    recent=inputs/'market-observations'/market/'latest.json'
+    if recent.exists():
+        observation=json.loads(recent.read_text())
+        if observation['market']==market and observation['status']=='PRICES_VERIFIED':
+            cutoff=max(cutoff,observation['day'])
     directory=output/'primary'/market
     target=directory/'checkpoint.json.gz'
     prior=target if target.is_file() else ROOT/'seed-primary'/f'{market}.json.gz'
@@ -197,10 +216,10 @@ def evaluate_market(inputs, release, output, market):
         exchange=engine.Market(panel,charts,pd.DatetimeIndex(list(archives)),cfg)
         def run(start,end,variant,state):
             return kernel(exchange,start,end,'primary',extras=variant=='B',checkpoint=state)
-    return publish_primary(run,accounts,cutoff,market,directory,charts)
+    return publish_primary(run,accounts,cutoff,market,directory,charts,panel)
 
 
-def publish_primary(run, accounts, cutoff, market, directory, charts):
+def publish_primary(run, accounts, cutoff, market, directory, charts, panel):
     history_path=directory/'release.json'
     history=json.loads(history_path.read_text())['curves'] if history_path.exists() else {}
     from production import save
@@ -216,7 +235,10 @@ def publish_primary(run, accounts, cutoff, market, directory, charts):
         if len(curve)!=len({day for day,_ in curve}):
             raise ValueError('Primary valuation dates overlap')
     directory.mkdir(parents=True,exist_ok=True)
-    save(directory/'ledgers'/f'{cutoff}.json',ledger)
+    # Normalize all payloads before replacing any checkpoint file.
+    decisions=js(panel.loc[panel.signal_date>pd.Timestamp(next(iter(accounts.values()))['summary']['through'])]
+                 .to_dict('records'))
+    save(directory/'ledgers'/f'{cutoff}.json',dict(accounts=ledger,decisions=decisions))
     (directory/'checkpoint.json.gz').write_bytes(gzip.compress(json.dumps(checkpoints,allow_nan=False).encode(),mtime=0))
     save(directory/'price-basis.json',dict(date=cutoff,prices={s:float(frame.loc[pd.Timestamp(cutoff),'adj_close'])
         for s,frame in charts.items() if 'adj_close' in frame and pd.Timestamp(cutoff) in frame.index}))

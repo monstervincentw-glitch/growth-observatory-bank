@@ -5,7 +5,7 @@ on:
     - cron: '27 13 * * 1-5'
   push:
     branches: [main]
-    paths: ['performance/seed/manifest.json']
+    paths: ['engine/market-observations.mjs']
   workflow_dispatch:
     inputs:
       market:
@@ -31,6 +31,7 @@ jobs:
         shell: bash
         run: |
           touch /tmp/research-weekly.txt
+          echo '{}' > /tmp/financial-versions.json
           if git ls-remote --exit-code origin refs/heads/research-data >/dev/null; then
             git fetch --depth=1 origin research-data
             git show FETCH_HEAD:release.json > /tmp/research-prior.json
@@ -38,11 +39,19 @@ jobs:
           else
             node engine/seed.mjs /tmp/research-prior.json
           fi
+      - name: Load previous financial versions
+        env:
+          MARKET: ${{ inputs.market || (github.event.schedule == '17 22 * * 1-5' && 'US' || 'TW') }}
+        run: |
+          if git cat-file -e "FETCH_HEAD:financial-versions/$MARKET.json" 2>/dev/null; then
+            git show "FETCH_HEAD:financial-versions/$MARKET.json" > /tmp/financial-versions.json
+          fi
       - name: Calculate and validate research
         env:
           PERFORMANCE_INPUT_DIR: /tmp/performance-market-inputs
+          FINANCIAL_VERSION_INDEX: /tmp/financial-versions.json
           PERFORMANCE_ETF_CONTEXT: /tmp/performance-etf-context.json
-          MARKET: ${{ inputs.market || ((github.event_name == 'push' || github.event.schedule == '17 22 * * 1-5') && 'US' || 'TW') }}
+          MARKET: ${{ inputs.market || ((github.event.schedule == '17 22 * * 1-5') && 'US' || 'TW') }}
         run: node engine/update.mjs "$MARKET" /tmp/research-prior.json /tmp/research-release.json
       - name: Publish result without changing the app branch
         run: |
@@ -76,6 +85,13 @@ jobs:
             for file in /tmp/performance-market-inputs/etf-inputs/*.json; do
               previous="/tmp/research-publish/etf-inputs/${file##*/}"
               if [[ -f "$previous" ]] && node -e 'const [a,b]=process.argv.slice(1).map(require); process.exit(a.status==="VERIFIED" && b.status!=="VERIFIED"?0:1)' "$previous" "$file"; then
+                rm -- "$file"
+              fi
+            done
+            for file in /tmp/performance-market-inputs/market-{observations,prices}/*/*.json; do
+              relative="${file#/tmp/performance-market-inputs/}"
+              previous="/tmp/research-publish/$relative"
+              if [[ -f "$previous" ]] && node -e 'const [a,b]=process.argv.slice(1).map(require); process.exit(a.day>b.day || (a.day===b.day && a.status==="PRICES_VERIFIED" && b.status!=="PRICES_VERIFIED")?0:1)' "$previous" "$file"; then
                 rm -- "$file"
               fi
             done

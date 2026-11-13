@@ -9,6 +9,7 @@ import shutil
 from etf import PartialData
 from live_etf import advance, read_state
 from research_inputs import research_release
+from primary_valuation import mark_valuation
 
 
 def save(path, payload):
@@ -93,6 +94,11 @@ def main():
                              primary(args.inputs,release,args.output,scope))
         except Exception as exc:
             result[scope] = record('SOURCE_ERROR',None,None,type(exc).__name__+': '+str(exc)[:500])
+    for market in ('US','TW'):
+        try:
+            result[market]['valuationThrough']=mark_valuation(args.inputs,release,args.output,market)
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            result[market]['valuationError']=str(exc)[:400]
     report = dict(schema=1, run=args.run, at=datetime.now(timezone.utc).isoformat(), results=result)
     save(args.output/'status.json',report)
     save(args.output/'runs'/f'{args.run}.json',report)
