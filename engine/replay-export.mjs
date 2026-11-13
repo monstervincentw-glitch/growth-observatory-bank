@@ -10,7 +10,7 @@ async function save(folder, file, value) {
   await writeFile(join(folder,file), JSON.stringify(value)+'\n');
 }
 
-export async function archiveResearch(folder, {market, context, batch, bars, instruments}) {
+export async function archiveResearch(folder, {market, context, batch, bars, instruments, attempt}) {
   const {cutoff, benchmarks, macro, createdAt, marketDates}=context;
   const stocks=Object.fromEntries(instruments.map(s=>[s.symbol,{
     bars:bars[s.symbol]??[], source:s.priceSource, quoteStatus:s.priceValidation,
@@ -19,8 +19,11 @@ export async function archiveResearch(folder, {market, context, batch, bars, ins
     evaluation:s.evaluation, researchRank:s.researchRank, marketEvent:s.marketEvent,
     industry:s.industry, benchmark:s.benchmark, name:s.name, features:s.features
   }]));
-  await save(join(folder,'primary-inputs',market),cutoff+'.json',{
-    schema:1, market, cutoff, batch, observedAt:createdAt, status:'RESEARCH_VERIFIED',
+  const verified=attempt.status==='published';
+  const directory=verified?'primary-inputs':'unverified-primary-inputs';
+  await save(join(folder,directory,market),cutoff+'.json',{
+    schema:1, market, cutoff, batch, observedAt:createdAt, runId:attempt.runId,
+    status:verified?'RESEARCH_VERIFIED':'RESEARCH_REJECTED', errors:attempt.errors,
     priceBasis:'adjusted total return', benchmarks, calendar:marketDates??benchmarks.QQQ.map(b=>b.date),
     stocks, macro
   });
@@ -41,7 +44,7 @@ export function weeklySessions(bars, cutoff) {
 
 export async function archiveEtf(folder, context, batch, knownWeekly) {
   const {cutoff, benchmarks, createdAt}=context;
-  const prices={}, errors={};
+  const prices={}, errors={}, vintageErrors={};
   // Reuse the two benchmarks already returned by the research request.
   for (const symbol of ETF_SYMBOLS) {
     try {
@@ -56,12 +59,12 @@ export async function archiveEtf(folder, context, batch, knownWeekly) {
     try {
       const series=Object.fromEntries(await Promise.all(SERIES.map(async s=>[s,await readMacroVintage(s,day)])));
       await save(join(folder,'weekly-vintages'),day+'.json',{day,source:'ALFRED',observedAt:new Date().toISOString(),series});
-    } catch(error) { errors['ALFRED '+day]=String(error.message||error).slice(0,160); }
+    } catch(error) { vintageErrors[day]=String(error.message||error).slice(0,160); }
   }
   await save(join(folder,'etf-inputs'),cutoff+'.json',{
     schema:1, cutoff, batch, observedAt:createdAt, updatedAt:new Date().toISOString(),
     source:'Yahoo Finance chart', priceBasis:'USD split/dividend-adjusted total return',
-    status:Object.keys(errors).length?'PARTIAL_DATA':'VERIFIED', weeks, errors, prices
+    status:Object.keys(errors).length?'PARTIAL_DATA':'VERIFIED', weeks, errors, vintageErrors, prices
   });
 }
 

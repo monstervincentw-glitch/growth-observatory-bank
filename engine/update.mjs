@@ -67,6 +67,7 @@ try{
       financialFailed.add(symbol);
       report('financial',symbol)(code);
     }
+    replayResearch={market,context,bars,instruments};
     requirePublishable(financialReview);
     const newJob={market,status:'done',total:markets[market],updated:attempt.updated,failed:0,created_at:attempt.at,updated_at:now,retained:0,
       fallback:stocks.filter(s=>s.priceValidation?.mode==='fallback_verified').length};
@@ -75,7 +76,6 @@ try{
       macros:{...Object.fromEntries(Object.entries(old.markets).map(([k,v])=>[k,v.macro])),[market]:macro},
       strategySignalTimes:{...Object.fromEntries(Object.entries(old.markets).map(([k,v])=>[k,v.signalAt])),[market]:now}};
     snapshot=project(dashboard,baseline,old.qa);
-    replayResearch={market,context,bars,instruments};
     attempt.status='published';
     attempt.detail='收盤已驗證並發布排名。財報及總經狀態：'+JSON.stringify(attempt.health);
   }
@@ -110,11 +110,9 @@ await writeFile(outputPath,JSON.stringify({snapshot,rows,attempt,attempts:{...pr
 console.log(JSON.stringify(attempt));
 
 const archiveDir=process.env.PERFORMANCE_INPUT_DIR;
-if(archiveDir&&attempt.status!=='failed'){
-  if(replayResearch){
-    try {await archiveResearch(archiveDir,{...replayResearch,batch:id});}
-    catch(error){console.warn('Primary replay input: '+String(error.message||error));}
-  }
+if(archiveDir&&replayResearch){
+  try {await archiveResearch(archiveDir,{...replayResearch,batch:id,attempt});}
+  catch(error){console.warn('Primary replay input: '+String(error.message||error));}
 }
 
 const etfContext=process.env.PERFORMANCE_ETF_CONTEXT;

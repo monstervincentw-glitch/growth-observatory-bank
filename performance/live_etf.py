@@ -44,16 +44,19 @@ def archive_state(folder, view, state, overlap):
         state_sha256=sha256(raw).hexdigest(), overlap_sha256=sha256(prices).hexdigest()), sort_keys=True)+'\n')
 
 
-def weekly_history(data_root, cutoff):
+def weekly_history(data_root, cutoff, *, for_etf=False):
     weekly = pd.read_csv(SOURCE/'weekly.csv', parse_dates=['macro_vintage_date'])
     with TemporaryDirectory() as temporary:
         folder = Path(temporary)
+        sessions = date_slice(cutoff)
         for day in complete_weeks(cutoff):
             name = str(day.date())
             path = data_root/'weekly-vintages'/f'{name}.json'
             if name == '2026-11-06' and not path.exists():
                 path = SOURCE.parent/'seed-weekly'/f'{name}.json'
             if not path.exists():
+                if for_etf and (sessions>day).sum()<2:
+                    continue
                 raise PartialData(f'ALFRED vintage absent: {name}')
             vintage = json.loads(path.read_text())
             if vintage['day'] != name or vintage['source'] != 'ALFRED':
@@ -67,7 +70,7 @@ def weekly_history(data_root, cutoff):
 
 
 def signals_for(data_root, cutoff):
-    weekly, evidence = weekly_history(data_root, cutoff)
+    weekly, evidence = weekly_history(data_root, cutoff, for_etf=True)
     macro = advisor.grouped_macro(advisor.add_first_vintage(weekly),'base')
     flags=macro[['rate_flag','conditions_flag','inflation_flag']]
     lower=flags.eq(True).sum(axis=1)

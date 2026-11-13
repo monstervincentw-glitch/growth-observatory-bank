@@ -60,7 +60,6 @@ jobs:
           git -C /tmp/research-publish add release.json attempt.json attempts.json
           git -C /tmp/research-publish commit -m "Record close research run"
           git -C /tmp/research-publish push origin HEAD:refs/heads/research-data
-          node -e 'if (require("/tmp/research-release.json").attempt.status === "failed") process.exitCode = 1'
       - name: Collect missing ETF instruments using the same research provider
         continue-on-error: true
         timeout-minutes: 8
@@ -73,6 +72,13 @@ jobs:
         shell: bash
         run: |
           if [[ -d /tmp/performance-market-inputs ]]; then
+            shopt -s nullglob
+            for file in /tmp/performance-market-inputs/etf-inputs/*.json; do
+              previous="/tmp/research-publish/etf-inputs/${file##*/}"
+              if [[ -f "$previous" ]] && node -e 'const [a,b]=process.argv.slice(1).map(require); process.exit(a.status==="VERIFIED" && b.status!=="VERIFIED"?0:1)' "$previous" "$file"; then
+                rm -- "$file"
+              fi
+            done
             cp -R /tmp/performance-market-inputs/. /tmp/research-publish/
             git -C /tmp/research-publish add --all
             if ! git -C /tmp/research-publish diff --cached --quiet; then
@@ -80,3 +86,5 @@ jobs:
               git -C /tmp/research-publish push origin HEAD:refs/heads/research-data
             fi
           fi
+      - name: Preserve existing research failure reporting
+        run: node -e 'if (require("/tmp/research-release.json").attempt.status === "failed") process.exitCode = 1'
