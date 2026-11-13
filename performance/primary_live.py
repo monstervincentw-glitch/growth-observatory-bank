@@ -163,6 +163,8 @@ def evaluate_market(inputs, release, output, market):
     # A sealed price basis must be supplied by the verified primary checkpoint.
     # Never reuse a new provider adjustment scale for old units.
     basis_path=directory/'price-basis.json'
+    if not basis_path.exists() and anchor==ARCHIVE_END:
+        basis_path=ROOT/'seed-primary'/f'{market}-prices.json'
     if not basis_path.exists():
         result['detail']='缺少主策略檢查點同基準的已驗證價格及決策橋接'
         return result
@@ -172,7 +174,11 @@ def evaluate_market(inputs, release, output, market):
     engine,kernel,cfg=sealed_engine(market)
     max_us=cutoff if market=='US' else release['snapshot']['markets']['US']['macro']['marketAsOf']
     from equity_ab import grouped_macro
-    weekly=weekly_history(inputs,pd.Timestamp(max_us))[0]
+    from etf import PartialData
+    try:
+        weekly=weekly_history(inputs,pd.Timestamp(max_us))[0]
+    except PartialData as exc:
+        raise ResearchGap(str(exc)) from exc
     grouped=grouped_macro(weekly,'base').set_index('macro_vintage_date')
     base=archives[pd.Timestamp(anchor)]
     scales={}
@@ -216,7 +222,10 @@ def evaluate_market(inputs, release, output, market):
         exchange=engine.Market(panel,charts,pd.DatetimeIndex(list(archives)),cfg)
         def run(start,end,variant,state):
             return kernel(exchange,start,end,'primary',extras=variant=='B',checkpoint=state)
-    return publish_primary(run,accounts,cutoff,market,directory,charts,panel)
+    try:
+        return publish_primary(run,accounts,cutoff,market,directory,charts,panel)
+    except (AssertionError, KeyError, ValueError) as exc:
+        raise ResearchGap(f'{market} {cutoff}: checkpoint validation failed: {exc}') from exc
 
 
 def publish_primary(run, accounts, cutoff, market, directory, charts, panel):
@@ -238,10 +247,21 @@ def publish_primary(run, accounts, cutoff, market, directory, charts, panel):
     # Normalize all payloads before replacing any checkpoint file.
     decisions=js(panel.loc[panel.signal_date>pd.Timestamp(next(iter(accounts.values()))['summary']['through'])]
                  .to_dict('records'))
-    save(directory/'ledgers'/f'{cutoff}.json',dict(accounts=ledger,decisions=decisions))
-    (directory/'checkpoint.json.gz').write_bytes(gzip.compress(json.dumps(checkpoints,allow_nan=False).encode(),mtime=0))
-    save(directory/'price-basis.json',dict(date=cutoff,prices={s:float(frame.loc[pd.Timestamp(cutoff),'adj_close'])
-        for s,frame in charts.items() if 'adj_close' in frame and pd.Timestamp(cutoff) in frame.index}))
     latest={key:dict(positions=rows['positions'],orders=rows['orders']) for key,rows in ledger.items()}
-    save(directory/'release.json',dict(schema=1,market=market,through=cutoff,summary=summaries,curves=history,latest=latest))
+    payloads={
+        f'ledgers/{cutoff}.json':dict(accounts=ledger,decisions=decisions),
+        'price-basis.json':dict(date=cutoff,prices={s:float(frame.loc[pd.Timestamp(cutoff),'adj_close'])
+            for s,frame in charts.items() if 'adj_close' in frame and pd.Timestamp(cutoff) in frame.index}),
+        'release.json':dict(schema=1,market=market,through=cutoff,summary=summaries,curves=history,latest=latest),
+    }
+    from tempfile import TemporaryDirectory
+    with TemporaryDirectory(dir=directory) as temp:
+        staged=Path(temp)
+        for name,payload in payloads.items():
+            save(staged/name,payload)
+        (staged/'checkpoint.json.gz').write_bytes(gzip.compress(json.dumps(checkpoints,allow_nan=False).encode(),mtime=0))
+        for name in [*payloads,'checkpoint.json.gz']:
+            destination=directory/name
+            destination.parent.mkdir(parents=True,exist_ok=True)
+            (staged/name).replace(destination)
     return dict(status='VERIFIED',through=cutoff,requested=cutoff,cohorts=len(summaries),detail='')
