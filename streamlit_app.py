@@ -451,23 +451,52 @@ def runner_attempts():
 
 
 def update_status(state):
+    """Keep public market health concise; put diagnostics behind an expander."""
+    summaries = []
     for market, info in state["markets"].items():
         label = "美股" if market == "US" else "台股"
-        count = lambda value: "—" if value is None else value
-        st.caption(f"{label}｜預期 {info['expected']} · 成功 {count(info['succeeded'])} · 失敗 {count(info['failed'])}"
-                   f" · 未處理 {count(info['notAttempted'])}｜最後成功收盤 {info['date'] or '待核對'}"
-                   f" · 資料時間 {stamp(info['lastSuccessAt'])}")
-        if info["reason"]:
-            st.warning(f"{label}資料異常｜{info['reason']}｜正式買入訊號暫停")
-            if info["affected"]:
-                st.write("受影響股票｜" + "、".join(info["affected"]))
-            elif info["marketWide"]:
-                st.write(f"受影響範圍｜{label}全市場 {info['expected']} 檔")
-            if info["errors"]:
-                with st.expander(f"{label}資料錯誤明細"):
-                    table([{"標的":e.get("symbol") or "市場","資料類型":e.get("type"),"錯誤":str(e.get("code")),
-                            "來源":e.get("provider"),"時間":stamp(e.get("at")),"更新識別":e.get("runId"),
-                            "研究批次":e.get("batch")} for e in info["errors"]], label=f"{label}資料錯誤")
+        errors = info.get("errors") or []
+        last_date = info.get("date") or "待核對"
+        if info.get("reason"):
+            count = sum(e.get("code") == "MISSING_FILING_EVIDENCE" for e in errors)
+            if count:
+                summaries.append(f"{label}資料待驗證（{count} 檔財報）；正式新買入訊號暫停，沿用 {last_date}")
+            elif info.get("marketWide"):
+                summaries.append(f"{label}資料待驗證；沿用 {last_date}")
+            else:
+                summaries.append(f"{label}資料待驗證；沿用 {last_date}")
+    if summaries:
+        st.caption("⚠️ " + "｜".join(summaries))
+    else:
+        st.caption("✓ 美股、台股研究資料維持最近已驗證批次")
+    with st.expander("資料更新狀態與錯誤明細", expanded=False):
+        for market, info in state["markets"].items():
+            label = "美股" if market == "US" else "台股"
+            count = lambda value: "—" if value is None else value
+            st.markdown(f"**{label}**｜最後成功收盤 {info.get('date') or '待核對'} · 資料時間 {stamp(info.get('lastSuccessAt'))}")
+            expected = info.get("expected")
+            if not info.get("reason") and info.get("succeeded") == 0 and info.get("failed") == 0 and info.get("notAttempted") == expected:
+                st.caption("同一收盤日或休市，沒有新資料需要處理；不是全部股票更新失敗。")
+            else:
+                st.caption(f"預期 {count(expected)} · 成功 {count(info.get('succeeded'))} · 失敗 {count(info.get('failed'))} · 未處理 {count(info.get('notAttempted'))}")
+            if not info.get("reason"):
+                continue
+            errors = info.get("errors") or []
+            if any(e.get("code") == "MISSING_FILING_EVIDENCE" for e in errors):
+                st.caption("新財報缺少可核對的公告時點與版本資料，保留已驗證批次；不可用未證實的財報產生正式買入訊號。")
+            elif info.get("marketWide"):
+                st.caption("全市場資料更新未通過，保留已驗證批次。")
+            else:
+                st.caption("來源資料尚有異常，保留已驗證批次。")
+            if info.get("affected"):
+                st.caption("受影響股票：" + "、".join(info["affected"]))
+            if errors:
+                table([{"標的": e.get("symbol") or "市場", "資料類型": e.get("type"),
+                        "錯誤": str(e.get("code")), "來源": e.get("provider"),
+                        "時間": stamp(e.get("at")), "更新識別": e.get("runId"),
+                        "研究批次": e.get("batch")} for e in errors], label=f"{label}資料錯誤")
+            else:
+                st.caption(str(info["reason"]))
 
 
 def current_update_state():
