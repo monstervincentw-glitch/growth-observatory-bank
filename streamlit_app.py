@@ -1,6 +1,6 @@
 import gzip
 import json
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 from datetime import datetime
 from io import BytesIO
 from os import environ
@@ -16,7 +16,7 @@ from sheets_data import BASE, SnapshotReader, fetch_rows, read_gzip
 from shared.validation import health
 from shared.candidates import FORMAL, PENDING, RESEARCH, SCOPES, candidate_status, in_scope
 from taiwan_fund_research import render as render_taiwan_fund_research
-from performance_view import Reader as PerformanceReader, fetch as fetch_performance, fetch_published, overlay as overlay_performance
+from performance_view import Reader as PerformanceReader, fetch as fetch_performance, overlay as overlay_performance
 from performance.publication import decode as decode_performance
 
 st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide", initial_sidebar_state="auto")
@@ -191,6 +191,15 @@ def markets(market, block, signal_available, market_reason=None):
 def market_picker(column, *, label_visibility="visible"):
     return MARKETS[column.segmented_control("市場", list(MARKETS), default="美股", key="bank-market",
                                             label_visibility=label_visibility) or "美股"]
+
+
+def fetch_published(path):
+    base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/performance-data/"
+    with urlopen(Request(base + path, headers={"Cache-Control":"no-cache"}), timeout=5) as response:
+        raw = response.read(2_000_001)
+    if len(raw)>2_000_000:
+        raise ValueError("績效資料超過大小限制")
+    return json.loads(raw)
 
 
 @st.cache_data(ttl=90, show_spinner=False)
