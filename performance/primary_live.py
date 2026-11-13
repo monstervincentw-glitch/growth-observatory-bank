@@ -34,9 +34,9 @@ def load_archive(inputs, market, days):
     folder = inputs/'primary-inputs'/market
     by_day = {}
     for date in days:
-        path = folder/f'{date.date()}.json'
+        path = inputs/'observed-primary-inputs'/market/f'{date.date()}.json'
         if not path.exists():
-            path = inputs/'observed-primary-inputs'/market/f'{date.date()}.json'
+            path = folder/f'{date.date()}.json'
         if path.exists():
             data = json.loads(path.read_text())
             if (data['market']!=market or data['cutoff']!=str(date.date()) or
@@ -154,6 +154,11 @@ def evaluate_market(inputs, release, output, market):
     result=dict(status='WAITING_FOR_CONTINUITY',through=anchor,requested=cutoff,
         archived_sessions=[str(day.date()) for day in archives if day>pd.Timestamp(anchor)],
         missing_sessions=missing,filing_or_quote_gaps=filing)
+    if recent.exists() and observation.get('day') in missing:
+        absent=sorted(set(observation.get('quotes',{}))-set(observation.get('observations',{})))
+        result['latest_observation']=dict(date=observation['day'],
+            decisionStatus=observation.get('decisionStatus'), missingEffectiveFinancial=absent,
+            deferredFinancial=observation.get('pendingFinancial',[]))
     if missing or filing:
         result['detail']='需要逐日且已驗證的決策與成交資料'
         return result
