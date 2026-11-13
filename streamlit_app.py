@@ -16,6 +16,8 @@ from sheets_data import BASE, SnapshotReader, fetch_rows, read_gzip
 from shared.validation import health
 from shared.candidates import FORMAL, PENDING, RESEARCH, SCOPES, candidate_status, in_scope
 from taiwan_fund_research import render as render_taiwan_fund_research
+from performance_view import Reader as PerformanceReader, fetch as fetch_performance, overlay as overlay_performance
+from performance.publication import decode as decode_performance
 
 st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide", initial_sidebar_state="auto")
 
@@ -201,6 +203,17 @@ def backtest(research, nav):
     curve["日期"] = pd.to_datetime(curve["日期"])
     trend_chart(curve, "日期", ["A", "B"], ylabel="淨值倍數")
     st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
+    marks = (data or {}).get("markets", {}).get(market, {}).get("marks", {}).get(str(year))
+    if marks:
+        selected = next(row for row in rows if row["start_year"] == year)
+        block = []
+        for row in marks["portfolios"]:
+            variant = row["variant"]
+            original = (selected[f"{variant}_cumulative"] + 1) * (100_000 if market == "US" else 3_000_000)
+            block.append({"方案": variant, "持倉估值": number(row["value"]),
+                          "相對封存日變動": percent(row["value"] / original - 1)})
+        st.caption(f"持倉估值 {marks['date']} · 策略回測 2026-11-04 · 依封存部位及已驗證收盤價")
+        table(block, label="封存持股最新估值")
     if market=="TW":
         st.warning("台股 2016–2026 起跑組為研究版。現有封存驗收沒有確認符合公告時點、財報版本及成交證據的可信起始年。")
     else:
@@ -267,7 +280,34 @@ def tracking(snapshot_data, baseline):
     csv_button("匯出策略估值 CSV",plans,f"{market}-{year}-tracking.csv",f"track-{market}")
     st.caption(f"最近訊號計算 {stamp(block['signalAt'])} · {('USD' if market=='US' else 'TWD')}")
 
-def advisor(research):
+@st.cache_resource
+def performance_reader():
+    return PerformanceReader(environ.get("PERFORMANCE_CACHE_PATH", "/tmp/growth-bank-performance/release.json"))
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def advisor_performance():
+    book = environ.get("PERFORMANCE_SHEETS_ID")
+    try:
+        account = st.secrets.get("performance_google_service_account")
+    except FileNotFoundError:
+        account = None
+    if book and account:
+        data, warning = performance_reader().refresh(lambda: fetch_performance(book, account))
+        if data:
+            return data, warning, "Google Sheets"
+    else:
+        warning = None
+    try:
+        rows = json.loads((BASE / "data/etf-verified-release.json").read_text())
+        return decode_performance(rows), warning, "已驗證績效批次"
+    except (OSError, ValueError, TypeError, KeyError):
+        return None, warning or "ETF 績效批次讀取失敗，顯示原封存。", None
+
+
+def advisor(research, research_close=None):
+    current, performance_error, performance_source = advisor_performance()
+    research = overlay_performance(research, current)
     products=sorted({x["symbol"] for x in research["advisor"]})
     with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
         product=st.selectbox("研究商品",products,index=products.index("QQQ"),width=132)
@@ -280,7 +320,16 @@ def advisor(research):
     })
     st.subheader("A／B／C／D 績效比較")
     strategy_comparison(comparison, {code: f"{code} {name}" for code, name in PLANS.items()})
-    st.caption("封存至 2026-11-04。早期信用利差代理與發布時點存在限制。共同基金採可得淨值，銀行申贖截止時間及費用依通路而異。")
+    cutoff = selected[0].get("through", "2026-11-04")
+    if cutoff == "2026-11-04":
+        st.caption("顧問績效封存至 2026-11-04。早期信用利差代理與發布時點存在限制。共同基金採可得淨值。")
+    else:
+        st.caption(f"ETF 績效截止 {cutoff} · {performance_source} · {current['batch']} · 更新 {stamp(current['calculated_at'])}")
+        age = (datetime.now(ZoneInfo("America/New_York")).date() - datetime.fromisoformat(cutoff).date()).days
+        if age > 4 or (research_close and cutoff < research_close):
+            st.warning("STALE_DATA｜ETF 績效日期落後，顯示最後驗證批次。")
+    if performance_error:
+        st.warning(performance_error)
     with st.expander("各策略明細"):
         table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"累積":percent(r["cumulative"]),"CAGR":percent(r["cagr"]),
             "最大回撤":percent(r["mdd"]),"最差年度":r["worst_year"],"最差年報酬":percent(r["worst_year_return"]),
@@ -363,6 +412,7 @@ def current_update_state():
 
 
 def clear_research_caches():
+    advisor_performance.clear()
     snapshot.clear()
     runner_attempts.clear()
 
@@ -413,7 +463,7 @@ def advisor_page():
     if advisor_page=="台灣可申購共同基金":
         render_taiwan_fund_research(fund_view)
     else:
-        advisor(research)
+        advisor(research, data["markets"]["US"]["macro"]["marketAsOf"] if data else None)
 
 
 layout_style()
