@@ -2,6 +2,7 @@ import gzip
 import json
 from urllib.request import Request, urlopen
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from os import environ
 from urllib.error import HTTPError
@@ -198,24 +199,24 @@ def market_picker(column, *, label_visibility="visible"):
                                             label_visibility=label_visibility) or "美股"]
 
 
-def fetch_published(path):
-    base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/performance-data/"
-    with urlopen(Request(base + path, headers={"Cache-Control":"no-cache"}), timeout=5) as response:
-        raw = response.read(2_000_001)
-    if len(raw)>2_000_000:
-        raise ValueError("績效資料超過大小限制")
+def fetch_bank_json(branch, path, limit=2_000_000):
+    base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/"
+    request = Request(f"{base}{branch}/{path}", headers={"Cache-Control":"no-cache"})
+    with urlopen(request, timeout=15) as response:
+        raw = response.read(limit+1)
+    if len(raw)>limit:
+        raise ValueError("銀行版資料超過大小限制")
     return json.loads(raw)
+
+
+def fetch_published(path):
+    return fetch_bank_json("performance-data",path)
 
 
 @st.cache_data(ttl=90, show_spinner=False)
 def market_prices(market):
     try:
-        base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/research-data/"
-        with urlopen(Request(f"{base}market-prices/{market}/latest.json", headers={"Cache-Control":"no-cache"}), timeout=5) as response:
-            raw = response.read(200_001)
-        if len(raw)>200_000:
-            return None
-        payload=json.loads(raw)
+        payload=fetch_bank_json("research-data",f"market-prices/{market}/latest.json",200_000)
         if payload["schema"]!=1 or payload["market"]!=market or payload["status"] not in ("PRICES_VERIFIED","PARTIAL_PRICES"):
             return None
         if any(row["priceDate"]!=payload["day"] or not isinstance(row["close"],(int,float)) or row["close"]<=0
@@ -471,17 +472,14 @@ def advisor(research, research_close=None):
 
 @st.cache_data(ttl=90, show_spinner=False)
 def runner_attempts():
-    base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/research-data/"
     try:
         try:
-            with urlopen(base + "attempts.json", timeout=5) as response:
-                attempts = json.loads(response.read(262_145))
+            attempts=fetch_bank_json("research-data","attempts.json",262_144)
         except HTTPError as error:
             if error.code != 404:
                 raise
-            with urlopen(base + "attempt.json", timeout=5) as response:
-                attempt = json.loads(response.read(262_145))
-            attempts = {attempt["market"]: attempt}
+            attempt=fetch_bank_json("research-data","attempt.json",262_144)
+            attempts={attempt["market"]:attempt}
         for market, record in attempts.items():
             if market not in ("US", "TW") or record["market"] != market or record["status"] not in ("published", "same_close", "failed", "quotes_only"):
                 raise ValueError("更新紀錄格式錯誤")
@@ -492,7 +490,7 @@ def runner_attempts():
         return {}, "更新紀錄無法驗證"
 
 
-def update_status(state):
+def update_status(state, quote=None):
     """Keep public market health concise; put diagnostics behind an expander."""
     summaries = []
     for market, info in state["markets"].items():
@@ -519,8 +517,7 @@ def update_status(state):
                 st.caption("同一收盤日或休市，沒有新資料需要處理；不是全部股票更新失敗。")
             else:
                 st.caption(f"預期 {count(expected)} · 成功 {count(info.get('succeeded'))} · 失敗 {count(info.get('failed'))} · 未處理 {count(info.get('notAttempted'))}")
-            quote=market_prices(market)
-            if quote:
+            if quote and quote["market"]==market:
                 st.caption(f"已驗證行情 {quote['day']} · {len(quote['quotes'])} 檔")
             if not info.get("reason"):
                 continue
@@ -542,8 +539,8 @@ def update_status(state):
                 st.caption(str(info["reason"]))
 
 
-def current_update_state():
-    attempts, issue = runner_attempts()
+def current_update_state(loaded=None):
+    attempts, issue = loaded if loaded is not None else runner_attempts()
     entry = {"snapshot": data, "batch": batch, "checksum": research_state["checksum"]} if data else None
     # A successful price-only run preserves the previous strategy batch.
     for market, attempt in attempts.items():
@@ -591,12 +588,17 @@ def records(data, source, batch):
 
 def market_page():
     market = market_picker(market_controls, label_visibility="collapsed")
-    state = current_update_state()
-    update_status(state)
+    # Load the two independent public files concurrently.
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        attempts=pool.submit(runner_attempts)
+        prices=pool.submit(market_prices,market)
+        state=current_update_state(attempts.result())
+        quote=prices.result()
+    update_status(state,quote)
     if data is None:
         return
     block = data["markets"][market]
-    markets(market, block, state["markets"][market]["usable"], market_prices(market))
+    markets(market, block, state["markets"][market]["usable"], quote)
 
 
 def advisor_page():
