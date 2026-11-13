@@ -2,6 +2,7 @@ import {readFile, writeFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {gzipSync} from 'node:zlib';
 import {estimatePortfolios} from './tracking.ts';
+import {validateResearch} from '../shared/research-validator.mjs';
 
 const publicFields = {
   stock: ['key','market','symbol','name','industry','ticker','cik','benchmark','currency','priceDate','close','observedAt','sourceQuality','integrity','financialObservedAt','lastAttemptAt','priceSource','sourceWarning','sourceError'],
@@ -77,7 +78,7 @@ export function project(dashboard, baseline, note='BANK-QA-A') {
     const marks=Object.fromEntries(Object.entries(byYear).map(([year,rows])=>[year,estimatePortfolios(rows,stocks,baseline.date,macro.marketAsOf)]));
     snapshot.markets[market]={stocks,macro,marks,signalAt:dashboard.strategySignalTimes?.[market]||null};
   }
-  return validate(snapshot);
+  return validateResearch(validate(snapshot));
 }
 export function envelope(snapshot) {
   validate(snapshot);

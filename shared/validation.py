@@ -145,7 +145,9 @@ def health(entry, source, issue=None, now=None, expected=None, attempts=None):
                                  or any(cutoff < close for close in published)))
         attempt = attempts.get(market, {})
         failed = block and attempt.get("status") == "failed" and as_time(attempt["at"]) > as_time(block["macro"]["lastMarketPublishedAt"])
-        reason = issue or ("行情已過期或落後應有交易日" if stale else "市場發布失敗，保留前批" if failed else None)
+        detail = attempt.get("detail") if failed else None
+        reason = issue or (("市場發布失敗，保留前批" + (f"｜{detail[:400]}" if isinstance(detail, str) and detail else ""))
+                           if failed else "行情已過期或落後應有交易日" if stale else None)
         result[market] = dict(date=cutoff, stale=stale, reason=reason,
                               usable=source == "sheets" and not reason and bool(block and block["signalAt"]),
                               financialIncomplete=sum(s["financial"]["financial_status"] != "ok" for s in block["stocks"]) if block else None,

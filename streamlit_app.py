@@ -364,6 +364,9 @@ def records(data, source, batch):
 
 def market_page():
     market = market_picker(market_controls, label_visibility="collapsed")
+    if data is None:
+        st.error(f"研究快照尚未取得，正式訊號待驗證。{research_state['issue'] or ''}")
+        return
     block = data["markets"][market]
     attempts, issue = runner_attempts()
     state = health({"snapshot": data, "batch": batch, "checksum": research_state["checksum"]},
@@ -390,18 +393,15 @@ def advisor_page():
 layout_style()
 sidebar_brand()
 data, research_state = snapshot()
-if data is None:
-    st.error(f"研究快照尚未取得，正式訊號待驗證。{research_state['issue'] or ''}")
-    st.stop()
 batch = research_state["batch"]
-source = "Google Sheets" if research_state["source"] == "sheets" else "Sheets 上次成功快取"
+source = {"sheets":"Google Sheets", "last_verified":"Sheets 上次成功快取"}.get(research_state["source"], "研究資料待核對")
 research, baseline, nav = load_archive()
 page = st.navigation([
     st.Page(market_page, title="市場觀測", icon=":material/monitoring:", default=True),
     st.Page(lambda: backtest(research, nav), title="主策略回測", icon=":material/timeline:", url_path="backtest"),
-    st.Page(lambda: tracking(data, baseline), title="策略模擬", icon=":material/stacked_line_chart:", url_path="simulation"),
+    st.Page(lambda: tracking(data, baseline) if data else st.warning("研究快照待核對，靜態估值暫停。"), title="策略模擬", icon=":material/stacked_line_chart:", url_path="simulation"),
     st.Page(advisor_page, title="顧問風控", icon=":material/shield:", url_path="advisor"),
-    st.Page(lambda: records(data, source, batch), title="更新紀錄與規則", icon=":material/history:", url_path="updates"),
+    st.Page(lambda: records(data, source, batch) if data else st.warning(research_state["issue"] or "研究快照待核對。"), title="更新紀錄與規則", icon=":material/history:", url_path="updates"),
 ], expanded=True)
 
 with st.container(key="bank-content"):
@@ -411,9 +411,13 @@ with st.container(key="bank-content"):
     else:
         status, refresh = st.columns([5, 1], vertical_alignment="center")
     with status:
-        status_line(source, data["markets"]["US"]["macro"]["marketAsOf"],
-                    data["markets"]["TW"]["macro"]["marketAsOf"], data["historyThrough"])
+        if data:
+            status_line(source, data["markets"]["US"]["macro"]["marketAsOf"],
+                        data["markets"]["TW"]["macro"]["marketAsOf"], data["historyThrough"])
+            st.caption(f"研究批次 {batch}")
+        else:
+            st.caption("公開研究日期待核對，歷史回測仍可查看。")
     refresh.button("重新讀取資料", on_click=snapshot.clear)
-    if source != "Google Sheets":
-        st.warning("本次 Sheets 讀取未通過。畫面標示目前採用的最後成功快照或封存備援。")
+    if research_state["source"] == "last_verified":
+        st.warning("本次 Sheets 讀取未通過。目前顯示上次驗證的日期與排名，正式訊號待驗證。")
     page.run()

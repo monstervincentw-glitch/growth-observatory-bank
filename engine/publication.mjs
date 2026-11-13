@@ -15,9 +15,13 @@ export function verifyMarketInputs(stocks, before) {
     }
     if (old?.financial.latest_period && f.latest_period < old.financial.latest_period)
       errors.push(stock.symbol+' 財報期別倒退');
-    if (f.fundamental_release_key && old?.financial.fundamental_release_key === f.fundamental_release_key)
-      counts.financialUnchanged++;
-    else counts.financialUpdated++;
+    const unchanged = f.fundamental_release_key && old?.financial.fundamental_release_key === f.fundamental_release_key;
+    if (unchanged) counts.financialUnchanged++;
+    else {
+      counts.financialUpdated++;
+      if (stock.market === 'TW' && !stock.evaluation.filingVerified)
+        errors.push(stock.symbol+' 新財報版本缺少收盤前公告與版本證據');
+    }
   }
   return {counts, errors};
 }
