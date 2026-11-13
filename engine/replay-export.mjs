@@ -50,7 +50,7 @@ export async function archiveEtf(folder, context, batch, knownWeekly) {
       prices[symbol]=rows.slice(-320);
     } catch(error) { errors[symbol]=String(error.message||error).slice(0,160); }
   }
-  const weeks=weeklySessions(benchmarks.QQQ,createdAt.slice(0,10)>cutoff?createdAt.slice(0,10):cutoff);
+  const weeks=weeklySessions(benchmarks.QQQ,cutoff);
   for (const day of weeks) {
     if (knownWeekly.has(day)) continue;
     try {

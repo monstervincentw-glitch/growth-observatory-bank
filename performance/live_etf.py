@@ -69,6 +69,19 @@ def weekly_history(data_root, cutoff):
 def signals_for(data_root, cutoff):
     weekly, evidence = weekly_history(data_root, cutoff)
     macro = advisor.grouped_macro(advisor.add_first_vintage(weekly),'base')
+    flags=macro[['rate_flag','conditions_flag','inflation_flag']]
+    lower=flags.eq(True).sum(axis=1)
+    upper=lower+flags.isna().sum(axis=1)
+    # If every possible score implies the same original red/non-red decision,
+    # give the engine that decision via its existing numerical threshold.
+    # Save the range in evidence and never report the proxy as a published score.
+    decisive=(upper<2)|(lower>=2)
+    inferred=macro.grouped_score.isna()&decisive&macro.macro_vintage_date.gt('2026-11-04')
+    bounds={str(macro.loc[i,'macro_vintage_date'].date()):[int(lower[i]),int(upper[i])] for i in macro.index[inferred]}
+    macro.loc[inferred,'grouped_score']=lower[inferred].astype(float)
+    for item in evidence:
+        if item['vintage_date'] in bounds:
+            item['decision_score_range']=bounds[item['vintage_date']]
     # Use the same session lag as the original ETF replay.
     old_calendar = pd.DatetimeIndex(pd.read_csv(SOURCE/'sessions.csv')['date'])
     calendar = old_calendar.union(date_slice(cutoff))

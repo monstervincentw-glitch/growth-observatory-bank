@@ -38,10 +38,11 @@ def weekly_macro(folder, weekly):
                      'reference_3m_date':None, 'reference_3m_value':None}
             if name == 'CPIAUCSL':
                 year, quarter = obs-pd.DateOffset(months=12), obs-pd.DateOffset(months=3)
-                row.update(cpi_yoy=last/values[year]-1, cpi_3m_annualized=(last/values[quarter])**4-1,
+                year_value,quarter_value=values.get(year,np.nan),values.get(quarter,np.nan)
+                row.update(cpi_yoy=last/year_value-1, cpi_3m_annualized=(last/quarter_value)**4-1,
                            cpi_observation=obs)
-                entry.update(reference_date=str(year.date()), reference_value=values[year],
-                             reference_3m_date=str(quarter.date()), reference_3m_value=values[quarter])
+                entry.update(reference_date=str(year.date()), reference_value=float(year_value) if pd.notna(year_value) else None,
+                             reference_3m_date=str(quarter.date()), reference_3m_value=float(quarter_value) if pd.notna(quarter_value) else None)
             else:
                 earlier = values.loc[:obs-pd.Timedelta(days=90)]
                 delta = last-float(earlier.iloc[-1])
