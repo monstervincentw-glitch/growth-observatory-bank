@@ -6,7 +6,11 @@ import hashlib
 import io
 import json
 import re
+import tempfile
+from threading import Lock
 from pathlib import Path
+
+from shared.validation import as_time, health, require, validate
 from urllib.parse import urlparse
 from urllib.request import urlopen
 
@@ -22,47 +26,72 @@ def read_gzip(path):
 
 
 def check(snapshot):
-    if snapshot.get("schema") != 1 or snapshot.get("historyThrough") != "2026-11-04":
-        raise ValueError("資料版本不符")
-    if set(snapshot) != {"schema", "sourceVersion", "historyThrough", "generatedAt", "qa", "markets", "jobs"}:
-        raise ValueError("研究欄位不符")
-    for market, count in COUNTS.items():
-        block = snapshot["markets"][market]
-        stocks, macro = block["stocks"], block["macro"]
-        if len(stocks) != count or len({stock["symbol"] for stock in stocks}) != count:
-            raise ValueError("研究池筆數錯誤")
-        lights = list(macro["categoryStates"].values())
-        if len(lights) != 3 or any(value not in (0, 1, None) for value in lights):
-            raise ValueError("燈號欄位錯誤")
-        low, high = lights.count(1), lights.count(1) + lights.count(None)
-        if macro["scoreRange"] != [low, high] or macro["decision"] != ("red" if low >= 2 else "non_red" if high < 2 else "unknown"):
-            raise ValueError("資金溫度不一致")
-        ranks = sorted((s["researchRank"] for s in stocks if s["researchRank"]), key=lambda r: r["rank"])
-        for index, rank in enumerate(ranks, 1):
-            if rank["rank"] != index or rank["date"] != macro["marketAsOf"]:
-                raise ValueError("排名版本不一致")
-            points = sum(x["weight"] * x["percentile"] * 100 for x in rank["detail"]["parts"])
-            if abs(points - rank["score"]) > 1e-8:
-                raise ValueError("評分不一致")
-    return snapshot
+    return validate(snapshot)
+
+
+def parse_envelope(rows, now=None, expected=None):
+    require(rows and rows[0] == HEADER and 2 <= len(rows) <= 300, "資料封套不完整")
+    records = rows[1:]
+    batch, _, count, checksum, _ = records[0]
+    require(re.fullmatch(r"v29-[0-9a-f]{16}", batch) and str(count) == str(len(records))
+            and re.fullmatch(r"[0-9a-f]{64}", checksum), "批次不完整")
+    encoded = []
+    for index, (bid, part, parts, sha, text) in enumerate(records, 1):
+        require(bid == batch and str(part) == str(index) and str(parts) == str(len(records)) and sha == checksum
+                and re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", text) and len(text) <= 18000, "批次或分段不一致")
+        encoded.append(text)
+    with gzip.GzipFile(fileobj=io.BytesIO(base64.b64decode("".join(encoded), validate=True))) as stream:
+        raw = stream.read(8_000_001)
+    require(len(raw) <= 8_000_000, "研究快照超過大小限制")
+    require(hashlib.sha256(raw).hexdigest() == checksum, "SHA-256 驗證失敗")
+    return dict(snapshot=validate(json.loads(raw), now, expected), batch=batch, checksum=checksum)
 
 
 def parse_rows(rows):
-    if not rows or rows[0] != HEADER or len(rows) < 2:
-        raise ValueError("資料封套不完整")
-    records = [r for r in rows[1:] if any(r)]
-    batch, _, count, checksum, _ = records[0]
-    if not re.fullmatch(r"v29-[0-9a-f]{16}", batch) or len(records) != int(count):
-        raise ValueError("批次不完整")
-    encoded = []
-    for index, (bid, part, parts, sha, text) in enumerate(records, 1):
-        if bid != batch or int(part) != index or int(parts) != len(records) or sha != checksum:
-            raise ValueError("分段批次不一致")
-        encoded.append(text)
-    raw = gzip.decompress(base64.b64decode("".join(encoded), validate=True))
-    if hashlib.sha256(raw).hexdigest() != checksum:
-        raise ValueError("資料校驗失敗")
-    return check(json.loads(raw)), batch
+    entry = parse_envelope(rows)
+    return entry["snapshot"], entry["batch"]
+
+
+class SnapshotReader:
+    def __init__(self, cache_path=None):
+        self.cache_path = Path(cache_path) if cache_path else None
+        self.last = None
+        self.lock = Lock()
+
+    def read(self, fetch, now=None, expected=None):
+        with self.lock:
+            if self.last is None and self.cache_path and self.cache_path.exists():
+                try:
+                    self.last = parse_envelope(json.loads(self.cache_path.read_text()), now)
+                except (OSError, ValueError, KeyError, TypeError, EOFError):
+                    pass
+            try:
+                rows = fetch()
+                incoming = parse_envelope(rows, now, expected)
+                if self.last:
+                    before, after = self.last["snapshot"], incoming["snapshot"]
+                    require(as_time(after["generatedAt"]) >= as_time(before["generatedAt"])
+                            and all(after["markets"][m]["macro"]["marketAsOf"] >= b["macro"]["marketAsOf"]
+                                    for m, b in before["markets"].items())
+                            and (incoming["batch"] != self.last["batch"] or incoming["checksum"] == self.last["checksum"]),
+                            "發布批次倒退或同批內容不同")
+                if self.cache_path and (not self.last or incoming["checksum"] != self.last["checksum"]):
+                    self.save(rows)
+                self.last = incoming
+                status = health(self.last, "sheets", now=now, expected=expected)
+            except Exception as error:
+                status = health(self.last, "last_verified" if self.last else "unavailable", str(error), now, expected)
+            return self.last, status
+
+    def save(self, rows):
+        self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(mode="w", dir=self.cache_path.parent, delete=False) as temp:
+            try:
+                json.dump(rows, temp)
+                temp.close()
+                Path(temp.name).replace(self.cache_path)
+            finally:
+                Path(temp.name).unlink(missing_ok=True)
 
 
 def fetch_rows(public_csv_url, service_account=None):
@@ -85,5 +114,6 @@ def fetch_rows(public_csv_url, service_account=None):
     if target.scheme != "https" or not (valid_publish or valid_script):
         raise ValueError("Sheets 發布網址不符")
     with urlopen(public_csv_url, timeout=15) as response:
-        raw = response.read(2_000_000)
+        raw = response.read(2_000_001)
+    require(len(raw) <= 2_000_000, "研究快照超過大小限制")
     return list(csv.reader(io.StringIO(raw.decode("utf-8-sig"))))

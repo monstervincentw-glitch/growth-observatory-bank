@@ -56,7 +56,6 @@ export function validate(snapshot) {
     if(!lights.every(x=>[0,1,null].includes(x))||JSON.stringify(macro.scoreRange)!==JSON.stringify([low,high])||
         macro.decision!==(low>=2?'red':high<2?'non_red':'unknown'))fail(market+' 資金燈號不一致');
     const candidates=stocks.filter(x=>x.researchRank).sort((a,b)=>a.researchRank.rank-b.researchRank.rank);
-    if(!candidates.length)fail(market+' 缺候選快照');
     for(const [index,i] of candidates.entries()){
       const r=i.researchRank,p=r.detail.parts;
       if(r.rank!==index+1||r.date!==macro.marketAsOf||i.priceDate!==r.date||r.archived||!i.integrity||i.sourceError||

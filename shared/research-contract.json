@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "sourceVersion": 29,
+  "historyThrough": "2026-11-04",
+  "strategy": "grouped-2of3-20261111-tristate",
+  "counts": {"US": 89, "TW": 80},
+  "maxAgeDays": 5,
+  "flags": ["fundamental","filingVerified","funding","tradable","divergence","fresh","primary","buy_hold"],
+  "weights": {
+    "US": {"growth":0.3375,"acceleration":0.15,"operating":0.15,"cashflow":0.1125,"value":0.25},
+    "TW": {"growth":0.5,"operating":0.25,"cashflow":0.25}
+  },
+  "privateFields": ["owner","owner_id","ownerId","email","holdings","portfoliosPrivate","closedHoldings","watchlist","transactions","transaction","ledger","ledgerEntries","cash","account_id","accountId","quantity","costBasis","private"]
+}

@@ -184,8 +184,10 @@ export async function refreshInstrument(old:Instrument,context:RefreshContext,re
  const validated=validateBars(bars);bars=requireClose(validated.bars,context.cutoff);
  let financial:Financial={...old.financial};
  if(!reuseFinancial){
+  try{
   if(old.market==='US')financial=secFinancial(await readJSON(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(old.cik).padStart(10,'0')}.json`,{'User-Agent':'GrowthObservatory/1.0 personal financial research'}),bars.at(-1)!.date);
   else{const start=iso(ms(context.cutoff)-1400*dayms);const [income,cash]=await Promise.all([finmind('TaiwanStockFinancialStatements',old.symbol,start,context.cutoff),finmind('TaiwanStockCashFlowsStatement',old.symbol,start,context.cutoff)]);financial=twFinancial(income,cash,bars.at(-1)!.date);}
+  }catch(error){throw new Error('財報來源：'+(error instanceof Error?error.message:String(error)));}
  }
  if(old.market==='TW'&&old.financial.filingEvidence?.releaseKey===financial.fundamental_release_key)
   financial.filingEvidence=old.financial.filingEvidence;

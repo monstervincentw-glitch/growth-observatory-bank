@@ -1,8 +1,8 @@
 import {readFile,writeFile} from 'node:fs/promises';
-import {gunzipSync} from 'node:zlib';
 import {makeContext,refreshInstrument} from './providers.ts';
 import {evaluate,rankInstruments} from './rules.ts';
 import {project,envelope,validate,markets} from './project.mjs';
+import {requirePublishable,verifyMarketInputs} from './publication.mjs';
 
 const [market, priorPath, outputPath] = process.argv.slice(2);
 if(!(market in markets)||!priorPath||!outputPath)throw Error('使用方式：node engine/update.mjs US|TW 舊發布.json 新發布.json');
@@ -41,6 +41,9 @@ try{
       .sort((a,b)=>b.rankScore-a.rankScore||a.key.localeCompare(b.key));
     const ranks=new Map(scores.map((s,i)=>[s.key,{rank:i+1,score:s.rankScore,detail:s.rankDetail,date:context.cutoff,archived:false,divergence:evaluate(s,macro).divergence}]));
     const instruments=stocks.map(s=>({...s,evaluation:evaluate(s,macro),researchRank:ranks.get(s.key)||null}));
+    const financialReview=verifyMarketInputs(instruments,before.stocks);
+    attempt.health={...financialReview.counts, macro:macro.status};
+    requirePublishable(financialReview);
     const newJob={market,status:'done',total:markets[market],updated:attempt.updated,failed:0,created_at:attempt.at,updated_at:now,retained:0,
       fallback:stocks.filter(s=>s.priceValidation?.mode==='fallback_verified').length};
     const dashboard={authenticated:false,storageReady:true,serverTime:now,jobs:[newJob,...old.jobs],
@@ -49,15 +52,15 @@ try{
       strategySignalTimes:{...Object.fromEntries(Object.entries(old.markets).map(([k,v])=>[k,v.signalAt])),[market]:now}};
     snapshot=project(dashboard,baseline,old.qa);
     attempt.status='published';
-    attempt.detail='完整收盤、財報、總經與排名已核對。';
+    attempt.detail='收盤已驗證並發布排名。財報及總經狀態：'+JSON.stringify(attempt.health);
   }
 }catch(error){
   attempt.status='failed';
   attempt.detail=String(error.message||error).slice(0,1600);
 }
-const {id,rows}=envelope(snapshot);
+const {id,rows}=snapshot===old && prior.rows ? {id:prior.rows[1][0],rows:prior.rows} : envelope(snapshot);
 attempt.batch=id;
 attempt.us_close=snapshot.markets.US.macro.marketAsOf;
 attempt.tw_close=snapshot.markets.TW.macro.marketAsOf;
-await writeFile(outputPath,JSON.stringify({snapshot,rows,attempt})+'\n');
+await writeFile(outputPath,JSON.stringify({snapshot,rows,attempt,attempts:{...prior.attempts,[market]:attempt}})+'\n');
 console.log(JSON.stringify(attempt));

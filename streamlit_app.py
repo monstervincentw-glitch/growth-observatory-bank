@@ -3,7 +3,8 @@ import json
 from urllib.request import urlopen
 from datetime import datetime
 from io import BytesIO
-from threading import Lock
+from os import environ
+from urllib.error import HTTPError
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -11,7 +12,9 @@ import streamlit as st
 
 from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout_style,
                          readable_table, sidebar_brand, status_line, strategy_comparison, trend_chart)
-from sheets_data import BASE, check, fetch_rows, parse_rows, read_gzip
+from sheets_data import BASE, SnapshotReader, fetch_rows, read_gzip
+from shared.validation import health
+from shared.candidates import FORMAL, PENDING, RESEARCH, SCOPES, candidate_status, in_scope
 from taiwan_fund_research import render as render_taiwan_fund_research
 
 st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide", initial_sidebar_state="auto")
@@ -26,29 +29,20 @@ PCT_ADVISOR = ["cumulative","cagr","mdd","worst_year_return","transaction_cost_i
                "strategy_return","window_mdd","drawdown"]
 
 @st.cache_resource
-def last_sheet_snapshot():
-    return Lock(), {}
+def sheet_reader():
+    return SnapshotReader(environ.get("RESEARCH_CACHE_PATH", "/tmp/growth-bank-research/snapshot.json"))
+
 
 @st.cache_data(ttl=90, show_spinner=False)
 def snapshot():
     config_path = BASE / "data/sheets-url.txt"
-    csv_url = config_path.read_text().strip() if config_path.exists() else ""
+    csv_url = environ.get("RESEARCH_SHEETS_URL") or (config_path.read_text().strip() if config_path.exists() else "")
     try:
         account = st.secrets.get("google_service_account")
     except FileNotFoundError:
         account = None
-    try:
-        data, batch = parse_rows(fetch_rows(csv_url, account))
-        lock, last = last_sheet_snapshot()
-        with lock:
-            last.update(data=data, batch=batch)
-        return data, batch, "Google Sheets"
-    except (OSError, KeyError, ValueError, TypeError, ImportError):
-        lock, last = last_sheet_snapshot()
-        with lock:
-            if last:
-                return last["data"], last["batch"], "Sheets 上次成功快取"
-        return check(read_gzip("data/snapshot.json.gz")), None, "封存備援"
+    entry, state = sheet_reader().read(lambda: fetch_rows(csv_url, account))
+    return entry["snapshot"] if entry else None, state
 
 @st.cache_data(show_spinner=False)
 def load_archive():
@@ -96,20 +90,23 @@ def funding_details(macro):
         table(rows, label="資金溫度資料版本")
         st.caption("利率、金融條件、通膨各至多一分。最低分已達 2 則觸發，最高分低於 2 則未達門檻，其他為未知。")
 
-def markets(market, block, signal_available):
+def markets(market, block, signal_available, market_reason=None):
     stocks = block["stocks"]
     by_rank = sorted(stocks, key=lambda s: s["researchRank"]["rank"] if s["researchRank"] else 1000)
     funding_dashboard(block["macro"])
-    scope_control, search_control, industry_control, order_control = st.columns([3.45, 1.65, 1, 1], vertical_alignment="bottom")
-    scope = scope_control.segmented_control("顯示範圍", ["研究候選","全部研究池","主策略正式候選","背離長抱候選"],
-                                            default="研究候選", key=f"scope-{market}")
+    states = {stock["key"]: candidate_status(stock, block["macro"], signal_available, market_reason)
+              for stock in stocks}
+    scope_control, search_control, industry_control, order_control = st.columns([1.4, 1.4, 1, 1], vertical_alignment="bottom")
+    scope = scope_control.selectbox("顯示範圍", SCOPES, key=f"scope-{market}")
+    study_count = sum(state["research"] for state in states.values())
+    formal_count = sum(state["formal"] for state in states.values())
+    formal_summary = f"{formal_count} 檔" if signal_available else "待驗證"
+    st.caption(f"背離研究候選 {study_count} 檔 · 背離正式買入訊號 {formal_summary}")
     query = search_control.text_input("搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
     industry = industry_control.selectbox("產業",["全部", *sorted({s["industry"] for s in stocks if s.get("industry")})],key=f"industry-{market}")
     order = order_control.selectbox("排序",["研究排名","營收成長","126 日回撤"],key=f"sort-{market}")
     def visible(stock):
-        scope_ok = {"研究候選": bool(stock["researchRank"]), "全部研究池": True,
-                    "主策略正式候選": signal_available and stock["evaluation"].get("primary"),
-                    "背離長抱候選": signal_available and stock["evaluation"].get("buy_hold")}.get(scope, True)
+        scope_ok = in_scope(stock, states[stock["key"]], scope, signal_available)
         return scope_ok and (industry=="全部" or stock.get("industry")==industry) and query in " ".join(str(stock.get(k) or "") for k in ("symbol","name","industry")).casefold()
     selected_stocks = list(filter(visible, by_rank))
     if order!="研究排名":
@@ -122,6 +119,7 @@ def markets(market, block, signal_available):
     for stock in selected_stocks:
         rank = stock["researchRank"] or {}
         f, e = stock["financial"], stock["evaluation"]
+        state = states[stock["key"]]
         rows.append({"排名":rank.get("rank"),"代號":stock["symbol"],"公司":stock["name"],"產業":stock.get("industry"),
             "總分":round(rank["score"],2) if rank else None,"收盤":stock["close"],"行情日":stock["priceDate"],
             "TTM 營收年增":percent(f.get("revenue_growth")),"單季營收年增":percent(f.get("quarterly_growth")),
@@ -129,20 +127,30 @@ def markets(market, block, signal_available):
             "P/S":stock["features"].get("price_sales"),"財報期":f.get("latest_period"),
             "申報日":f.get("max_input_filed") or f.get("filingEvidence",{}).get("publishedAt"),
             "資料品質":"待核對" if stock.get("sourceError") or not stock["integrity"] else "已核對",
-            "正式訊號":("主策略" if e.get("primary") else "背離長抱" if e.get("buy_hold") else "—") if signal_available else "待更新"})
+            "主策略正式訊號":("符合正式條件" if e["primary"] else "—") if signal_available else "待驗證",
+            "背離研究":"符合" if state["research"] else "—",
+            "背離正式狀態":state["label"],"背離阻擋原因":"｜".join(state["reasons"])})
     if not signal_available:
         st.warning("目前保留可核對的研究排名，正式訊號待更新。")
     if not rows:
         funding_details(block["macro"])
-        st.info("目前篩選條件沒有符合的標的。")
+        if scope == FORMAL and not signal_available:
+            st.info(market_reason or "正式訊號待驗證，請查看資料狀態。")
+        elif scope == FORMAL and not formal_count:
+            st.info("本批沒有符合背離正式買入條件的標的。可切換至背離研究候選查看逐檔原因。")
+        else:
+            st.info("目前篩選條件沒有符合的標的。")
         return
-    main_columns = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增", "正式訊號"]
+    main_columns = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增",
+                    "背離正式狀態" if scope in (RESEARCH, FORMAL, PENDING) else "主策略正式訊號"]
     detail_columns = ["代號", "單季營收年增", "營益率", "營業現金流率", "P/S", "財報期", "申報日", "資料品質"]
+    if scope in (RESEARCH, FORMAL, PENDING):
+        detail_columns += ["背離研究", "背離正式狀態", "背離阻擋原因"]
     page_size = 20
     page_key = f"stocks-page-{market}"
     start = min(st.session_state.get(page_key, 0), (len(rows) - 1) // page_size * page_size)
     with st.container(horizontal=True, gap="small", vertical_alignment="center"):
-        st.subheader("研究候選與分數", anchor=False)
+        st.subheader(scope, anchor=False)
         st.write(f"{start + 1}–{min(start + page_size, len(rows))} ／ {len(rows)} 檔")
         if len(rows) > page_size:
             st.button("上一頁", key=f"stocks-prev-{market}", disabled=start == 0,
@@ -167,8 +175,10 @@ def markets(market, block, signal_available):
     st.caption(f"財報期 {f.get('latest_period') or '待核對'} · 首次／最近可核對觀測 {stamp(stock.get('financialObservedAt'))} · 行情來源 {stock.get('priceSource') or '待核對'}")
     if stock.get("sourceWarning") or stock.get("sourceError"):
         st.warning(stock.get("sourceWarning") or stock["sourceError"])
-    if e.get("reasons"):
-        st.caption("｜".join(e["reasons"]))
+    state = states[stock["key"]]
+    st.write(f"**背離正式狀態** {state['label']}")
+    if state["reasons"]:
+        st.caption("｜".join(state["reasons"]))
     technical = stock["features"]
     st.caption(f"126 日回撤 {percent(technical.get('drawdown_126'))} · 63 日相對報酬 {percent(technical.get('relative_63'))} · 可用交易日 {technical.get('history_sessions','—')}")
     if stock["history"]:
@@ -304,20 +314,35 @@ def advisor(research):
         report_file(label,name)
 
 @st.cache_data(ttl=90, show_spinner=False)
-def latest_runner_attempt():
-    url = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/research-data/attempt.json"
+def runner_attempts():
+    base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/research-data/"
     try:
-        with urlopen(url, timeout=5) as response:
-            attempt = json.loads(response.read(30_000))
-    except (OSError, ValueError):
-        return None
-    return attempt if attempt.get("market") in ("US","TW") and attempt.get("status") in ("published","same_close","failed") else None
+        try:
+            with urlopen(base + "attempts.json", timeout=5) as response:
+                attempts = json.loads(response.read(30_001))
+        except HTTPError as error:
+            if error.code != 404:
+                raise
+            with urlopen(base + "attempt.json", timeout=5) as response:
+                attempt = json.loads(response.read(30_001))
+            attempts = {attempt["market"]: attempt}
+        for market, record in attempts.items():
+            if market not in ("US", "TW") or record["market"] != market or record["status"] not in ("published", "same_close", "failed"):
+                raise ValueError("更新紀錄格式錯誤")
+            if datetime.fromisoformat(record["at"]).tzinfo is None:
+                raise ValueError("更新紀錄時間缺少時區")
+        return attempts, None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return {}, "更新紀錄無法驗證"
+
 
 def records(data, source, batch):
     st.write(f"**來源** {source}　**批次** {batch or '封存備援'}")
     st.write(f"**同步驗收標記** {data['qa']}")
-    attempt = latest_runner_attempt()
-    if attempt:
+    attempts, issue = runner_attempts()
+    if issue:
+        st.warning(issue)
+    for attempt in attempts.values():
         result = {"same_close":"同一收盤，保留快照","failed":"來源更新失敗","published":"研究批次已發布"}[attempt["status"]]
         st.write(f"**最近雲端收盤工作** {attempt['market']} · {result} · {stamp(attempt.get('at'))}")
         if attempt["status"] == "failed":
@@ -340,12 +365,12 @@ def records(data, source, batch):
 def market_page():
     market = market_picker(market_controls, label_visibility="collapsed")
     block = data["markets"][market]
-    market_date = datetime.fromisoformat(block["macro"]["marketAsOf"]).date()
-    age = (datetime.now(ZoneInfo("Asia/Taipei")).date() - market_date).days
-    attempt = latest_runner_attempt()
-    failed_since_publish = bool(attempt and attempt["market"]==market and attempt["status"]=="failed" and
-        attempt.get("at","") > block["macro"].get("lastMarketPublishedAt",""))
-    markets(market,block,source=="Google Sheets" and 0<=age<=5 and not failed_since_publish)
+    attempts, issue = runner_attempts()
+    state = health({"snapshot": data, "batch": batch, "checksum": research_state["checksum"]},
+                   research_state["source"], research_state["issue"] or issue, attempts=attempts)
+    markets(market, block, state["markets"][market]["usable"], state["markets"][market]["reason"])
+    if state["markets"][market]["reason"]:
+        st.warning(state["markets"][market]["reason"])
 
 
 def advisor_page():
@@ -364,7 +389,12 @@ def advisor_page():
 
 layout_style()
 sidebar_brand()
-data, batch, source = snapshot()
+data, research_state = snapshot()
+if data is None:
+    st.error(f"研究快照尚未取得，正式訊號待驗證。{research_state['issue'] or ''}")
+    st.stop()
+batch = research_state["batch"]
+source = "Google Sheets" if research_state["source"] == "sheets" else "Sheets 上次成功快取"
 research, baseline, nav = load_archive()
 page = st.navigation([
     st.Page(market_page, title="市場觀測", icon=":material/monitoring:", default=True),
