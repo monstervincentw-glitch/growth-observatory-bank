@@ -11,21 +11,21 @@ export function verifyMarketInputs(stocks, before) {
     if (stock.marketEvent) continue;
     if (f.financial_status !== 'ok') {
       counts.financialPending++;
-      if (old?.financial.financial_status === 'ok') errors.push(stock.symbol+' 新取得財報欄位不足');
+      if (old?.financial.financial_status === 'ok') errors.push({symbol:stock.symbol,code:'INCOMPLETE_FINANCIAL',message:'新取得財報欄位不足'});
     }
     if (old?.financial.latest_period && f.latest_period < old.financial.latest_period)
-      errors.push(stock.symbol+' 財報期別倒退');
+      errors.push({symbol:stock.symbol,code:'FINANCIAL_ROLLBACK',message:'財報期別倒退'});
     const unchanged = f.fundamental_release_key && old?.financial.fundamental_release_key === f.fundamental_release_key;
     if (unchanged) counts.financialUnchanged++;
     else {
       counts.financialUpdated++;
       if (stock.market === 'TW' && !stock.evaluation.filingVerified)
-        errors.push(stock.symbol+' 新財報版本缺少收盤前公告與版本證據');
+        errors.push({symbol:stock.symbol,code:'MISSING_FILING_EVIDENCE',message:'新財報版本缺少收盤前公告與版本證據'});
     }
   }
   return {counts, errors};
 }
 
 export function requirePublishable(result) {
-  if (result.errors.length) throw new Error('財報版本待核對，保留前批：'+result.errors.join('｜'));
+  if (result.errors.length) throw new Error('財報版本待核對，保留前批：'+result.errors.map(({symbol,message})=>symbol+' '+message).join('｜'));
 }

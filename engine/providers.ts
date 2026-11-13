@@ -1,3 +1,5 @@
+import {monitoredFetch} from './update-diagnostics.mjs';
+type Diagnostic = (code:number|string,provider?:string)=>void;
 import {macroCutoff,latestCpiVintage,scoreMacro,unavailableMacro,SERIES,type MacroSeriesInput} from './macro.ts';
 export type {MacroSeriesInput} from './macro.ts';
 import type {Instrument,Financial,Market,Macro,Bar} from './types.ts';
@@ -15,14 +17,14 @@ export const latestClosedDate=(market:Market,now=new Date())=>{
  while([0,6].includes(new Date(ms(eligible)).getUTCDay()))eligible=iso(ms(eligible)-dayms);
  return eligible;
 };
-async function readJSON(url:string,headers:Record<string,string>={}){
- const response=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 GrowthObservatory/1.0 personal research',...headers},signal:AbortSignal.timeout(22000)});
+async function readJSON(url:string,headers:Record<string,string>={},diagnostic?:Diagnostic){
+ const response=await monitoredFetch(url,{headers:{'User-Agent':'Mozilla/5.0 GrowthObservatory/1.0 personal research',...headers},signal:AbortSignal.timeout(22000)},diagnostic);
  if(!response.ok)throw new Error(`來源HTTP ${response.status}: ${new URL(url).hostname}${response.status===429?'（來源限流，本次不連續重試）':''}`);
  return response.json() as Promise<any>;
 }
-export async function yahoo(ticker:string,market:Market,cutoff:string):Promise<Bar[]>{
+export async function yahoo(ticker:string,market:Market,cutoff:string,diagnostic?:Diagnostic):Promise<Bar[]>{
  const end=Math.floor((ms(cutoff)+2*dayms)/1000),start=Math.floor((ms(cutoff)-850*dayms)/1000);
- const obj=await readJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${start}&period2=${end}&interval=1d&events=div%2Csplits`);
+ const obj=await readJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${start}&period2=${end}&interval=1d&events=div%2Csplits`,{},diagnostic);
  const x=obj.chart?.result?.[0];if(!x)throw new Error('行情來源沒有有效結果');
  const q=x.indicators.quote[0],adj=x.indicators.adjclose?.[0]?.adjclose;
  const zone=market==='US'?'America/New_York':'Asia/Taipei';
@@ -35,15 +37,21 @@ export async function yahoo(ticker:string,market:Market,cutoff:string):Promise<B
  }
  return validateBars(rows).bars;
 }
-export async function finmind(dataset:string,symbol?:string,start='2018-01-01',end=iso(Date.now())){
+export async function finmind(dataset:string,symbol?:string,start='2018-01-01',end=iso(Date.now()),diagnostic?:Diagnostic){
  const q=new URLSearchParams({dataset,start_date:start,end_date:end});if(symbol)q.set('data_id',symbol);
- const obj=await readJSON('https://api.finmindtrade.com/api/v4/data?'+q);
+ const obj=await readJSON('https://api.finmindtrade.com/api/v4/data?'+q,{},diagnostic);
  if(obj.status!==200||!Array.isArray(obj.data))throw new Error(`FinMind ${dataset}: ${obj.msg||'來源格式異常'}`);
  return obj.data as any[];
 }
-export async function taiwanBenchmark(cutoff:string):Promise<{bars:Bar[],dates:string[]}>{
+async function finishRequests<T extends readonly unknown[]>(requests:T):Promise<{[K in keyof T]:Awaited<T[K]>}>{
+ const results=await Promise.allSettled(requests);
+ const failed=results.find(r=>r.status==='rejected');
+ if(failed)throw failed.reason;
+ return results.map(r=>(r as PromiseFulfilledResult<unknown>).value) as {[K in keyof T]:Awaited<T[K]>};
+}
+export async function taiwanBenchmark(cutoff:string,diagnostic?:Diagnostic):Promise<{bars:Bar[],dates:string[]}>{
  const start=iso(ms(cutoff)-850*dayms);
- const [prices,divs,calendar]=await Promise.all([finmind('TaiwanStockPrice','0052',start,cutoff),finmind('TaiwanStockDividendResult','0052',start,cutoff),finmind('TaiwanStockTradingDate',undefined,start,cutoff)]);
+ const [prices,divs,calendar]=await finishRequests([finmind('TaiwanStockPrice','0052',start,cutoff,diagnostic),finmind('TaiwanStockDividendResult','0052',start,cutoff,diagnostic),finmind('TaiwanStockTradingDate',undefined,start,cutoff,diagnostic)] as const);
  const dividends=new Map<string,number>();for(const r of divs)dividends.set(r.date,(dividends.get(r.date)||0)+Number(r.stock_and_cache_dividend));
  const rows=prices.filter(r=>r.open>0&&r.close>0&&r.Trading_Volume>0).sort((a,b)=>a.date.localeCompare(b.date));
  let wealth=1;const result:Bar[]=[];
@@ -104,7 +112,7 @@ export function twFinancial(income:any[],cashflow:any[],asof:string):Financial{
  const f:Financial={financial_status:x&&[x.growth,x.quarter,x.op,x.cfo].every(finite)?'ok':'incomplete_financial_fields',revenue_growth:x?.growth??null,quarterly_growth:x?.quarter??null,operating_margin:finite(x?.op)?x!.op:null,cfo_margin:finite(x?.cfo)?x!.cfo:null,revenue_ttm:x?.revenue??null,latest_period:last?.date??null,financial_age_days:last?days(asof,last.date):null,prior_release_growth:prior?.growth??null,prior_release_margin:finite(prior?.op)?prior!.op:null,fundamental_release_key:null,financial_event_date:null,date_basis:'啟用後實際首次觀測時間，非回填歷史公告日'};
  f.fundamental_release_key=[f.latest_period,f.revenue_growth,f.operating_margin,f.cfo_margin].join('|');return f;
 }
-export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,market:Market='US',allowUnavailable=false):Promise<Macro>{
+export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,market:Market='US',allowUnavailable=false,diagnostic?:Diagnostic):Promise<Macro>{
  const asof=macroCutoff(cutoff),cpiVintage=latestCpiVintage(asof,cutoff,market==='US');
  try{
   // An older transport payload cannot override a fresh request for this close.
@@ -114,7 +122,7 @@ export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,mark
   }else{
    const results=await Promise.allSettled(SERIES.map(async series=>{
     const url=`https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=${series}&vintage_date=${series==='CPIAUCSL'?cpiVintage:asof}&cosd=2019-01-01`;
-    const response=await fetch(url,{headers:{'User-Agent':'GrowthObservatory research'},signal:AbortSignal.timeout(18000)});
+    const response=await monitoredFetch(url,{headers:{'User-Agent':'GrowthObservatory research'},signal:AbortSignal.timeout(18000)},diagnostic);
     if(!response.ok)throw new Error(series+' 總經來源 HTTP '+response.status);
     return [series,await response.text()] as const;
    }));
@@ -131,12 +139,12 @@ export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,mark
  }catch(error){throw Object.assign(error instanceof Error?error:new Error(String(error)),{requiredMacroVintageDate:asof,requiredCpiVintageDate:cpiVintage,marketCloseDate:cutoff});}
 }
 export interface RefreshContext{market:Market;cutoff:string;benchmarks:Record<string,Bar[]>;marketDates?:string[];macro:Macro;createdAt:string;}
-export async function makeContext(market:Market,supplied?:MacroSeriesInput,allowMacroUnavailable=false):Promise<RefreshContext>{
+export async function makeContext(market:Market,supplied?:MacroSeriesInput,allowMacroUnavailable=false,diagnostic?:(type:string,symbol:string|null)=>Diagnostic):Promise<RefreshContext>{
  const closed=latestClosedDate(market);const benchmarks:Record<string,Bar[]>={};let cutoff=closed,marketDates:string[]|undefined;
- if(market==='US'){for(const name of ['QQQ','SOXX','IGV'])benchmarks[name]=await yahoo(name,'US',closed);cutoff=benchmarks.QQQ.at(-1)!.date;}
- else{const b=await taiwanBenchmark(closed);benchmarks['0052']=b.bars;marketDates=b.dates;cutoff=b.dates.at(-1)!;}
+ if(market==='US'){for(const name of ['QQQ','SOXX','IGV'])benchmarks[name]=await yahoo(name,'US',closed,diagnostic?.('benchmark',name));cutoff=benchmarks.QQQ.at(-1)!.date;}
+ else{const b=await taiwanBenchmark(closed,diagnostic?.('benchmark','0052'));benchmarks['0052']=b.bars;marketDates=b.dates;cutoff=b.dates.at(-1)!;}
  if(!cutoff||days(closed,cutoff)>5)throw new Error('市場交易日曆或基準行情過期');
- const macro=await refreshMacro(cutoff,supplied,market,allowMacroUnavailable);return{market,cutoff,benchmarks,marketDates,macro,createdAt:new Date().toISOString()};
+ const macro=await refreshMacro(cutoff,supplied,market,allowMacroUnavailable,diagnostic?.('macro',null));return{market,cutoff,benchmarks,marketDates,macro,createdAt:new Date().toISOString()};
 }
 export function priceFeatures(bars:Bar[],benchmark:Bar[]){
  const bmap=new Map(benchmark.map(b=>[b.date,b.adjClose]));const ref=(date:string)=>benchmark.filter(b=>b.date<=date).at(-1)?.adjClose??NaN;
@@ -158,24 +166,24 @@ export function confirmedInactive(instrument:Instrument,cutoff:string):Instrumen
   priceSource:'Yahoo／FinMind 最後成交核對',sourceWarning:summary,marketEvent:{effectiveDate,summary,source}};
 }
 
-export async function refreshInstrument(old:Instrument,context:RefreshContext,reuseFinancial=false,cachedBars:Bar[]=[]):Promise<Instrument & {_bars?:Bar[]}>{
+export async function refreshInstrument(old:Instrument,context:RefreshContext,reuseFinancial=false,cachedBars:Bar[]=[],diagnostic?:(type:string)=>Diagnostic):Promise<Instrument & {_bars?:Bar[]}>{
  const inactive=confirmedInactive(old,context.cutoff);if(inactive)return inactive;
  if(context.cutoff<old.priceDate)throw new Error(`更新截止日${context.cutoff}落後既有收盤${old.priceDate}，拒絕覆寫較新的資料`);
  if(sameCloseReusable(old,context.cutoff))return{...old,sourceError:null,lastAttemptAt:new Date().toISOString(),sourceWarning:old.sourceError?`保留同一收盤日已成功驗證快照；前次重抓異常：${old.sourceError}`:old.sourceWarning,priceValidation:{cutoff:context.cutoff,validatedAt:old.priceValidation?.validatedAt||old.observedAt,mode:'same_close_snapshot'}};
  let bars:Bar[]=[],priceSource='Yahoo',primaryError='';
- try{bars=await yahoo(old.ticker,old.market,context.cutoff);}catch(e){primaryError=e instanceof Error?e.message:String(e);}
+ try{bars=await yahoo(old.ticker,old.market,context.cutoff,diagnostic?.('quote'));}catch(e){primaryError=e instanceof Error?e.message:String(e);}
  if(primaryError||bars.at(-1)?.date!==context.cutoff){
   primaryError=primaryError||`主來源最後完整日期${bars.at(-1)?.date||'無'}，目標${context.cutoff}`;
   try{
    const start=iso(ms(context.cutoff)-850*dayms);
    if(old.market==='US'){
-    const raw=await finmind('USStockPrice',old.symbol,start,context.cutoff);
+    const raw=await finmind('USStockPrice',old.symbol,start,context.cutoff,diagnostic?.('quote'));
     bars=raw.filter(r=>r.date<=context.cutoff).map(r=>({date:r.date,time:ms(r.date),open:Number(r.Open),close:Number(r.Close),high:Number(r.High),low:Number(r.Low),volume:Number(r.Volume),adjClose:Number(r.Adj_Close),adjOpen:Number(r.Open)*Number(r.Adj_Close)/Number(r.Close)}));
     bars=requireClose(validateBars(bars).bars,context.cutoff);priceSource='FinMind USStockPrice';
    }else{
     const history=bars.length?bars:cachedBars;
     const last=history.at(-1);if(!last)throw new Error('尚無已驗證歷史可供備援銜接');
-    const [raw,actions]=await Promise.all([finmind('TaiwanStockPrice',old.symbol,last.date,context.cutoff),finmind('TaiwanStockDividendResult',old.symbol,last.date,context.cutoff)]);
+    const [raw,actions]=await finishRequests([finmind('TaiwanStockPrice',old.symbol,last.date,context.cutoff,diagnostic?.('quote')),finmind('TaiwanStockDividendResult',old.symbol,last.date,context.cutoff,diagnostic?.('quote'))] as const);
     bars=backfillTaiwan(history,raw,actions,context.cutoff);priceSource='Yahoo歷史＋FinMind已核對收盤';
    }
   }catch(e){throw new Error(`${primaryError}；備援未通過：${e instanceof Error?e.message:String(e)}`);}
@@ -185,9 +193,9 @@ export async function refreshInstrument(old:Instrument,context:RefreshContext,re
  let financial:Financial={...old.financial};
  if(!reuseFinancial){
   try{
-  if(old.market==='US')financial=secFinancial(await readJSON(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(old.cik).padStart(10,'0')}.json`,{'User-Agent':'GrowthObservatory/1.0 personal financial research'}),bars.at(-1)!.date);
-  else{const start=iso(ms(context.cutoff)-1400*dayms);const [income,cash]=await Promise.all([finmind('TaiwanStockFinancialStatements',old.symbol,start,context.cutoff),finmind('TaiwanStockCashFlowsStatement',old.symbol,start,context.cutoff)]);financial=twFinancial(income,cash,bars.at(-1)!.date);}
-  }catch(error){throw new Error('財報來源：'+(error instanceof Error?error.message:String(error)));}
+  if(old.market==='US')financial=secFinancial(await readJSON(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(old.cik).padStart(10,'0')}.json`,{'User-Agent':'GrowthObservatory/1.0 personal financial research'},diagnostic?.('financial')),bars.at(-1)!.date);
+  else{const start=iso(ms(context.cutoff)-1400*dayms);const [income,cash]=await finishRequests([finmind('TaiwanStockFinancialStatements',old.symbol,start,context.cutoff,diagnostic?.('financial')),finmind('TaiwanStockCashFlowsStatement',old.symbol,start,context.cutoff,diagnostic?.('financial'))] as const);financial=twFinancial(income,cash,bars.at(-1)!.date);}
+  }catch(error){throw Object.assign(new Error('財報來源：'+(error instanceof Error?error.message:String(error))),{dataType:'financial'});}
  }
  if(old.market==='TW'&&old.financial.filingEvidence?.releaseKey===financial.fundamental_release_key)
   financial.filingEvidence=old.financial.filingEvidence;

@@ -80,7 +80,7 @@ class SnapshotReader:
                 self.last = incoming
                 status = health(self.last, "sheets", now=now, expected=expected)
             except Exception as error:
-                status = health(self.last, "last_verified" if self.last else "unavailable", str(error), now, expected)
+                status = health(self.last, "last_verified" if self.last else "unavailable", f"Google Sheets 讀取或驗證異常｜{error}", now, expected)
             return self.last, status
 
     def save(self, rows):

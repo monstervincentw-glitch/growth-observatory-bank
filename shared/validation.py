@@ -139,16 +139,25 @@ def health(entry, source, issue=None, now=None, expected=None, attempts=None):
         block = entry["snapshot"]["markets"][market] if entry else None
         cutoff = block["macro"]["marketAsOf"] if block else None
         published = [record.get(market.lower() + "_close") for record in attempts.values()
-                     if record.get("status") == "published" and record.get(market.lower() + "_close")]
+                     if record.get(market.lower() + "_close")]
         stale = bool(cutoff and ((now.astimezone(TAIPEI).date() - as_date(cutoff)).days > CONTRACT["maxAgeDays"]
                                  or cutoff < expected.get(market, cutoff)
                                  or any(cutoff < close for close in published)))
         attempt = attempts.get(market, {})
-        failed = block and attempt.get("status") == "failed" and as_time(attempt["at"]) > as_time(block["macro"]["lastMarketPublishedAt"])
-        detail = attempt.get("detail") if failed else None
+        failure = attempt.get("unresolvedFailure") or attempt
+        failed = failure.get("status") == "failed" and (
+            not block or as_time(failure["at"]) > as_time(block["macro"]["lastMarketPublishedAt"]))
+        detail = failure.get("detail") if failed else None
         reason = issue or (("市場發布失敗，保留前批" + (f"｜{detail[:400]}" if isinstance(detail, str) and detail else ""))
                            if failed else "行情已過期或落後應有交易日" if stale else None)
         result[market] = dict(date=cutoff, stale=stale, reason=reason,
+                              lastSuccessAt=block["macro"].get("lastMarketPublishedAt") if block else None,
+                              expected=attempt.get("expected", MARKETS[market]),
+                              succeeded=attempt.get("succeeded", attempt.get("updated")), failed=attempt.get("failed"),
+                              notAttempted=attempt.get("notAttempted"), attemptStatus=attempt.get("status"),
+                              affected=failure.get("affected", []) if failed else [],
+                              marketWide=bool(failed and failure.get("marketWide")),
+                              errors=failure.get("errors", []) if failed else [],
                               usable=source == "sheets" and not reason and bool(block and block["signalAt"]),
                               financialIncomplete=sum(s["financial"]["financial_status"] != "ok" for s in block["stocks"]) if block else None,
                               filingPending=sum(not s["evaluation"]["filingVerified"] for s in block["stocks"]) if block else None,

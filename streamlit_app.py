@@ -319,12 +319,12 @@ def runner_attempts():
     try:
         try:
             with urlopen(base + "attempts.json", timeout=5) as response:
-                attempts = json.loads(response.read(30_001))
+                attempts = json.loads(response.read(262_145))
         except HTTPError as error:
             if error.code != 404:
                 raise
             with urlopen(base + "attempt.json", timeout=5) as response:
-                attempt = json.loads(response.read(30_001))
+                attempt = json.loads(response.read(262_145))
             attempts = {attempt["market"]: attempt}
         for market, record in attempts.items():
             if market not in ("US", "TW") or record["market"] != market or record["status"] not in ("published", "same_close", "failed"):
@@ -336,12 +336,42 @@ def runner_attempts():
         return {}, "更新紀錄無法驗證"
 
 
+def update_status(state):
+    for market, info in state["markets"].items():
+        label = "美股" if market == "US" else "台股"
+        count = lambda value: "—" if value is None else value
+        st.caption(f"{label}｜預期 {info['expected']} · 成功 {count(info['succeeded'])} · 失敗 {count(info['failed'])}"
+                   f" · 未處理 {count(info['notAttempted'])}｜最後成功收盤 {info['date'] or '待核對'}"
+                   f" · 資料時間 {stamp(info['lastSuccessAt'])}")
+        if info["reason"]:
+            st.warning(f"{label}資料異常｜{info['reason']}｜正式買入訊號暫停")
+            if info["affected"]:
+                st.write("受影響股票｜" + "、".join(info["affected"]))
+            elif info["marketWide"]:
+                st.write(f"受影響範圍｜{label}全市場 {info['expected']} 檔")
+            if info["errors"]:
+                with st.expander(f"{label}資料錯誤明細"):
+                    table([{"標的":e.get("symbol") or "市場","資料類型":e.get("type"),"錯誤":str(e.get("code")),
+                            "來源":e.get("provider"),"時間":stamp(e.get("at")),"更新識別":e.get("runId"),
+                            "研究批次":e.get("batch")} for e in info["errors"]], label=f"{label}資料錯誤")
+
+
+def current_update_state():
+    attempts, issue = runner_attempts()
+    entry = {"snapshot": data, "batch": batch, "checksum": research_state["checksum"]} if data else None
+    return health(entry, research_state["source"], research_state["issue"] or issue, attempts=attempts)
+
+
+def clear_research_caches():
+    snapshot.clear()
+    runner_attempts.clear()
+
+
 def records(data, source, batch):
     st.write(f"**來源** {source}　**批次** {batch or '封存備援'}")
     st.write(f"**同步驗收標記** {data['qa']}")
-    attempts, issue = runner_attempts()
-    if issue:
-        st.warning(issue)
+    update_status(current_update_state())
+    attempts, _ = runner_attempts()
     for attempt in attempts.values():
         result = {"same_close":"同一收盤，保留快照","failed":"來源更新失敗","published":"研究批次已發布"}[attempt["status"]]
         st.write(f"**最近雲端收盤工作** {attempt['market']} · {result} · {stamp(attempt.get('at'))}")
@@ -364,16 +394,12 @@ def records(data, source, batch):
 
 def market_page():
     market = market_picker(market_controls, label_visibility="collapsed")
+    state = current_update_state()
+    update_status(state)
     if data is None:
-        st.error(f"研究快照尚未取得，正式訊號待驗證。{research_state['issue'] or ''}")
         return
     block = data["markets"][market]
-    attempts, issue = runner_attempts()
-    state = health({"snapshot": data, "batch": batch, "checksum": research_state["checksum"]},
-                   research_state["source"], research_state["issue"] or issue, attempts=attempts)
     markets(market, block, state["markets"][market]["usable"], state["markets"][market]["reason"])
-    if state["markets"][market]["reason"]:
-        st.warning(state["markets"][market]["reason"])
 
 
 def advisor_page():
@@ -417,7 +443,5 @@ with st.container(key="bank-content"):
             st.caption(f"研究批次 {batch}")
         else:
             st.caption("公開研究日期待核對，歷史回測仍可查看。")
-    refresh.button("重新讀取資料", on_click=snapshot.clear)
-    if research_state["source"] == "last_verified":
-        st.warning("本次 Sheets 讀取未通過。目前顯示上次驗證的日期與排名，正式訊號待驗證。")
+    refresh.button("重新讀取資料", on_click=clear_research_caches)
     page.run()
