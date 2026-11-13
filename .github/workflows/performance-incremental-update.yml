@@ -1,0 +1,55 @@
+name: 銀行版每日績效續算
+on:
+  workflow_run:
+    workflows: ["收盤研究更新"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: verified-bank-performance
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r performance/requirements.txt
+      - name: Load published research and last performance checkpoint
+        run: |
+          git fetch --depth=1 origin research-data
+          git worktree add --detach /tmp/research-data FETCH_HEAD
+          if git ls-remote --exit-code origin refs/heads/performance-data >/dev/null; then
+            git fetch --depth=1 origin performance-data
+            git worktree add --detach /tmp/performance-data FETCH_HEAD
+          else
+            git worktree add --detach /tmp/performance-data HEAD
+            git -C /tmp/performance-data switch --orphan performance-data
+          fi
+      - name: Continue and validate the official accounts
+        env:
+          PYTHONPATH: .
+        run: python performance/production.py /tmp/research-data /tmp/performance-data --run "${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+      - name: Publish verified performance and status atomically
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/performance-data add --all
+          if ! git -C /tmp/performance-data diff --cached --quiet; then
+            git -C /tmp/performance-data commit -m "Publish bank performance run $GITHUB_RUN_ID"
+            git -C /tmp/performance-data push origin HEAD:refs/heads/performance-data
+          fi
+          {
+            echo '### 績效更新結果'
+            echo '~~~json'
+            cat /tmp/performance-data/status.json
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"

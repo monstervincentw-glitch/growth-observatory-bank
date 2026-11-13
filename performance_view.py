@@ -4,8 +4,21 @@ import os
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from threading import Lock
+from urllib.request import Request, urlopen
 
 from performance.publication import OFFICIAL_RESEARCH_ID,api_base,api_get,decode
+
+
+PERFORMANCE_BASE = 'https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/performance-data/'
+
+
+def fetch_published(path):
+    request = Request(PERFORMANCE_BASE + path, headers={'Cache-Control':'no-cache'})
+    with urlopen(request, timeout=5) as response:
+        raw = response.read(2_000_001)
+    if len(raw)>2_000_000:
+        raise ValueError('Published performance response too large')
+    return json.loads(raw)
 
 class Reader:
     def __init__(self,path):

@@ -112,6 +112,12 @@ export function twFinancial(income:any[],cashflow:any[],asof:string):Financial{
  const f:Financial={financial_status:x&&[x.growth,x.quarter,x.op,x.cfo].every(finite)?'ok':'incomplete_financial_fields',revenue_growth:x?.growth??null,quarterly_growth:x?.quarter??null,operating_margin:finite(x?.op)?x!.op:null,cfo_margin:finite(x?.cfo)?x!.cfo:null,revenue_ttm:x?.revenue??null,latest_period:last?.date??null,financial_age_days:last?days(asof,last.date):null,prior_release_growth:prior?.growth??null,prior_release_margin:finite(prior?.op)?prior!.op:null,fundamental_release_key:null,financial_event_date:null,date_basis:'啟用後實際首次觀測時間，非回填歷史公告日'};
  f.fundamental_release_key=[f.latest_period,f.revenue_growth,f.operating_margin,f.cfo_margin].join('|');return f;
 }
+export async function readMacroVintage(series:typeof SERIES[number],vintage:string,diagnostic?:Diagnostic){
+ const url=`https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=${series}&vintage_date=${vintage}&cosd=2019-01-01`;
+ const response=await monitoredFetch(url,{headers:{'User-Agent':'GrowthObservatory research'},signal:AbortSignal.timeout(18000)},diagnostic);
+ if(!response.ok)throw new Error(series+' 總經來源 HTTP '+response.status);
+ return response.text();
+}
 export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,market:Market='US',allowUnavailable=false,diagnostic?:Diagnostic):Promise<Macro>{
  const asof=macroCutoff(cutoff),cpiVintage=latestCpiVintage(asof,cutoff,market==='US');
  try{
@@ -120,12 +126,8 @@ export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,mark
   if(supplied?.vintageDate===asof&&(supplied.cpiVintageDate??asof)===cpiVintage){
    raw=supplied.series;
   }else{
-   const results=await Promise.allSettled(SERIES.map(async series=>{
-    const url=`https://alfred.stlouisfed.org/graph/alfredgraph.csv?id=${series}&vintage_date=${series==='CPIAUCSL'?cpiVintage:asof}&cosd=2019-01-01`;
-    const response=await monitoredFetch(url,{headers:{'User-Agent':'GrowthObservatory research'},signal:AbortSignal.timeout(18000)},diagnostic);
-    if(!response.ok)throw new Error(series+' 總經來源 HTTP '+response.status);
-    return [series,await response.text()] as const;
-   }));
+   const results=await Promise.allSettled(SERIES.map(async series=>
+    [series,await readMacroVintage(series,series==='CPIAUCSL'?cpiVintage:asof,diagnostic)] as const));
    const rejected=results.filter(r=>r.status==='rejected');
    if(rejected.length){
     transportError=new Error(rejected.map(r=>String(r.reason)).join('；'));

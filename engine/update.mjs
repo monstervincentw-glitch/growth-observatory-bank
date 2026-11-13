@@ -5,6 +5,7 @@ import {evaluate,rankInstruments} from './rules.ts';
 import {project,envelope,validate,markets} from './project.mjs';
 import {createDiagnostics} from './update-diagnostics.mjs';
 import {requirePublishable,verifyMarketInputs} from './publication.mjs';
+import {archiveResearch} from './replay-export.mjs';
 
 const [market, priorPath, outputPath] = process.argv.slice(2);
 if(!(market in markets)||!priorPath||!outputPath)throw Error('使用方式：node engine/update.mjs US|TW 舊發布.json 新發布.json');
@@ -21,9 +22,12 @@ const financialFailed=new Set();
 const report=(type,symbol)=> (code,provider)=>diagnostics.record({type,symbol},code,provider);
 let marketWide=false;
 let snapshot=old;
+let replayResearch;
+let replayContext;
 
 try{
   const context=await makeContext(market,undefined,false,report);
+  replayContext=context;
   const before=old.markets[market];
   if(context.cutoff<before.macro.marketAsOf)throw Error('基準行情日期倒退，保留前批');
   if(!['vintage_verified','macro_incomplete'].includes(context.macro.status)||
@@ -34,12 +38,13 @@ try{
     attempt.detail='最近完整收盤已發布；休市或同日重跑。';
   }else{
     const stocks=[];
+    const bars={};
     const errors=[];
     for(let n=0;n<before.stocks.length;n+=3){
       const group=before.stocks.slice(n,n+3);
       const results=await Promise.allSettled(group.map(stock=>refreshInstrument(stock,context,false,[],type=>report(type,stock.symbol))));
       for(const [i,result] of results.entries()){
-        if(result.status==='fulfilled'){const {_bars,...data}=result.value;stocks.push(data);attempt.updated++;}
+        if(result.status==='fulfilled'){const {_bars,...data}=result.value;stocks.push(data);if(_bars)bars[data.symbol]=_bars;attempt.updated++;}
         else {
           const symbol=group[i].symbol, type=result.reason?.dataType||'quote';
           affected.add(symbol);
@@ -70,6 +75,7 @@ try{
       macros:{...Object.fromEntries(Object.entries(old.markets).map(([k,v])=>[k,v.macro])),[market]:macro},
       strategySignalTimes:{...Object.fromEntries(Object.entries(old.markets).map(([k,v])=>[k,v.signalAt])),[market]:now}};
     snapshot=project(dashboard,baseline,old.qa);
+    replayResearch={market,context,bars,instruments};
     attempt.status='published';
     attempt.detail='收盤已驗證並發布排名。財報及總經狀態：'+JSON.stringify(attempt.health);
   }
@@ -102,3 +108,17 @@ attempt.detail += `｜預期 ${attempt.expected}，成功 ${attempt.succeeded}�
 const priorAttempts=prior.attempts??(prior.attempt?.market?{[prior.attempt.market]:prior.attempt}:{});
 await writeFile(outputPath,JSON.stringify({snapshot,rows,attempt,attempts:{...priorAttempts,[market]:attempt}})+'\n');
 console.log(JSON.stringify(attempt));
+
+const archiveDir=process.env.PERFORMANCE_INPUT_DIR;
+if(archiveDir&&attempt.status!=='failed'){
+  if(replayResearch){
+    try {await archiveResearch(archiveDir,{...replayResearch,batch:id});}
+    catch(error){console.warn('Primary replay input: '+String(error.message||error));}
+  }
+}
+
+const etfContext=process.env.PERFORMANCE_ETF_CONTEXT;
+if(etfContext&&market==='US'&&replayContext&&attempt.status!=='failed'){
+  try {await writeFile(etfContext,JSON.stringify({context:replayContext,batch:id})+'\n');}
+  catch(error){console.warn('ETF context: '+String(error.message||error));}
+}

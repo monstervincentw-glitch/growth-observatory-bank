@@ -3,6 +3,9 @@ on:
   schedule:
     - cron: '17 22 * * 1-5'
     - cron: '27 13 * * 1-5'
+  push:
+    branches: [main]
+    paths: ['performance/seed/manifest.json']
   workflow_dispatch:
     inputs:
       market:
@@ -27,15 +30,19 @@ jobs:
       - name: Load last verified batch
         shell: bash
         run: |
+          touch /tmp/research-weekly.txt
           if git ls-remote --exit-code origin refs/heads/research-data >/dev/null; then
             git fetch --depth=1 origin research-data
             git show FETCH_HEAD:release.json > /tmp/research-prior.json
+            git ls-tree --name-only FETCH_HEAD:weekly-vintages 2>/dev/null | sed 's/\.json$//' > /tmp/research-weekly.txt || true
           else
             node engine/seed.mjs /tmp/research-prior.json
           fi
       - name: Calculate and validate research
         env:
-          MARKET: ${{ inputs.market || (github.event.schedule == '17 22 * * 1-5' && 'US' || 'TW') }}
+          PERFORMANCE_INPUT_DIR: /tmp/performance-market-inputs
+          PERFORMANCE_ETF_CONTEXT: /tmp/performance-etf-context.json
+          MARKET: ${{ inputs.market || ((github.event_name == 'push' || github.event.schedule == '17 22 * * 1-5') && 'US' || 'TW') }}
         run: node engine/update.mjs "$MARKET" /tmp/research-prior.json /tmp/research-release.json
       - name: Publish result without changing the app branch
         run: |
@@ -54,3 +61,22 @@ jobs:
           git -C /tmp/research-publish commit -m "Record close research run"
           git -C /tmp/research-publish push origin HEAD:refs/heads/research-data
           node -e 'if (require("/tmp/research-release.json").attempt.status === "failed") process.exitCode = 1'
+      - name: Collect missing ETF instruments using the same research provider
+        continue-on-error: true
+        timeout-minutes: 8
+        run: |
+          if [[ -s /tmp/performance-etf-context.json ]]; then
+            node engine/replay-export.mjs /tmp/performance-etf-context.json /tmp/performance-market-inputs /tmp/research-weekly.txt
+          fi
+      - name: Save verified inputs for the performance engine
+        continue-on-error: true
+        shell: bash
+        run: |
+          if [[ -d /tmp/performance-market-inputs ]]; then
+            cp -R /tmp/performance-market-inputs/. /tmp/research-publish/
+            git -C /tmp/research-publish add --all
+            if ! git -C /tmp/research-publish diff --cached --quiet; then
+              git -C /tmp/research-publish commit -m "Save market inputs for performance"
+              git -C /tmp/research-publish push origin HEAD:refs/heads/research-data
+            fi
+          fi

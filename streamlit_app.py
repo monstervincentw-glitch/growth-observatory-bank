@@ -16,7 +16,7 @@ from sheets_data import BASE, SnapshotReader, fetch_rows, read_gzip
 from shared.validation import health
 from shared.candidates import FORMAL, PENDING, RESEARCH, SCOPES, candidate_status, in_scope
 from taiwan_fund_research import render as render_taiwan_fund_research
-from performance_view import Reader as PerformanceReader, fetch as fetch_performance, overlay as overlay_performance
+from performance_view import Reader as PerformanceReader, fetch as fetch_performance, fetch_published, overlay as overlay_performance
 from performance.publication import decode as decode_performance
 
 st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide", initial_sidebar_state="auto")
@@ -193,16 +193,62 @@ def market_picker(column, *, label_visibility="visible"):
                                             label_visibility=label_visibility) or "美股"]
 
 
+@st.cache_data(ttl=90, show_spinner=False)
+def performance_status():
+    try:
+        payload = fetch_published('status.json')
+        if payload.get('schema') != 1 or set(payload['results']) != {'ETF','US','TW'}:
+            raise ValueError('績效狀態格式錯誤')
+        return payload['results']
+    except (OSError, ValueError, TypeError, KeyError):
+        return {}
+
+
+@st.cache_data(ttl=90, show_spinner=False)
+def primary_performance(market):
+    try:
+        release = fetch_published(f'primary/{market}/release.json')
+        keys = {(row['year'],row['variant']) for row in release['summary']}
+        years = range(2006 if market == 'US' else 2016, 2027)
+        if (release.get('schema') != 1 or release['market'] != market or
+                keys != {(year,plan) for year in years for plan in 'AB'} or
+                len(keys) != len(release['summary']) or
+                any(row['through'] != release['through'] for row in release['summary'])):
+            raise ValueError('主策略績效批次不完整')
+        return release
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+
+
 def backtest(research, nav):
     with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
         market = market_picker(st)
         rows = research[market.lower()]
         year = st.selectbox("歷史淨值起始年", [r["start_year"] for r in reversed(rows)], key=f"curve-{market}", width=152)
+    live=primary_performance(market)
+    if live:
+        summary={(r['year'],r['variant']):r for r in live['summary']}
+        rows=[r | {f"{plan}_{field}":summary[r["start_year"],plan][field]
+                   for plan in 'AB' for field in ('cumulative','cagr','max_drawdown')} for r in rows]
     st.subheader("A／B 歷史淨值")
     curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
     curve["日期"] = pd.to_datetime(curve["日期"])
+    if live:
+        updated=pd.DataFrame({plan:dict(live['curves'][f'{market}_{year}_{plan}']) for plan in 'AB'}).rename_axis("日期").reset_index()
+        updated["日期"]=pd.to_datetime(updated["日期"])
+        curve=pd.concat([curve,updated],ignore_index=True)
     trend_chart(curve, "日期", ["A", "B"], ylabel="淨值倍數")
-    st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
+    if live:
+        st.caption(f"已驗證主策略回測 · 結算 {live['through']} · GitHub 正式績效")
+        for plan in 'AB':
+            info=live['latest'][f'{market}_{year}_{plan}']
+            with st.expander(f"{plan} 版最新模擬持倉與交易"):
+                if info['positions']:
+                    table(info['positions'],label=f"{plan} 版模擬持倉")
+                if info['orders']:
+                    table(info['orders'],label=f"{plan} 版模擬交易")
+    else:
+        st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
     marks = (data or {}).get("markets", {}).get(market, {}).get("marks", {}).get(str(year))
     if marks:
         selected = next(row for row in rows if row["start_year"] == year)
@@ -214,6 +260,9 @@ def backtest(research, nav):
                           "相對封存日變動": percent(row["value"] / original - 1)})
         st.caption(f"持倉估值 {marks['date']} · 策略回測 2026-11-04 · 依封存部位及已驗證收盤價")
         table(block, label="封存持股最新估值")
+    status=performance_status().get(market,{})
+    if status.get('status') == 'WAITING_FOR_CONTINUITY':
+        st.warning(f"主策略交易績效待銜接 · 結算 {status['through']} · 研究 {status['requested']}")
     if market=="TW":
         st.warning("台股 2016–2026 起跑組為研究版。現有封存驗收沒有確認符合公告時點、財報版本及成交證據的可信起始年。")
     else:
@@ -287,6 +336,9 @@ def performance_reader():
 
 @st.cache_data(ttl=90, show_spinner=False)
 def advisor_performance():
+    live, error = performance_reader().refresh(lambda: fetch_published('etf/release.json'))
+    if live:
+        return live, error, "GitHub 正式績效"
     book = environ.get("PERFORMANCE_SHEETS_ID")
     try:
         account = st.secrets.get("performance_google_service_account")
@@ -297,7 +349,7 @@ def advisor_performance():
         if data:
             return data, warning, "Google Sheets"
     else:
-        warning = None
+        warning = error
     try:
         rows = json.loads((BASE / "data/etf-verified-release.json").read_text())
         return decode_performance(rows), warning, "已驗證績效批次"
@@ -328,6 +380,10 @@ def advisor(research, research_close=None):
         age = (datetime.now(ZoneInfo("America/New_York")).date() - datetime.fromisoformat(cutoff).date()).days
         if age > 4 or (research_close and cutoff < research_close):
             st.warning("STALE_DATA｜ETF 績效日期落後，顯示最後驗證批次。")
+    if cutoff != "2026-11-04":
+        status=performance_status().get('ETF',{})
+        if status.get('status') in ('PARTIAL_DATA','SOURCE_ERROR','VALIDATION_FAILED'):
+            st.warning(f"{status['status']}｜ETF 更新未通過，顯示最後驗證績效。")
     if performance_error:
         st.warning(performance_error)
     with st.expander("各策略明細"):
@@ -413,6 +469,8 @@ def current_update_state():
 
 def clear_research_caches():
     advisor_performance.clear()
+    performance_status.clear()
+    primary_performance.clear()
     snapshot.clear()
     runner_attempts.clear()
 
