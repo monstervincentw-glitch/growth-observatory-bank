@@ -97,6 +97,7 @@ def prices_and_rows(archive, day, market, macro, cfg, engine, scale_by_symbol):
         features = {k:np.nan if v is None else v for k,v in stock['features'].items()}
         row = f|features|dict(symbol=symbol,signal_date=day,industry=stock['industry'],name=stock['name'],
             macro_status='vintage_verified',macro_stress=macro['score'],macro_vintage_date=macro['date'],
+            macro_score_range=macro['score_range'],
             funding_good=macro['score']<=cfg['entry_max_macro_stress'],
             technical_divergence=bool(stock['evaluation']['divergence']))
         if market=='US':
@@ -125,6 +126,22 @@ def prices_and_rows(archive, day, market, macro, cfg, engine, scale_by_symbol):
         pool=frame.loc[common]
         frame['selection_score']=.5*pool.revenue_growth.rank(pct=True)+.25*pool.operating_margin.rank(pct=True)+.25*pool.cfo_margin.rank(pct=True)
     return frame,quotes
+
+
+def replay_funding(macro, cfg):
+    if macro.grouped_status=='vintage_verified':
+        return dict(score=macro.grouped_score, date=macro.name, score_range=None)
+    if macro.macro_status!='vintage_verified':
+        return None
+    flags=[macro.rate_flag, macro.conditions_flag, macro.inflation_flag]
+    lower=sum(bool(flag) for flag in flags if pd.notna(flag))
+    upper=lower+sum(pd.isna(flag) for flag in flags)
+    for threshold in (cfg['entry_max_macro_stress']+1, cfg['exit_macro_stress']):
+        if lower<threshold<=upper:
+            return None
+    # Both original gates give the same result at every score in this range.
+    # Pass the lower bound to the sealed engine and preserve the audit range.
+    return dict(score=int(lower), date=macro.name, score_range=(int(lower),int(upper)))
 
 
 def evaluate_market(inputs, release, output, market):
@@ -194,8 +211,8 @@ def evaluate_market(inputs, release, output, market):
     frames, charts = [], {}
     for day,archive in archives.items():
         available=day if market=='US' else day-pd.Timedelta(days=1)
-        macro=grouped.loc[:available].iloc[-1]
-        if macro.grouped_status!='vintage_verified':
+        funding=replay_funding(grouped.loc[:available].iloc[-1],cfg)
+        if funding is None:
             raise ResearchGap(f'{market} {day.date()}: original macro vintage unavailable')
         # Match each archived curve's base observation, including revisions
         # caused by distributions since the previous run.
@@ -207,7 +224,7 @@ def evaluate_market(inputs, release, output, market):
             if anchor_quote is None or symbol not in scales:
                 raise ResearchGap(f'{market} {day.date()}: no price overlap for {symbol}')
             scales_today[symbol]=basis['prices'][symbol]/anchor_quote['adjClose']
-        frame,quotes=prices_and_rows(archive,day,market,dict(score=macro.grouped_score,date=macro.name),cfg,engine,scales_today)
+        frame,quotes=prices_and_rows(archive,day,market,funding,cfg,engine,scales_today)
         frames.append(frame)
         for symbol, quote in quotes.items():
             charts.setdefault(symbol,{})[day]=quote
