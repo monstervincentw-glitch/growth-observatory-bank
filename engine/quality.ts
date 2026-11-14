@@ -7,11 +7,16 @@ export function sameCloseReusable(old:Instrument,cutoff:string):boolean{
  return old.priceDate===cutoff&&old.integrity===true&&Number.isFinite(old.close)&&old.close>0&&!!old.financialObservedAt&&Number.isFinite(Date.parse(old.financialObservedAt))&&transient;
 }
 
+export function dailyBoundsAgree(bar:Pick<Bar,'high'|'low'|'open'|'close'>):boolean{
+ return Number.isFinite(bar.high)&&Number.isFinite(bar.low)&&bar.high!>=bar.low!&&
+   bar.high!>=Math.max(bar.open,bar.close)*(1-1e-5)&&bar.low!<=Math.min(bar.open,bar.close)*(1+1e-5);
+}
+
 export function validateBars(input:Bar[]):{bars:Bar[];warnings:string[]}{
  const bars=[...input].sort((a,b)=>a.date.localeCompare(b.date));
  if(bars.length<252)throw new Error('有效行情不足252個交易日');
  const warnings:string[]=[];
- const ohlc=(b:Bar)=>[b.open,b.close,b.high,b.low,b.volume,b.adjClose].every(v=>typeof v==='number'&&Number.isFinite(v)&&v>0)&&b.high!>=Math.max(b.open,b.close)*(1-1e-5)&&b.low!<=Math.min(b.open,b.close)*(1+1e-5)&&b.high!>=b.low!;
+ const ohlc=(b:Bar)=>[b.open,b.close,b.high,b.low,b.volume,b.adjClose].every(v=>typeof v==='number'&&Number.isFinite(v)&&v>0)&&dailyBoundsAgree(b);
  for(let n=0;n<bars.length;n++){
   const b=bars[n];
   if(!/^\d{4}-\d{2}-\d{2}$/.test(b.date)||!ohlc(b))throw new Error(`行情OHLC／成交量不完整或不一致：${b.date}`);

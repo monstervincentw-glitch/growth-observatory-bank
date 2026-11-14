@@ -5,7 +5,7 @@ on:
     - cron: '27 13 * * 1-5'
   push:
     branches: [main]
-    paths: ['engine/market-observations.mjs']
+    paths: ['engine/market-observations.mjs', 'engine/providers.ts']
   workflow_dispatch:
     inputs:
       market:
@@ -22,6 +22,8 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    env:
+      MARKET: ${{ inputs.market || ((github.event.schedule == '17 22 * * 1-5' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[research-us]'))) && 'US' || 'TW') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,8 +42,6 @@ jobs:
             node engine/seed.mjs /tmp/research-prior.json
           fi
       - name: Load previous financial versions
-        env:
-          MARKET: ${{ inputs.market || (github.event.schedule == '17 22 * * 1-5' && 'US' || 'TW') }}
         run: |
           if git cat-file -e "FETCH_HEAD:financial-versions/$MARKET.json" 2>/dev/null; then
             git show "FETCH_HEAD:financial-versions/$MARKET.json" > /tmp/financial-versions.json
@@ -51,7 +51,6 @@ jobs:
           PERFORMANCE_INPUT_DIR: /tmp/performance-market-inputs
           FINANCIAL_VERSION_INDEX: /tmp/financial-versions.json
           PERFORMANCE_ETF_CONTEXT: /tmp/performance-etf-context.json
-          MARKET: ${{ inputs.market || ((github.event.schedule == '17 22 * * 1-5') && 'US' || 'TW') }}
         run: node engine/update.mjs "$MARKET" /tmp/research-prior.json /tmp/research-release.json
       - name: Publish result without changing the app branch
         run: |

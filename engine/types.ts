@@ -4,7 +4,7 @@ export interface Financial {
  growth_acceleration?:number|null;shares?:number|null;shares_date?:string|null;shares_filed?:string|null;latest_period?:string|null;max_input_filed?:string|null;prior_release_growth?:number|null;prior_release_margin?:number|null;
  financial_age_days:number|null;fundamental_release_key:string|null;financial_event_date?:string|null;filingEvidence?:{period:string;releaseKey:string;publishedAt:string;verifiedThrough:string;source:string};date_basis?:string;
 }
-export interface Bar {date:string;open:number;close:number;adjClose:number;adjOpen:number;volume:number;time:number;high?:number;low?:number;}
+export interface Bar {date:string;open:number;close:number;adjClose:number;adjOpen:number;volume:number;time:number;high?:number;low?:number;verifiedBounds?:'Yahoo 5m';}
 export interface Instrument {key:string;market:Market;symbol:string;name:string;industry:string;ticker:string;cik?:number;benchmark:string;currency:string;priceDate:string;close:number;history:{date:string;close:number}[];financial:Financial;features:{history_sessions:number;dollar_volume:number;drawdown_126:number;relative_63:number;market_cap_estimate?:number|null;price_sales?:number|null};rankScore:number|null;source:string;observedAt:string;sourceQuality:string;integrity:boolean;sourceError?:string|null;financialObservedAt?:string;priceSource?:string;sourceWarning?:string|null;marketEvent?:{effectiveDate:string;summary:string;source:string};lastAttemptAt?:string;priceValidation?:{cutoff:string;validatedAt:string;mode:string};}
 export type RiskFlag=0|1|null;
 export type MacroDecision='non_red'|'red'|'unknown';

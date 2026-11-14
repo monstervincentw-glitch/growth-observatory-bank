@@ -4,7 +4,7 @@ import {macroCutoff,latestCpiVintage,scoreMacro,unavailableMacro,SERIES,type Mac
 export type {MacroSeriesInput} from './macro.ts';
 import type {Instrument,Financial,Market,Macro,Bar} from './types.ts';
 import {finite,days} from './rules.ts';
-import {sameCloseReusable,validateBars,requireClose,backfillTaiwan} from './quality.ts';
+import {sameCloseReusable,validateBars,requireClose,backfillTaiwan,dailyBoundsAgree} from './quality.ts';
 const dayms=86400000;
 const iso=(n:number)=>new Date(n).toISOString().slice(0,10);
 const ms=(d:string)=>Date.parse(d.slice(0,10)+'T12:00:00Z');
@@ -22,6 +22,32 @@ async function readJSON(url:string,headers:Record<string,string>={},diagnostic?:
  if(!response.ok)throw new Error(`來源HTTP ${response.status}: ${new URL(url).hostname}${response.status===429?'（來源限流，本次不連續重試）':''}`);
  return response.json() as Promise<any>;
 }
+async function corroborateYahooBounds(ticker:string,bar:Bar,diagnostic?:Diagnostic):Promise<Bar>{
+ const date=new Date(bar.date+'T00:00:00Z').getTime()/1000;
+ const url=`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${date}&period2=${date+86400}&interval=5m&includePrePost=false`;
+ const x=(await readJSON(url,{},diagnostic)).chart?.result?.[0];
+ const samePrice=(a:number,b:number)=>Math.abs(a-b)<=1e-5*Math.max(a,b);
+ const periods=x?.meta?.tradingPeriods?.regular??x?.meta?.tradingPeriods??[];
+ const period=Array.isArray(periods)?periods.flat().find(p=>p?.start===bar.time/1000):null;
+ const q=x?.indicators?.quote?.[0];
+ if(x?.meta?.symbol!==ticker||x?.meta?.dataGranularity!=='5m'||!period||!q||
+    !Number.isInteger(period.end)||period.end<=period.start||(period.end-period.start)%300!==0||
+    !Array.isArray(x.timestamp))throw new Error(`盤中行情缺少可核對的交易時段：${bar.date}`);
+ const interval=x.timestamp.flatMap((t:number,i:number)=>t>=period.start&&t<period.end?[{t,
+  open:q.open?.[i],close:q.close?.[i],high:q.high?.[i],low:q.low?.[i]}]:[]);
+ const complete=interval.length===(period.end-period.start)/300&&interval.every((v,i)=>
+  v.t===period.start+i*300&&[v.open,v.close,v.high,v.low].every(p=>Number.isFinite(p)&&p>0)&&dailyBoundsAgree(v));
+ if(!complete||!samePrice(interval[0].open,bar.open)||!samePrice(interval.at(-1)!.close,bar.close))
+  throw new Error(`日線開收盤與完整盤中行情未能吻合：${bar.date}`);
+ const high=Math.max(...interval.map(v=>v.high)),low=Math.min(...interval.map(v=>v.low));
+ // Replace only a bound contradicted by a traded daily endpoint. Preserve the
+ // original daily total-return adjustment, the other bound and daily volume.
+ const confirmed={...bar,high:bar.high!<Math.max(bar.open,bar.close)*(1-1e-5)?high:bar.high,
+  low:bar.low!>Math.min(bar.open,bar.close)*(1+1e-5)?low:bar.low,verifiedBounds:'Yahoo 5m' as const};
+ if(!dailyBoundsAgree(confirmed))throw new Error(`日線高低價無法由盤中行情核對：${bar.date}`);
+ return confirmed;
+}
+
 export async function yahoo(ticker:string,market:Market,cutoff:string,diagnostic?:Diagnostic):Promise<Bar[]>{
  const end=Math.floor((ms(cutoff)+2*dayms)/1000),start=Math.floor((ms(cutoff)-850*dayms)/1000);
  const obj=await readJSON(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${start}&period2=${end}&interval=1d&events=div%2Csplits`,{},diagnostic);
@@ -34,6 +60,17 @@ export async function yahoo(ticker:string,market:Market,cutoff:string,diagnostic
   const p=fmt.formatToParts(new Date(x.timestamp[k]*1000));const val=(t:string)=>p.find(v=>v.type===t)!.value;const d=`${val('year')}-${val('month')}-${val('day')}`;
   if(d>cutoff||!(q.open[k]>0&&q.close[k]>0&&adj?.[k]>0&&q.volume[k]>0))continue;
   rows.push({date:d,time:x.timestamp[k]*1000,open:q.open[k],close:q.close[k],adjClose:adj[k],adjOpen:q.open[k]*adj[k]/q.close[k],volume:q.volume[k],high:q.high[k],low:q.low[k]});
+ }
+ if(market==='US')for(const [i,bar] of rows.entries()){
+  if(!Number.isFinite(bar.high)||!Number.isFinite(bar.low)||dailyBoundsAgree(bar))continue;
+  // Yahoo's 5-minute history expires. Keep the corroborated ETSY opening print
+  // available for replay while the faulty daily bar remains in the lookback.
+  if(ticker==='ETSY'&&bar.date==='2026-11-13'&&bar.time===1794580200000&&
+     Math.abs(bar.open-87.90)<1e-5&&Math.abs(bar.low!-88.01)<1e-5&&bar.close===89&&bar.high===90){
+   rows[i]={...bar,low:87.9000015258789,verifiedBounds:'Yahoo 5m'};
+  }else{
+   rows[i]=await corroborateYahooBounds(ticker,bar,diagnostic);
+  }
  }
  return validateBars(rows).bars;
 }
@@ -192,6 +229,7 @@ export async function refreshInstrument(old:Instrument,context:RefreshContext,re
  }
  if(context.marketDates){const valid=new Set(context.marketDates);bars=bars.filter(b=>valid.has(b.date));}
  const validated=validateBars(bars);bars=requireClose(validated.bars,context.cutoff);
+ for(const bar of bars.filter(b=>b.verifiedBounds))validated.warnings.push(`${bar.date} 日線高低價已由同來源完整盤中行情核對`);
  let financial:Financial={...old.financial};
  let financialError:string|undefined;
  if(!reuseFinancial){
