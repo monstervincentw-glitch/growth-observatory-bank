@@ -1,7 +1,14 @@
 name: 收盤研究更新
 on:
   schedule:
+    # GitHub Actions uses UTC; US: 06:17 Asia/Taipei (Tue-Sat).
     - cron: '17 22 * * 1-5'
+    # TW: first check at 16:30, then automatic retries at 17:30/18:30.
+    # Retain 21:27 as a final fallback if Taiwan market data is delayed.
+    # The engine handles same_close without replaying an already published close.
+    - cron: '30 8 * * 1-5'
+    - cron: '30 9 * * 1-5'
+    - cron: '30 10 * * 1-5'
     - cron: '27 13 * * 1-5'
   push:
     branches: [main]
