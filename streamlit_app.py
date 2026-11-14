@@ -219,8 +219,22 @@ def fetch_bank_json(branch, path, limit=2_000_000):
     return json.loads(raw)
 
 
+@st.cache_data(ttl=90, show_spinner=False)
+def performance_revision():
+    repo = "https://api.github.com/repos/monstervincentw-glitch/growth-observatory-bank"
+    try:
+        url = f"{repo}/git/ref/heads/performance-data?v={int(datetime.now().timestamp())//90}"
+        with urlopen(Request(url), timeout=5) as response:
+            sha = json.load(response)["object"]["sha"]
+        if len(sha) == 40 and all(c in "0123456789abcdef" for c in sha):
+            return sha
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    return "performance-data"
+
+
 def fetch_published(path):
-    return fetch_bank_json("performance-data",path)
+    return fetch_bank_json(performance_revision(),path)
 
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -562,6 +576,7 @@ def current_update_state(loaded=None):
 
 
 def clear_research_caches():
+    performance_revision.clear()
     advisor_performance.clear()
     performance_status.clear()
     primary_performance.clear()
