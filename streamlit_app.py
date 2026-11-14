@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from io import BytesIO
 from os import environ
 from urllib.error import HTTPError
+from importlib import reload
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -20,6 +21,13 @@ from taiwan_fund_research import render as render_taiwan_fund_research
 from performance_view import Reader as PerformanceReader, fetch as fetch_performance, overlay as overlay_performance
 from performance.publication import decode as decode_performance
 
+# Streamlit can reload this entry point while Python still holds old helpers.
+if "fallback" not in (SnapshotReader.read.__kwdefaults__ or {}):
+    import sheets_data
+    import shared.validation
+    health = reload(shared.validation).health
+    SnapshotReader = reload(sheets_data).SnapshotReader
+
 st.set_page_config(page_title="成長股觀測站｜銀行版", layout="wide", initial_sidebar_state="auto")
 
 MARKETS = {"美股": "US", "台股": "TW"}
@@ -32,7 +40,7 @@ PCT_ADVISOR = ["cumulative","cagr","mdd","worst_year_return","transaction_cost_i
                "strategy_return","window_mdd","drawdown"]
 
 @st.cache_resource
-def sheet_reader():
+def verified_research_reader():
     return SnapshotReader(environ.get("RESEARCH_CACHE_PATH", "/tmp/growth-bank-research/snapshot.json"))
 
 
@@ -44,7 +52,7 @@ def snapshot():
         account = st.secrets.get("google_service_account")
     except FileNotFoundError:
         account = None
-    entry, state = sheet_reader().read(lambda: fetch_bank_json("research-data", "release.json")["rows"],
+    entry, state = verified_research_reader().read(lambda: fetch_bank_json("research-data", "release.json")["rows"],
         source="github", fallback=lambda: fetch_rows(csv_url, account))
     return entry["snapshot"] if entry else None, state
 
