@@ -44,7 +44,8 @@ def snapshot():
         account = st.secrets.get("google_service_account")
     except FileNotFoundError:
         account = None
-    entry, state = sheet_reader().read(lambda: fetch_rows(csv_url, account))
+    entry, state = sheet_reader().read(lambda: fetch_bank_json("research-data", "release.json")["rows"],
+        source="github", fallback=lambda: fetch_rows(csv_url, account))
     return entry["snapshot"] if entry else None, state
 
 @st.cache_data(show_spinner=False)
@@ -201,7 +202,8 @@ def market_picker(column, *, label_visibility="visible"):
 
 def fetch_bank_json(branch, path, limit=2_000_000):
     base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/"
-    request = Request(f"{base}{branch}/{path}", headers={"Cache-Control":"no-cache"})
+    # Match the app cache window so a GitHub CDN entry from a prior run cannot linger.
+    request = Request(f"{base}{branch}/{path}?v={int(datetime.now().timestamp())//90}")
     with urlopen(request, timeout=15) as response:
         raw = response.read(limit+1)
     if len(raw)>limit:
@@ -619,7 +621,7 @@ layout_style()
 sidebar_brand()
 data, research_state = snapshot()
 batch = research_state["batch"]
-source = {"sheets":"Google Sheets", "last_verified":"Sheets 上次成功快取"}.get(research_state["source"], "研究資料待核對")
+source = {"github":"GitHub 正式研究", "sheets":"Google Sheets", "last_verified":"上次成功快取"}.get(research_state["source"], "研究資料待核對")
 research, baseline, nav = load_archive()
 page = st.navigation([
     st.Page(market_page, title="市場觀測", icon=":material/monitoring:", default=True),

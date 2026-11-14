@@ -58,29 +58,34 @@ class SnapshotReader:
         self.last = None
         self.lock = Lock()
 
-    def read(self, fetch, now=None, expected=None):
+    def read(self, fetch, now=None, expected=None, *, source="sheets", fallback=None):
         with self.lock:
             if self.last is None and self.cache_path and self.cache_path.exists():
                 try:
                     self.last = parse_envelope(json.loads(self.cache_path.read_text()), now)
                 except (OSError, ValueError, KeyError, TypeError, EOFError):
                     pass
-            try:
-                rows = fetch()
-                incoming = parse_envelope(rows, now, expected)
-                if self.last:
-                    before, after = self.last["snapshot"], incoming["snapshot"]
-                    require(as_time(after["generatedAt"]) >= as_time(before["generatedAt"])
-                            and all(after["markets"][m]["macro"]["marketAsOf"] >= b["macro"]["marketAsOf"]
-                                    for m, b in before["markets"].items())
-                            and (incoming["batch"] != self.last["batch"] or incoming["checksum"] == self.last["checksum"]),
-                            "發布批次倒退或同批內容不同")
-                if self.cache_path and (not self.last or incoming["checksum"] != self.last["checksum"]):
-                    self.save(rows)
-                self.last = incoming
-                status = health(self.last, "sheets", now=now, expected=expected)
-            except Exception as error:
-                status = health(self.last, "last_verified" if self.last else "unavailable", f"Google Sheets 讀取或驗證異常｜{error}", now, expected)
+            candidates = [(source, fetch)]
+            if fallback is not None:
+                candidates.append(("sheets", fallback))
+            for label, load in candidates:
+                try:
+                    rows = load()
+                    incoming = parse_envelope(rows, now, expected)
+                    if self.last:
+                        before, after = self.last["snapshot"], incoming["snapshot"]
+                        require(as_time(after["generatedAt"]) >= as_time(before["generatedAt"])
+                                and all(after["markets"][m]["macro"]["marketAsOf"] >= b["macro"]["marketAsOf"]
+                                        for m, b in before["markets"].items())
+                                and (incoming["batch"] != self.last["batch"] or incoming["checksum"] == self.last["checksum"]),
+                                "發布批次倒退或同批內容不同")
+                    if self.cache_path and (not self.last or incoming["checksum"] != self.last["checksum"]):
+                        self.save(rows)
+                    self.last = incoming
+                    return self.last, health(self.last, label, now=now, expected=expected)
+                except Exception as error:
+                    failure = str(error)
+            status = health(self.last, "last_verified" if self.last else "unavailable", f"研究資料讀取或驗證異常｜{failure}", now, expected)
             return self.last, status
 
     def save(self, rows):

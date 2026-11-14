@@ -158,7 +158,7 @@ def health(entry, source, issue=None, now=None, expected=None, attempts=None):
                               affected=failure.get("affected", []) if failed else [],
                               marketWide=bool(failed and failure.get("marketWide")),
                               errors=failure.get("errors", []) if failed else [],
-                              usable=source == "sheets" and not reason and bool(block and block["signalAt"]),
+                              usable=source in ("sheets", "github") and not reason and bool(block and block["signalAt"]),
                               financialIncomplete=sum(s["financial"]["financial_status"] != "ok" for s in block["stocks"]) if block else None,
                               filingPending=sum(not s["evaluation"]["filingVerified"] for s in block["stocks"]) if block else None,
                               macro=block["macro"]["status"] if block else None)
