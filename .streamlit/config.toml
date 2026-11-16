@@ -1,19 +1,19 @@
 [theme]
 base = "light"
-primaryColor = "#71562F"
-backgroundColor = "#F7F9FC"
-secondaryBackgroundColor = "#E8EDF4"
-textColor = "#303849"
+primaryColor = "#AA8551"
+backgroundColor = "#FAF9F6"
+secondaryBackgroundColor = "#F4EFE6"
+textColor = "#263344"
 font = "sans serif"
-borderColor = "#CBD3E0"
+borderColor = "#E0E1E2"
 showWidgetBorder = true
 
 [theme.sidebar]
-backgroundColor = "#182940"
-secondaryBackgroundColor = "#32445B"
-textColor = "#E9EFF8"
-primaryColor = "#F4DDBA"
-borderColor = "#3B4B62"
+backgroundColor = "#24364A"
+secondaryBackgroundColor = "#354B63"
+textColor = "#EDF1F6"
+primaryColor = "#F1DFC1"
+borderColor = "#52627A"
 
 [browser]
 gatherUsageStats = false
