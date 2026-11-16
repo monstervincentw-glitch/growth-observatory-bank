@@ -553,64 +553,100 @@ def advisor_performance():
 def advisor(research, research_close=None):
     current, performance_error, performance_source = advisor_performance()
     research = overlay_performance(research, current)
-    products=sorted({x["symbol"] for x in research["advisor"]})
+    products = sorted({x["symbol"] for x in research["advisor"]})
     with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
-        product=st.selectbox("研究商品",products,index=products.index("QQQ"),width=132)
-        candidates=[r for r in research["advisor"] if r["symbol"]==product]
-        years=sorted({r["start_year"] for r in candidates})
-        cohort=st.selectbox("投資起始年",years,key=f"advisor-year-{product}",width=138)
-    selected=[r for r in candidates if r["start_year"]==cohort]
-    comparison = pd.DataFrame(selected).rename(columns={
-        "variant": "方案", "cumulative": "累積報酬", "cagr": "CAGR", "mdd": "最大回撤"
-    })
-    st.subheader("A／B／C／D 績效比較")
-    strategy_comparison(comparison, {code: f"{code} {name}" for code, name in PLANS.items()})
-    cutoff = selected[0].get("through", "2026-11-04")
-    if cutoff == "2026-11-04":
-        st.caption("顧問績效封存至 2026-11-04。早期信用利差代理與發布時點存在限制。共同基金採可得淨值。")
-    else:
-        st.caption(f"ETF 績效截止 {cutoff} · {performance_source} · {current['batch']} · 更新 {stamp(current['calculated_at'])}")
-        age = (datetime.now(ZoneInfo("America/New_York")).date() - datetime.fromisoformat(cutoff).date()).days
-        if age > 4 or (research_close and cutoff < research_close):
-            st.warning("STALE_DATA｜ETF 績效日期落後，顯示最後驗證批次。")
-    if cutoff != "2026-11-04":
-        status=performance_status().get('ETF',{})
-        if status.get('status') in ('PARTIAL_DATA','SOURCE_ERROR','VALIDATION_FAILED'):
-            st.warning(f"{status['status']}｜ETF 更新未通過，顯示最後驗證績效。")
-    if performance_error:
-        st.warning(performance_error)
-    with st.expander("各策略明細"):
-        table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"累積":percent(r["cumulative"]),"CAGR":percent(r["cagr"]),
-            "最大回撤":percent(r["mdd"]),"最差年度":r["worst_year"],"最差年報酬":percent(r["worst_year_return"]),
-            "高點至回本（天）":r["peak_to_recovery_calendar_days"],"成本／初始資金":percent(r["transaction_cost_initial_fraction"]),
-            "買入次數":r["buy_count"],"賣出次數":r["sell_count"]} for r in selected], label="各策略明細")
-    st.subheader("事件回撤")
-    event = st.segmented_control("事件回撤比較", list(WINDOWS), format_func=WINDOWS.get,
-                                 default="GFC", key="advisor-event") or "GFC"
-    events=[r for r in research["windows"] if r["symbol"]==product and r["start_year"]==cohort and str(r["window"])==str(event)]
-    if events:
-        event_drawdown_chart(pd.DataFrame(events), "variant", "window_mdd", WINDOWS[event])
-        table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"起日":r["first"],"迄日":r["last"],
-            "部分區間":r["partial"],"事件報酬":percent(r["strategy_return"]),"最大回撤":percent(r["window_mdd"]),
-            "紅燈交易日":r["red_sessions"]} for r in events], label="ETF／基金事件回撤")
-    else:
-        st.caption("此起跑年度在該事件沒有研究區間。")
+        product = st.selectbox("研究商品", products, index=products.index("QQQ"), width=132)
+        candidates = [r for r in research["advisor"] if r["symbol"] == product]
+        years = sorted({r["start_year"] for r in candidates})
+        cohort = st.selectbox("投資起始年", years, key=f"advisor-year-{product}", width=138)
+    selected = [r for r in candidates if r["start_year"] == cohort]
+    section = st.segmented_control(
+        "顧問研究區塊", ["績效比較", "市場事件", "台幣模擬"],
+        default="績效比較", key="bank-advisor-section",
+        label_visibility="collapsed",
+    ) or "績效比較"
+
+    if section == "績效比較":
+        comparison = pd.DataFrame(selected).rename(columns={
+            "variant": "方案", "cumulative": "累積報酬", "cagr": "CAGR", "mdd": "最大回撤"
+        })
+        st.subheader("A／B／C／D 績效比較")
+        strategy_comparison(comparison, {code: f"{code} {name}" for code, name in PLANS.items()})
+        cutoff = selected[0].get("through", "2026-11-04")
+        if cutoff == "2026-11-04":
+            st.caption("顧問績效封存至 2026-11-04。早期信用利差代理與發布時點存在限制。共同基金採可得淨值。")
+        else:
+            st.caption(f"ETF 績效截止 {cutoff} · {performance_source} · {current['batch']} · 更新 {stamp(current['calculated_at'])}")
+            age = (datetime.now(ZoneInfo("America/New_York")).date() - datetime.fromisoformat(cutoff).date()).days
+            if age > 4 or (research_close and cutoff < research_close):
+                st.warning("STALE_DATA｜ETF 績效日期落後，顯示最後驗證批次。")
+        if cutoff != "2026-11-04":
+            status = performance_status().get("ETF", {})
+            if status.get("status") in ("PARTIAL_DATA", "SOURCE_ERROR", "VALIDATION_FAILED"):
+                st.warning(f"{status['status']}｜ETF 更新未通過，顯示最後驗證績效。")
+        if performance_error:
+            st.warning(performance_error)
+        with st.expander("各策略明細"):
+            table([{"方案": r["variant"] + " " + PLANS[r["variant"]],
+                    "累積": percent(r["cumulative"]), "CAGR": percent(r["cagr"]),
+                    "最大回撤": percent(r["mdd"]), "最差年度": r["worst_year"],
+                    "最差年報酬": percent(r["worst_year_return"]),
+                    "高點至回本（天）": r["peak_to_recovery_calendar_days"],
+                    "成本／初始資金": percent(r["transaction_cost_initial_fraction"]),
+                    "買入次數": r["buy_count"], "賣出次數": r["sell_count"]}
+                   for r in selected], label="各策略明細")
+        return
+
+    if section == "市場事件":
+        st.subheader("市場事件回撤")
+        event = st.segmented_control(
+            "事件回撤比較", list(WINDOWS), format_func=WINDOWS.get,
+            default="GFC", key="advisor-event",
+        ) or "GFC"
+        events = [r for r in research["windows"] if
+                  r["symbol"] == product and r["start_year"] == cohort
+                  and str(r["window"]) == str(event)]
+        if events:
+            event_drawdown_chart(pd.DataFrame(events), "variant", "window_mdd", WINDOWS[event])
+            table([{"方案": r["variant"] + " " + PLANS[r["variant"]],
+                    "起日": r["first"], "迄日": r["last"],
+                    "部分區間": r["partial"], "事件報酬": percent(r["strategy_return"]),
+                    "最大回撤": percent(r["window_mdd"]), "紅燈交易日": r["red_sessions"]}
+                   for r in events], label="ETF／基金事件回撤")
+        else:
+            st.caption("此起跑年度在該事件沒有研究區間。")
+        return
+
     st.subheader("新台幣 1,000 萬元模擬組合")
     st.caption("2006 年起投，SPY 40%、QQQ 20%、AGG 30%、IEF 10%，計入匯率。")
-    options=list(dict.fromkeys(r["window"] for r in research["example"]))
-    example=st.selectbox("台幣組合市場事件",options,format_func=lambda x: WINDOWS.get(str(x),str(x)))
+    options = list(dict.fromkeys(r["window"] for r in research["example"]))
+    example = st.selectbox(
+        "台幣組合市場事件", options,
+        format_func=lambda x: WINDOWS.get(str(x), str(x)),
+    )
     example_rows = [r for r in research["example"] if r["window"] == example]
     if example_rows:
-        event_drawdown_chart(pd.DataFrame(example_rows), "variant", "drawdown",
-                             WINDOWS.get(str(example), str(example)), value_label="模擬組合最大回撤")
-    table([{"方案":r["variant"]+" "+PLANS[r["variant"]],"高點日":r["peak_date"],"高點淨值":number(r["peak_twd"]),
-        "低點日":r["trough_date"],"低點淨值":number(r["trough_twd"]),"虧損":number(r["loss_twd"]),
-        "回撤":percent(r["drawdown"]),"同額虧損":number(-r["drawdown"]*10_000_000),"回本日":r["recovery_date"],
-        "低點至回本（日）":r["days_trough_to_recovery"]} for r in example_rows], label="台幣模擬組合事件回撤")
-    for label,name in [("各商品／年度完整 CSV","advisor-by-year.csv"),("事件比較 CSV","advisor-events.csv"),
-        ("事件模擬成交與成本 CSV","advisor-event-fills.csv"),("台幣組合事件 CSV","advisor-twd-events.csv")]:
-        report_file(label,name)
-
+        event_drawdown_chart(
+            pd.DataFrame(example_rows), "variant", "drawdown",
+            WINDOWS.get(str(example), str(example)),
+            value_label="模擬組合最大回撤",
+        )
+    table([{"方案": r["variant"] + " " + PLANS[r["variant"]],
+            "高點日": r["peak_date"], "高點淨值": number(r["peak_twd"]),
+            "低點日": r["trough_date"], "低點淨值": number(r["trough_twd"]),
+            "虧損": number(r["loss_twd"]), "回撤": percent(r["drawdown"]),
+            "同額虧損": number(-r["drawdown"] * 10_000_000),
+            "回本日": r["recovery_date"],
+            "低點至回本（日）": r["days_trough_to_recovery"]}
+           for r in example_rows], label="台幣模擬組合事件回撤")
+    with st.expander("下載顧問研究 CSV"):
+        for label, name in [
+            ("各商品／年度完整 CSV", "advisor-by-year.csv"),
+            ("事件比較 CSV", "advisor-events.csv"),
+            ("事件模擬成交與成本 CSV", "advisor-event-fills.csv"),
+            ("台幣組合事件 CSV", "advisor-twd-events.csv"),
+        ]:
+            report_file(label, name)
 @st.cache_data(ttl=90, show_spinner=False)
 def runner_attempts():
     try:
