@@ -73,6 +73,20 @@ col2.metric("模擬可用現金",f"US$ {account['cash']:,.0f}")
 col3.metric("核心持股",f"{core_count} / 10")
 col4.metric("策略",strategy)
 
+# Public-only chart for visual review. Never render the owner's real NAV here.
+import pandas as pd
+st.subheader("帳戶淨值走勢 · USD（虛構示例）")
+st.caption("僅為介面示範，數字與使用者的私人持股、實際帳戶績效無關。"
+           "正式版會從受保護的私人 Google Sheets 顯示已核驗的每日淨值。")
+fake_nav=pd.DataFrame([
+    {"date":pd.to_datetime("2026-11-11"),"value":19540.00},
+    {"date":pd.to_datetime("2026-11-13"),"value":19280.00},
+])
+st.line_chart(fake_nav,x="date",y="value",height=230,use_container_width=True)
+with st.expander("最近每日淨值（虛構示例）"):
+    st.dataframe(fake_nav.rename(columns={"date":"日期","value":"淨值（美元）"}),
+                 hide_index=True,use_container_width=True)
+
 all_reviews=[exit_review(h,macro) for h in valued["holdings"]]
 risk=[r for r in all_reviews if r["status"]=="觸發出場條件"]
 unknown=[r for r in all_reviews if r["status"]=="資料待確認"]
