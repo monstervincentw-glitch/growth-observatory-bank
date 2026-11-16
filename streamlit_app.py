@@ -192,28 +192,46 @@ def markets(market, block, signal_available, latest_quotes=None):
         "代號", "單季營收年增", "營益率", "營業現金流率", "P/S",
         "財報期", "實際取得財報時間", "資料品質", "檢查原因",
     ]
-    page_size = 20
-    page_key = f"stocks-page-{market}"
-    start = min(st.session_state.get(page_key, 0),
-                (len(rows) - 1) // page_size * page_size)
-    with st.container(horizontal=True, gap="small", vertical_alignment="center"):
-        st.subheader(scope, anchor=False)
-        st.write(f"{start + 1}–{min(start + page_size, len(rows))} ／ {len(rows)} 檔")
-        if len(rows) > page_size:
-            st.button("上一頁", key=f"stocks-prev-{market}", disabled=start == 0,
-                      on_click=st.session_state.__setitem__,
-                      args=(page_key, max(0, start - page_size)))
-            st.button("下一頁", key=f"stocks-next-{market}",
-                      disabled=start + page_size >= len(rows),
-                      on_click=st.session_state.__setitem__,
-                      args=(page_key, start + page_size))
+    # Each major purpose gets its own workspace. Long tables no longer push
+    # the single-stock price chart beneath several screens of content.
+    section = st.segmented_control(
+        "市場觀測區塊", ["策略清單", "單檔圖表", "資金數據"],
+        default="策略清單", key=f"market-section-{market}",
+        label_visibility="collapsed",
+    ) or "策略清單"
+    if section == "資金數據":
+        funding_details(macro)
+        return
 
-    visible_rows = pd.DataFrame(rows[start:start + page_size])
-    readable_table(visible_rows[main_columns], label="即時市場觀測", layout="market")
-    with st.expander("本頁財報與進出場檢查明細"):
-        readable_table(visible_rows[detail_columns], label="即時研究明細")
-    csv_button("匯出目前篩選 CSV", rows, f"{market}-market-watch.csv", f"export-{market}")
-    funding_details(macro)
+    if section == "策略清單":
+        page_size = 10
+        page_key = f"stocks-page-{market}"
+        start = min(st.session_state.get(page_key, 0),
+                    (len(rows) - 1) // page_size * page_size)
+        with st.container(horizontal=True, gap="small", vertical_alignment="center"):
+            st.subheader(scope, anchor=False)
+            st.write(f"{start + 1}–{min(start + page_size, len(rows))} ／ {len(rows)} 檔 · 每頁 10 檔")
+            if len(rows) > page_size:
+                st.button("上一頁", key=f"stocks-prev-{market}", disabled=start == 0,
+                          on_click=st.session_state.__setitem__,
+                          args=(page_key, max(0, start - page_size)))
+                st.button("下一頁", key=f"stocks-next-{market}",
+                          disabled=start + page_size >= len(rows),
+                          on_click=st.session_state.__setitem__,
+                          args=(page_key, start + page_size))
+        visible_rows = pd.DataFrame(rows[start:start + page_size])
+        # Keep the essential decision columns compact; original full fields
+        # remain available in the detail expander and complete CSV export.
+        summary_columns = (["排名", "代號", "公司", "總分", "收盤", "TTM 營收年增"]
+                           + (["背離研究", "資金狀態"] if scope == DIVERGENCE
+                              else ["進場檢查", "持股出場檢查"]))
+        readable_table(visible_rows[summary_columns], label="即時市場觀測", layout="market")
+        with st.expander("本頁完整行情、產業與財報檢查明細"):
+            readable_table(visible_rows[main_columns + detail_columns],
+                           label="即時市場觀測完整明細")
+        csv_button("匯出全部篩選結果 CSV", rows, f"{market}-market-watch.csv", f"export-{market}")
+        st.caption("切換「單檔圖表」可查看個股走勢與評分；本頁只顯示 10 檔，匯出仍包含全部篩選結果。")
+        return
 
     stock = st.selectbox(
         "查看單檔分數、財報與行情", selected_stocks,
@@ -224,35 +242,40 @@ def markets(market, block, signal_available, latest_quotes=None):
     if rank:
         st.write(f"**#{rank['rank']}　{rank['score']:.2f} 分** · "
                  f"同業 {rank['detail']['industrySize']} 檔")
-        table([{
-            "因子": FACTORS[p["key"]],
-            "原始值": number(p["value"]) if p["key"] == "value" else percent(p["value"]),
-            "百分位": percent(p["percentile"]), "權重": percent(p["weight"]),
-            "貢獻分": round(p["weight"] * p["percentile"] * 100, 2),
-        } for p in rank["detail"]["parts"]], label="單檔評分")
     st.caption(f"財報期 {f.get('latest_period') or '待核對'} · "
                f"首次／最近取得 {stamp(stock.get('financialObservedAt'))} · "
                f"行情來源 {stock.get('priceSource') or '待核對'}")
+
+    # Keep the chart at the beginning of the single-stock workspace.
+    if stock["history"]:
+        history = pd.DataFrame(stock["history"]).rename(columns={"close": "調整收盤"})
+        history["date"] = pd.to_datetime(history["date"])
+        trend_chart(history.rename(columns={"date": "日期"}), "日期",
+                    ["調整收盤"], ylabel="調整收盤", height=285)
+    else:
+        st.info("目前沒有可供繪製的歷史行情，請查看資料取得狀態。")
+
     if stock.get("sourceWarning") or stock.get("sourceError"):
         st.warning(stock.get("sourceWarning") or stock["sourceError"])
-
     state = states[stock["key"]]
     st.write(f"**進場條件：** {state['entry_label']}　"
              f"**持股出場檢查：** {state['exit_label']}")
     if state["reasons"]:
         st.caption("｜".join(state["reasons"]))
-    st.caption("出場檢查只涵蓋最新財報與共通資金規則；"
-               "個股相對實際進場時的成長及營益率變化，需要持股紀錄才能完整判定。")
     technical = stock["features"]
     st.caption(f"126 日回撤 {percent(technical.get('drawdown_126'))} · "
                f"63 日相對報酬 {percent(technical.get('relative_63'))} · "
                f"可用交易日 {technical.get('history_sessions','—')}")
-    if stock["history"]:
-        history = pd.DataFrame(stock["history"]).rename(columns={"close": "調整收盤"})
-        history["date"] = pd.to_datetime(history["date"])
-        trend_chart(history.rename(columns={"date": "日期"}), "日期",
-                    ["調整收盤"], ylabel="調整收盤", height=315)
-
+    with st.expander("評分因子、資料版本與完整風險說明"):
+        if rank:
+            table([{
+                "因子": FACTORS[p["key"]],
+                "原始值": number(p["value"]) if p["key"] == "value" else percent(p["value"]),
+                "百分位": percent(p["percentile"]), "權重": percent(p["weight"]),
+                "貢獻分": round(p["weight"] * p["percentile"] * 100, 2),
+            } for p in rank["detail"]["parts"]], label="單檔評分")
+        st.caption("出場檢查只涵蓋最新財報與共通資金規則；"
+                   "個股相對實際進場時的成長及營益率變化，需要持股紀錄才能完整判定。")
 
 def market_picker(column, *, label_visibility="visible"):
     return MARKETS[column.segmented_control("市場", list(MARKETS), default="美股", key="bank-market",
