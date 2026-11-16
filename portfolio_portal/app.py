@@ -56,6 +56,23 @@ section[data-testid="stSidebar"] .stButton button[data-testid="stBaseButton-prim
  border-color:#d4b17a!important;box-shadow:inset 3px 0 0 #ad7d3e!important;
  font-weight:720!important
 }
+/* Active portfolio in sidebar: preserve champagne/navy palette with readable text.
+   Target portfolio nav keys only; do not change the separate management button. */
+section[data-testid="stSidebar"] [class*="st-key-nav-"] button[kind="primary"],
+section[data-testid="stSidebar"] [class*="st-key-nav-"] button[data-testid="stBaseButton-primary"]{
+ background:#e5c895!important;color:#23384d!important;
+ border-color:#b9843f!important;box-shadow:inset 4px 0 0 #b9843f!important;
+ font-weight:760!important
+}
+/* Streamlit button labels use nested p/span elements with a sidebar text rule. */
+section[data-testid="stSidebar"] [class*="st-key-nav-"] button[kind="primary"] :is(p,span),
+section[data-testid="stSidebar"] [class*="st-key-nav-"] button[data-testid="stBaseButton-primary"] :is(p,span){
+ color:#23384d!important;font-weight:760!important
+}
+section[data-testid="stSidebar"] [class*="st-key-nav-"] button[kind="primary"]:hover,
+section[data-testid="stSidebar"] [class*="st-key-nav-"] button[data-testid="stBaseButton-primary"]:hover{
+ background:#e9cfa1!important;color:#23384d!important
+}
 section[data-testid="stSidebar"] [data-testid="stExpander"]{
  background:#2c4056!important;border:1px solid #52627a!important;border-radius:.75rem
 }
