@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from research import latest_research
 from monitor import portfolio_reviews, data_too_old
 from core import compute_account, portfolio_value
+from entry_basis import apply_official_baselines, sync_entry_baselines
 from storage import PortfolioSheets, sheets_client
 
 
@@ -25,8 +26,19 @@ def run():
     snapshot = entry["snapshot"]
     portfolios = store.portfolios()
     transactions = store.transactions()
+    baseline_result = "skipped"
+    try:
+        added = sync_entry_baselines(store, transactions, portfolios, snapshot)
+        baseline_result = "recorded" if added else "unchanged"
+    except Exception as exc:
+        baseline_result = exc.__class__.__name__
+    try:
+        transactions = apply_official_baselines(transactions, store.entry_baselines())
+    except Exception as exc:
+        baseline_result = exc.__class__.__name__
     current = portfolio_reviews(portfolios, transactions, snapshot, entry["batch"])
     changed = store.append_monitor_results(current)
+    transitions = store.append_exit_transitions(current)
     nav_new_count=0
     # Save verified account NAV separately from owner-created positions/trades.
     # Use only a full, confirmed same-session quote for every held security.
@@ -51,7 +63,8 @@ def run():
         "result":"complete", "source":source, "batch":entry["batch"],
         "market_dates":{m:snapshot["markets"][m]["macro"]["marketAsOf"] for m in ("US","TW")},
         "portfolio_count":len(portfolios), "monitored_position_count":len(current),
-        "new_event_count":len(changed), "nav_snapshots_created":nav_new_count,
+        "new_event_count":len(changed), "exit_transitions":len(transitions),
+        "entry_baselines":baseline_result, "nav_snapshots_created":nav_new_count,
         "observation_warnings":len(notes),
         "at":datetime.now(timezone.utc).isoformat()
     },ensure_ascii=False))

@@ -11,7 +11,8 @@ import json
 import pandas as pd
 import streamlit as st
 
-from core import buy_plan, compute_account, contributions_through, divergence_plan, modified_dietz, owner_allowed, portfolio_value
+from core import buy_plan, compute_account, contributions_through, divergence_plan, funding_decision, modified_dietz, owner_allowed, portfolio_value
+from entry_basis import apply_official_baselines, resolve_buy_baseline, sync_entry_baselines
 from monitor import portfolio_reviews, review_holding, data_too_old
 from oauth_messages import oauth_error_message
 from research import latest_research
@@ -37,6 +38,101 @@ def public_error(exc):
     if any(word in lowered for word in ("private_key", "client_secret", "begin private", "token", "secret")):
         return "設定無法使用。請只在 Render 的 Environment 修正，不要把密鑰貼到聊天或 GitHub。"
     return text[:300]
+
+
+def pct(value):
+    if value in (None, ""):
+        return "無法判定"
+    try:
+        return f"{float(value):.2%}"
+    except (TypeError, ValueError):
+        return "無法判定"
+
+
+def points(value):
+    if value in (None, ""):
+        return "無法判定"
+    try:
+        return f"{float(value):+.2f} 個百分點"
+    except (TypeError, ValueError):
+        return "無法判定"
+
+
+def _cik(symbol, block):
+    for stock in block.get("stocks") or []:
+        if str(stock.get("symbol") or "").upper() == str(symbol or "").upper():
+            cik = str(stock.get("cik") or "").strip()
+            if cik.isdigit():
+                return cik.zfill(10)
+    return ""
+
+
+def _buy_facts(symbol, block):
+    from entry_basis import fetch_company_facts
+    cik = _cik(symbol, block)
+    if not cik:
+        return None
+    return fetch_company_facts(cik)
+
+
+def show_funding(macro):
+    decision = funding_decision(macro)
+    labels = {"red": "紅燈", "non_red": "非紅燈", "unknown": "未知"}
+    names = (("rates", "利率", "90 日實質利率升逾 0.50 個百分點，或政策利率升逾 0.25 個百分點。"),
+             ("conditions", "金融條件", "NFCI 高於 0，或 90 日升逾 0.25 指數點。"),
+             ("inflation", "通膨", "CPI 年增逾 4%，且近 3 個月年化高於年增率。"))
+    states = macro.get("categoryStates") if isinstance(macro.get("categoryStates"), dict) else {}
+
+    def flag(raw):
+        if raw in (1, "1", True):
+            return "已觸發"
+        if raw in (0, "0", False):
+            return "未觸發"
+        return "未知"
+
+    st.subheader("全球資金溫度")
+    cols = st.columns(3)
+    for col, (key, label, rule) in zip(cols, names):
+        col.metric(label, flag(states.get(key)))
+        col.caption(rule)
+    score = macro.get("scoreRange")
+    score_text = f"{score[0]}–{score[1]}" if isinstance(score, (list, tuple)) and len(score) == 2 else "無法計算"
+    st.write(f"綜合判斷：**{labels[decision]}** · 目前風險數量範圍 {score_text}")
+    if decision == "red":
+        st.error("紅燈已達主策略出場條件。這不會自動賣出。")
+    elif decision == "unknown":
+        st.warning("未知不是綠燈，也不等於未觸發出場。")
+    else:
+        st.caption("非紅燈只代表已判定的觸發數到不了兩項，不是全綠。個股財報出場仍分開檢查。")
+    stale_market = not macro.get("marketAsOf") or data_too_old(macro["marketAsOf"])
+    st.caption("行情日 " + str(macro.get("marketAsOf") or "未知")
+               + " · 觀測 " + str(macro.get("observedAt") or macro.get("calculatedAt") or "未知")
+               + " · 規則 " + str(macro.get("ruleVersion") or "未知")
+               + " · 新鮮度 " + ("過期，只供核對" if stale_market else "仍在可核對窗口"))
+    impact = {
+        "red": "對持股：主策略 A／B 將此紅燈列入出場條件。",
+        "non_red": "對持股：資金溫度這一項未構成出場。營收與營益率仍依建倉基準單獨判斷。",
+        "unknown": "對持股：資金溫度無法判定。此項不計為未觸發，其他已證實的出場條件仍有效。",
+    }[decision]
+    st.caption(impact)
+
+    def level(value, digits):
+        if value in (None, ""):
+            return "未知"
+        try:
+            return f"{float(value):.{digits}f}"
+        except (TypeError, ValueError):
+            return "未知"
+
+    readings = [
+        ("實質殖利率", level(macro.get("real_yield"), 2), level(macro.get("real_yield_90d_change"), 2)),
+        ("政策利率", level(macro.get("fed_funds"), 2), level(macro.get("fed_funds_90d_change"), 2)),
+        ("NFCI", level(macro.get("financial_conditions"), 3), level(macro.get("financial_conditions_90d_change"), 3)),
+        ("CPI 年增", pct(macro.get("cpi_yoy")), "—"),
+        ("CPI 近 3 個月年化", pct(macro.get("cpi_3m_annualized")), "—"),
+    ]
+    st.dataframe([{"項目": name, "讀數": value, "90 日變化": change} for name, value, change in readings],
+                 hide_index=True, use_container_width=True)
 
 
 def auth_gate():
@@ -119,6 +215,14 @@ for message in research_issues:
 try:
     portfolios = store.portfolios()
     transactions = store.transactions()
+    try:
+        sync_entry_baselines(store, transactions, portfolios, snapshot)
+    except Exception as exc:
+        st.warning("建倉財報基準這次沒有補齊，出場比較不會猜數字：" + public_error(exc))
+    try:
+        transactions = apply_official_baselines(transactions, store.entry_baselines())
+    except Exception as exc:
+        st.warning("無法讀取建倉基準稽核表，這次不套用補登：" + public_error(exc))
 except Exception as exc:
     st.error("讀取私人交易紀錄失敗，禁止建立建議或寫入新資料。")
     st.caption(public_error(exc))
@@ -133,11 +237,11 @@ except Exception as exc:
     st.caption(public_error(exc))
     st.stop()
 urgent=[r for r in live_reviews if r["status"]=="觸發出場條件"]
-pending=[r for r in live_reviews if r["status"]=="資料待確認"]
+pending=[r for r in live_reviews if r["status"] in ("資料待確認", "無法判定")]
 st.subheader("今日持股監控")
 summary_cols=st.columns(3)
 summary_cols[0].metric("觸發出場條件",len(urgent))
-summary_cols[1].metric("資料待確認",len(pending))
+summary_cols[1].metric("無法判定",len(pending))
 summary_cols[2].metric("目前監控持股",len(live_reviews))
 if urgent or pending:
     st.dataframe([{"組合":next((p["name"] for p in portfolios if p["id"]==r["portfolio_id"]),""),
@@ -151,7 +255,8 @@ with st.expander("監控事件歷史與存檔"):
     if st.button("記錄本次監控變化至私人 Google Sheets"):
         try:
             recorded=store.append_monitor_results(live_reviews)
-            st.success(f"已儲存 {len(recorded)} 筆新增／變更事件")
+            transitions=store.append_exit_transitions(live_reviews)
+            st.success(f"已儲存 {len(recorded)} 筆狀態變化、{len(transitions)} 筆條件觸發或解除")
             st.rerun()
         except Exception as exc:
             st.error("寫入監控紀錄失敗："+str(exc))
@@ -265,6 +370,7 @@ tab_hold,tab_plan,tab_trades,tab_market=st.tabs([
     "持股與出場監控","A／B 現金與買入","交易與現金","買入候選及研究"])
 
 with tab_hold:
+    show_funding(block["macro"])
     with st.expander("原私人站持股市值與損益｜已核對的歷史收盤紀錄"):
         historical=store.historical_positions(selected_id)
         if historical:
@@ -296,18 +402,36 @@ with tab_hold:
             if portfolio["strategy"] in ("A","B"):
                 review = review_holding(holding,portfolio["strategy"],block["macro"])
                 if data_too_old(block["macro"]["marketAsOf"]):
-                    review={"status":"資料待確認","reasons":[],
-                            "unknown":["研究行情日過期，暫停買賣判斷"],
-                            "financial_period":None,"observed_at":None,
-                            "asof":block["macro"]["marketAsOf"]}
+                    review={**review, "status":"無法判定", "reasons":[],
+                            "unknown":["無法判定：研究行情日過期，暫停買賣判斷"]}
                 st.write(f"**{review['status']}**")
                 for reason in review["reasons"]:
                     st.error("觸發："+reason)
                 for reason in review["unknown"]:
-                    st.warning("待確認："+reason)
-                st.caption(f"最新財報期 {review['financial_period']} · "
-                           f"首次取得 {review['observed_at']} · "
-                           f"行情日 {review['asof']}")
+                    st.warning(reason if reason.startswith("無法判定") else "無法判定："+reason)
+                base = review.get("baseline") or {}
+                latest = review.get("latest") or {}
+                change = review.get("change") or {}
+                st.write("建倉財報基準　營收成長 " + pct(base.get("growth"))
+                         + " · 營益率 " + pct(base.get("margin")))
+                st.caption("財報期 " + (base.get("period") or "無法判定")
+                           + " · 官方申報日 " + (base.get("filed") or "無法判定")
+                           + " · 來源 " + (base.get("source") or "無法判定")
+                           + " · 版本 " + ((base.get("version") or "")[:12] or "無法判定")
+                           + " · 驗證 " + (base.get("verification") or "無法判定"))
+                if base.get("reason"):
+                    st.caption(base["reason"])
+                first_lot = min(holding["lots"], key=lambda lot: (str(lot.get("at") or ""), str(lot.get("entry_filing_period") or "")))
+                manual_growth = first_lot.get("ledger_entry_growth")
+                manual_margin = first_lot.get("ledger_entry_margin")
+                if (manual_growth or manual_margin) and base.get("verification") != "OFFICIAL_FILING":
+                    st.caption("原始帳本另有人工填寫的進場數字，出場判斷不採用，也沒有改寫那一列。")
+                st.write("最新財報　營收成長 " + pct(latest.get("growth"))
+                         + " · 營益率 " + pct(latest.get("margin"))
+                         + " · 期別 " + (latest.get("period") or "無法判定"))
+                st.write("相對建倉　營收成長 " + points(change.get("growth_pp"))
+                         + " · 營益率 " + points(change.get("margin_pp")))
+                st.caption(f"首次取得 {review.get('observed_at') or '無法判定'} · 行情日 {review.get('asof')}")
             else:
                 review=review_holding(holding,portfolio["strategy"],block["macro"])
                 st.info("非 A／B 策略｜"+review["status"]+"；不套用主策略強制賣出規則。")
@@ -374,22 +498,23 @@ with tab_trades:
         cash_amount = st.text_input("現金異動金額（存／提）",value="")
         role=st.selectbox("持股類別", ["core","extra"] if portfolio["strategy"]=="B" else ["core"],
                           format_func=lambda x:"核心" if x=="core" else "額外")
-        st.caption("歷史補登的進場財報必須是當時實際可得的數值，請手動填寫；"
-                   "不可使用今天的財報冒充歷史買進基準。")
-        c4,c5=st.columns(2)
-        entry_growth=c4.text_input("進場時 TTM 營收年增率（小數，例如 0.25）",value="")
-        entry_margin=c5.text_input("進場時營益率（小數，例如 0.15）",value="")
-        entry_period=st.text_input("進場當時已取得的財報季度（選填）",value="")
+        st.caption("買入會另外把建倉當日已正式申報的營收成長率、營益率、財報期、官方申報日與版本寫進稽核表。"
+                   "寫不進去就標無法判定，不會用今天的財報回填，也不會改舊的交易列。")
         note=st.text_input("交易備註",value="")
         if st.form_submit_button("確認並寫入私人 Google Sheets",type="primary"):
             try:
-                store.append_transaction(
+                record = store.append_transaction(
                     portfolio_id=selected_id, action=action, trade_date=tdate.isoformat(),
                     symbol=symbol,quantity=qty,price=price,fee=fee,
-                    cash_amount=cash_amount,role=role,
-                    entry_growth=entry_growth,entry_margin=entry_margin,
-                    entry_filing_period=entry_period,note=note)
-                st.success("已寫入並驗證交易流水帳")
+                    cash_amount=cash_amount,role=role,note=note)
+                if action == "BUY":
+                    basis = resolve_buy_baseline(
+                        symbol, tdate.isoformat(), market=portfolio["market"],
+                        payload=_buy_facts(symbol, block),
+                        cik=_cik(symbol, block))
+                    store.append_entry_baselines([{**basis, "portfolio_id": selected_id,
+                                                    "ledger_id": record["id"]}])
+                st.success("已寫入交易流水帳。建倉基準寫在稽核表，原始舊列沒有被改寫。")
                 st.rerun()
             except Exception as exc:
                 st.error("未完成寫入："+str(exc))

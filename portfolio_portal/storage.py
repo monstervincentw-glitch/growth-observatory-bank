@@ -22,6 +22,11 @@ NAV_HEADERS = ["portfolio_id", "date", "nav", "cash", "equity_value", "liabiliti
                "daily_return", "cumulative_pnl", "twr", "source", "note"]
 POSITION_SNAPSHOT_HEADERS = ["portfolio_id", "date", "symbol", "name", "quantity", "avg_cost",
                              "cost_total", "market_value", "unrealized_pnl", "source", "note"]
+BASELINE_HEADERS = ["id", "recorded_at", "portfolio_id", "ledger_id", "symbol", "trade_date",
+                    "revenue_growth", "operating_margin", "filing_period", "official_published_at",
+                    "source", "version_id", "verification", "detail"]
+EXIT_TRANSITION_HEADERS = ["id", "recorded_at", "portfolio_id", "market", "symbol", "condition",
+                           "state", "first_triggered_at", "resolved_at", "signal_date", "batch", "detail"]
 
 
 def utc_now():
@@ -46,6 +51,8 @@ class PortfolioSheets:
         self.events_tab = self._tab("events", EVENT_HEADERS)
         self.nav_tab = self._tab("nav_history", NAV_HEADERS)
         self.positions_snapshot_tab = self._tab("position_snapshots", POSITION_SNAPSHOT_HEADERS)
+        self.baseline_tab = self._tab("entry_baselines", BASELINE_HEADERS)
+        self.exit_transition_tab = self._tab("exit_transitions", EXIT_TRANSITION_HEADERS)
 
     def _tab(self, name, headers):
         try:
@@ -160,6 +167,84 @@ class PortfolioSheets:
             saved={record["id"] for record in self.monitor_history()}
             if not all(record["id"] in saved for record in rows):
                 raise RuntimeError("監控歷史寫入確認失敗，請核對 Google Sheets")
+            return rows
+
+    def entry_baselines(self):
+        with self._lock:
+            return self._rows(self.baseline_tab, BASELINE_HEADERS)
+
+    def append_entry_baselines(self, rows):
+        """Append audit baselines. Never updates an existing ledger cell."""
+        from entry_basis import OFFICIAL
+        with self._lock:
+            saved = self.entry_baselines()
+            known = {(row["portfolio_id"], row["ledger_id"], row["version_id"]) for row in saved}
+            now = utc_now()
+            fresh = []
+            for row in rows:
+                version = str(row.get("version_id") or "")
+                key = (str(row.get("portfolio_id")), str(row.get("ledger_id")), version)
+                if not version or key in known:
+                    continue
+                if row.get("verification") == OFFICIAL:
+                    from core import money
+                    money(row.get("revenue_growth"))
+                    money(row.get("operating_margin"))
+                record = dict.fromkeys(BASELINE_HEADERS, "")
+                record.update({
+                    "id": str(uuid.uuid4()),
+                    "recorded_at": now,
+                    "portfolio_id": str(row.get("portfolio_id") or ""),
+                    "ledger_id": str(row.get("ledger_id") or ""),
+                    "symbol": str(row.get("symbol") or "").upper(),
+                    "trade_date": str(row.get("trade_date") or "")[:10],
+                    "revenue_growth": str(row.get("revenue_growth") or ""),
+                    "operating_margin": str(row.get("operating_margin") or ""),
+                    "filing_period": str(row.get("filing_period") or ""),
+                    "official_published_at": str(row.get("official_published_at") or "")[:10],
+                    "source": str(row.get("source") or "")[:300],
+                    "version_id": version,
+                    "verification": str(row.get("verification") or ""),
+                    "detail": str(row.get("detail") or "")[:300],
+                })
+                if record["verification"] not in (OFFICIAL, "UNVERIFIED"):
+                    raise ValueError("建倉基準驗證狀態無效")
+                fresh.append(record)
+                known.add(key)
+            if not fresh:
+                return []
+            self.baseline_tab.append_rows(
+                [[record[k] for k in BASELINE_HEADERS] for record in fresh],
+                value_input_option="RAW")
+            return fresh
+
+    def exit_transitions(self):
+        with self._lock:
+            return self._rows(self.exit_transition_tab, EXIT_TRANSITION_HEADERS)
+
+    def append_exit_transitions(self, current):
+        """Record first trigger and later resolution. Does not edit old rows."""
+        from monitor import condition_transitions
+        with self._lock:
+            history = self.exit_transitions()
+            changes = condition_transitions(current, history)
+            if not changes:
+                return []
+            now = utc_now()
+            rows = []
+            for change in changes:
+                record = dict.fromkeys(EXIT_TRANSITION_HEADERS, "")
+                record.update(change)
+                record["id"] = str(uuid.uuid4())
+                record["recorded_at"] = now
+                if record["state"] == "open":
+                    record["first_triggered_at"] = now
+                elif record["state"] == "resolved":
+                    record["resolved_at"] = now
+                rows.append(record)
+            self.exit_transition_tab.append_rows(
+                [[record[k] for k in EXIT_TRANSITION_HEADERS] for record in rows],
+                value_input_option="RAW")
             return rows
 
     def create_portfolio(self, *, name, market, strategy, currency, note=""):

@@ -84,9 +84,17 @@ def compute_account(transactions, portfolio_id):
             cash -= cost
             lots[symbol].append({
                 "quantity": qty, "unit_cost": cost / qty, "role": tx.get("role") or "core",
-                "at": tx["at"], "entry_growth": tx.get("entry_growth", ""),
+                "at": tx["at"], "ledger_id": tx.get("id", ""),
+                "entry_growth": tx.get("entry_growth", ""),
                 "entry_margin": tx.get("entry_margin", ""),
                 "entry_filing_period": tx.get("entry_filing_period", ""),
+                "baseline_filed": tx.get("baseline_filed", ""),
+                "baseline_source": tx.get("baseline_source", ""),
+                "baseline_version": tx.get("baseline_version", ""),
+                "baseline_verification": tx.get("baseline_verification", ""),
+                "baseline_reason": tx.get("baseline_reason", ""),
+                "ledger_entry_growth": tx.get("ledger_entry_growth", ""),
+                "ledger_entry_margin": tx.get("ledger_entry_margin", ""),
             })
         elif action == "SELL":
             qty, price = _positive(tx.get("quantity"), "quantity"), _positive(tx.get("price"), "price")
@@ -407,6 +415,36 @@ _HOLD_RULE = ("背離長抱僅在進場同時要求背離、基本面、可交�
               "持有後不套用主策略的營收、利潤率或資金紅燈強制出場。")
 
 
+def funding_decision(macro):
+    """Official 2-of-3 funding rule. Unknown is never treated as non-red.
+
+    Category states, when present, are the same tri-state inputs the publisher
+    stores. A bare non_red label without those states is not enough.
+    """
+    states = macro.get("categoryStates") if isinstance(macro, dict) else None
+    keys = ("rates", "conditions", "inflation")
+    if isinstance(states, dict) and all(key in states for key in keys):
+        flags = []
+        for key in keys:
+            raw = states[key]
+            if raw in (1, "1", True):
+                flags.append(1)
+            elif raw in (0, "0", False):
+                flags.append(0)
+            else:
+                flags.append(None)
+        triggered = sum(flag == 1 for flag in flags)
+        ceiling = triggered + sum(flag is None for flag in flags)
+        if triggered >= 2:
+            return "red"
+        if ceiling < 2:
+            return "non_red"
+        return "unknown"
+    if isinstance(macro, dict) and macro.get("decision") == "red":
+        return "red"
+    return "unknown"
+
+
 def _first_lot(holding):
     return min(holding["lots"], key=lambda lot: (str(lot.get("at") or ""), str(lot.get("entry_filing_period") or "")))
 
@@ -422,48 +460,76 @@ def _stale_financial(financial):
 
 
 def exit_review(holding, macro):
-    """Main-strategy A/B exit. Missing or stale inputs stay unconfirmed."""
+    """Main-strategy A/B exit. Missing inputs stay 無法判定, not a clean pass."""
     stock = holding["stock"]
     financial = stock.get("financial") or {}
     reasons = []
     unknown = []
     if not stock.get("integrity") or stock.get("sourceError"):
-        unknown.append("行情來源未確認")
-    if macro.get("decision") == "red":
+        unknown.append("無法判定：行情來源未確認")
+    funding = funding_decision(macro)
+    if funding == "red":
         reasons.append("全球資金溫度已達紅燈門檻")
-    elif macro.get("decision") != "non_red":
-        unknown.append("全球資金溫度未知")
+    elif funding != "non_red":
+        unknown.append("無法判定：全球資金溫度未知，不能當成未觸發或綠燈")
     published = [str(item) for item in (stock.get("evaluation") or {}).get("fundamentalReasons") or []]
     incomplete = financial.get("financial_status") != "ok"
     stale = _stale_financial(financial)
     if incomplete:
-        unknown.append("最新財報必要欄位不完整")
+        unknown.append("無法判定：最新財報必要欄位不完整")
     if stale:
-        unknown.append("財報超過 180 天或無法確認時效，暫停確定出場訊號")
+        unknown.append("無法判定：財報超過 180 天或無法確認時效，暫停確定出場訊號")
     financial_unconfirmed = incomplete or stale or any(item in UNCONFIRMED_REASONS for item in published)
     for item in published:
         if item in UNCONFIRMED_REASONS or financial_unconfirmed:
-            unknown.append(item)
+            unknown.append("無法判定：" + item)
         else:
             reasons.append(item)
     lot = _first_lot(holding)
     growth_known = lot.get("entry_growth") not in (None, "")
     margin_known = lot.get("entry_margin") not in (None, "")
+    growth = financial.get("revenue_growth")
+    margin = financial.get("operating_margin")
     if not growth_known or not margin_known:
-        unknown.append("最早一筆持股缺少進場時財報基準")
-    elif not financial_unconfirmed:
-        growth, margin = financial.get("revenue_growth"), financial.get("operating_margin")
+        why = lot.get("baseline_reason") or "最早一筆持股沒有官方申報日可證明的建倉財報基準"
+        unknown.append("無法判定：" + why)
+    elif financial_unconfirmed:
+        unknown.append("無法判定：最新財報不足以和建倉基準比較營收成長與營益率")
+    else:
         if growth is not None and money(growth) <= money(lot["entry_growth"]) - EXIT_GROWTH_DROP:
             reasons.append("營收成長較進場時下降至少 10 個百分點")
         if margin is not None and money(margin) <= money(lot["entry_margin"]) - EXIT_MARGIN_DROP:
             reasons.append("營益率較進場時下降至少 5 個百分點")
+        if growth in (None, ""):
+            unknown.append("無法判定：最新營收成長率缺失")
+        if margin in (None, ""):
+            unknown.append("無法判定：最新營益率缺失")
     if reasons:
         status = "觸發出場條件"
     elif unknown:
-        status = "資料待確認"
+        status = "無法判定"
     else:
         status = "未觸發出場條件"
+    change = {}
+    if growth_known and growth not in (None, ""):
+        change["growth_pp"] = str((money(growth) - money(lot["entry_growth"])) * 100)
+    if margin_known and margin not in (None, ""):
+        change["margin_pp"] = str((money(margin) - money(lot["entry_margin"])) * 100)
     return {"status": status, "reasons": list(dict.fromkeys(reasons)),
             "unknown": list(dict.fromkeys(unknown)), "symbol": stock["symbol"],
             "asof": stock.get("priceDate"), "financial_period": financial.get("latest_period"),
-            "observed_at": stock.get("financialObservedAt")}
+            "observed_at": stock.get("financialObservedAt"),
+            "baseline": {
+                "growth": lot.get("entry_growth") or "",
+                "margin": lot.get("entry_margin") or "",
+                "period": lot.get("entry_filing_period") or "",
+                "filed": lot.get("baseline_filed") or "",
+                "source": lot.get("baseline_source") or "",
+                "version": lot.get("baseline_version") or "",
+                "verification": lot.get("baseline_verification") or "",
+                "reason": lot.get("baseline_reason") or "",
+            },
+            "latest": {"growth": "" if growth is None else growth,
+                       "margin": "" if margin is None else margin,
+                       "period": financial.get("latest_period") or ""},
+            "change": change}

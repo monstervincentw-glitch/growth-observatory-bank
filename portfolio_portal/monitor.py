@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone, date, timedelta
 import hashlib
 import json
-from core import compute_account, portfolio_value, exit_review
+from core import compute_account, portfolio_value, exit_review, funding_decision
 
 
 def _as_date(value):
@@ -45,10 +45,10 @@ def review_holding(holding, strategy, macro):
         unknown.append("行情來源尚未核實")
     if s.get("financial", {}).get("financial_status")!="ok":
         unknown.append("最新財報資訊不足")
-    if macro.get("decision")=="red":
+    if funding_decision(macro) == "red":
         risks.append("全球資金溫度紅燈，僅作長抱風險觀察")
-    elif macro.get("decision")!="non_red":
-        unknown.append("全球資金溫度未知")
+    elif funding_decision(macro) != "non_red":
+        unknown.append("無法判定：全球資金溫度未知，不能當成未觸發")
     if strategy=="背離長抱":
         if not (s.get("evaluation") or {}).get("divergence"):
             risks.append("目前未具備最新背離觀察條件；不等於原策略賣出訊號")
@@ -120,3 +120,51 @@ def changed_events(current, history):
         if state!=prior:
             changed.append(row)
     return changed
+
+
+def _parts(text):
+    return [part for part in str(text or "").split("｜") if part]
+
+
+def condition_transitions(current, history):
+    """Append-only open and resolved rows for each exit condition.
+
+    history rows are previous transition records, oldest first. An open row is
+    the first trigger. A later resolved row records the release time without
+    editing the original trigger.
+    """
+    open_rows = {}
+    for row in history or []:
+        key = (str(row.get("portfolio_id")), str(row.get("symbol")), str(row.get("condition")))
+        if row.get("state") == "open":
+            open_rows[key] = row
+        elif row.get("state") == "resolved":
+            open_rows.pop(key, None)
+    active = {}
+    for row in current:
+        conditions = _parts(row.get("reasons")) + _parts(row.get("unknown"))
+        for condition in conditions:
+            active[(str(row["portfolio_id"]), str(row["symbol"]), condition)] = row
+    changes = []
+    for key, row in active.items():
+        if key in open_rows:
+            continue
+        changes.append({
+            "portfolio_id": key[0], "market": row.get("market", ""), "symbol": key[1],
+            "condition": key[2], "state": "open",
+            "first_triggered_at": "", "resolved_at": "",
+            "signal_date": row.get("signal_date", ""), "batch": row.get("batch", ""),
+            "detail": row.get("status", ""),
+        })
+    for key, opened in open_rows.items():
+        if key in active:
+            continue
+        changes.append({
+            "portfolio_id": key[0], "market": opened.get("market", ""), "symbol": key[1],
+            "condition": key[2], "state": "resolved",
+            "first_triggered_at": opened.get("first_triggered_at") or opened.get("recorded_at") or "",
+            "resolved_at": "",
+            "signal_date": "", "batch": "",
+            "detail": "條件已解除",
+        })
+    return changes

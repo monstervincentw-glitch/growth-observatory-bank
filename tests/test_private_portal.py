@@ -8,10 +8,14 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "portfolio_portal"))
 
 from core import (  # noqa: E402
-    buy_plan, compute_account, exit_review, modified_dietz, nav_extension, owner_allowed, portfolio_value,
+    buy_plan, compute_account, exit_review, funding_decision, modified_dietz, nav_extension, owner_allowed, portfolio_value,
 )
-from monitor import changed_events, data_too_old  # noqa: E402
-from render_entrypoint import BANK_SHEET_ID, create_auth_config, taipei_slot  # noqa: E402
+from entry_basis import (  # noqa: E402
+    apply_official_baselines, late_observation_reason, missing_baseline_rows, sec_financial,
+)
+from monitor import changed_events, condition_transitions, data_too_old  # noqa: E402
+from oauth_messages import oauth_error_code, oauth_error_message  # noqa: E402
+from render_entrypoint import BANK_SHEET_ID, create_auth_config, streamlit_env, taipei_slot  # noqa: E402
 
 
 def tx(action, **extra):
@@ -143,16 +147,18 @@ def test_exit_uses_first_lot_and_blocks_stale_financials():
             {"at": "2026-11-12T00:00:00+00:00", "entry_growth": "0.50", "entry_margin": "0.20", "quantity": 1},
         ],
     }
-    fresh = exit_review(holding, {"decision": "non_red"})
+    clear = {"decision": "non_red", "categoryStates": {"rates": 0, "conditions": 0, "inflation": 0}}
+    fresh = exit_review(holding, clear)
     assert fresh["status"] == "觸發出場條件"
     assert "營收成長較進場時下降至少 10 個百分點" not in fresh["reasons"]
     holding["lots"][0]["entry_growth"] = "0.31"
-    dropped = exit_review(holding, {"decision": "non_red"})
+    dropped = exit_review(holding, clear)
     assert "營收成長較進場時下降至少 10 個百分點" in dropped["reasons"]
     holding["stock"]["financial"]["financial_age_days"] = 200
-    stale = exit_review(holding, {"decision": "non_red"})
-    assert stale["status"] == "資料待確認"
+    stale = exit_review(holding, clear)
+    assert stale["status"] == "無法判定"
     assert not stale["reasons"]
+    assert any("無法判定" in item for item in stale["unknown"])
     red = exit_review(holding, {"decision": "red"})
     assert "全球資金溫度已達紅燈門檻" in red["reasons"]
     assert red["status"] == "觸發出場條件"
@@ -180,7 +186,7 @@ def test_scheduler_slots_and_secret_file_round_trip(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("PORTFOLIO_OWNER_EMAIL", "owner@example.com")
     monkeypatch.setenv("GOOGLE_OIDC_CLIENT_ID", "id")
-    monkeypatch.setenv("GOOGLE_OIDC_CLIENT_SECRET", "secret-value")
+    monkeypatch.setenv("GOOGLE_OIDC_CLIENT_SECRET", "secret-value\n")
     monkeypatch.setenv("STREAMLIT_COOKIE_SECRET", "cookie")
     monkeypatch.setenv("PRIVATE_PORTFOLIO_SHEET_ID", "sheet-private")
     monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON",
@@ -191,6 +197,7 @@ def test_scheduler_slots_and_secret_file_round_trip(tmp_path, monkeypatch):
     written = (tmp_path / ".streamlit" / "secrets.toml").read_text()
     assert "unit-test-key-material" in written
     assert "secret-value" in written
+    assert "secret-value\\n" not in written
     assert BANK_SHEET_ID not in written
     monkeypatch.setenv("PRIVATE_PORTFOLIO_SHEET_ID", BANK_SHEET_ID)
     try:
@@ -201,9 +208,145 @@ def test_scheduler_slots_and_secret_file_round_trip(tmp_path, monkeypatch):
         raise AssertionError("bank sheet was accepted as the private ledger")
 
 
+def test_oauth_failure_codes_stay_public_and_env_path_includes_portal():
+    assert oauth_error_code("access_denied") == "access_denied"
+    assert oauth_error_code("redirect_uri_mismatch") == "redirect_uri_mismatch"
+    assert oauth_error_code("client_secret=super-secret") == "unknown"
+    assert "super-secret" not in oauth_error_message("client_secret=super-secret")
+    assert "測試使用者" in oauth_error_message("access_denied")
+    assert "portfolio_portal" in streamlit_env()["PYTHONPATH"]
+
+
+def _fact(start, end, filed, val):
+    return {"start": start, "end": end, "filed": filed, "form": "10-Q", "val": val, "fy": 2025, "fp": "Q1"}
+
+
+def _facts(rows, tag="Revenues"):
+    return {"facts": {"us-gaap": {tag: {"units": {"USD": rows}}}}}
+
+
+def _eight_quarters():
+    spans = [
+        ("2024-01-01", "2024-03-31", "2024-05-01", 100),
+        ("2024-04-01", "2024-06-30", "2024-08-01", 100),
+        ("2024-07-01", "2024-09-30", "2024-11-01", 100),
+        ("2024-10-01", "2024-12-31", "2025-02-01", 100),
+        ("2025-01-01", "2025-03-31", "2025-05-01", 150),
+        ("2025-04-01", "2025-06-30", "2025-08-01", 150),
+        ("2025-07-01", "2025-09-30", "2025-11-01", 150),
+        ("2025-10-01", "2025-12-31", "2026-02-01", 150),
+    ]
+    revenue, operating, cash = [], [], []
+    for start, end, filed, val in spans:
+        revenue.append(_fact(start, end, filed, val))
+        operating.append(_fact(start, end, filed, 30 if val == 150 else 20))
+        cash.append(_fact(start, end, filed, 15))
+    payload = {"facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": revenue}},
+        "OperatingIncomeLoss": {"units": {"USD": operating}},
+        "NetCashProvidedByUsedInOperatingActivities": {"units": {"USD": cash}},
+    }}}
+    return payload
+
+
+def test_sec_baseline_uses_only_filings_public_two_days_before_the_trade():
+    payload = _eight_quarters()
+    ready = sec_financial(payload, "2026-11-11")
+    assert ready["ok"] is True
+    assert ready["verification"] == "OFFICIAL_FILING"
+    assert abs(float(ready["revenue_growth"]) - 0.5) < 1e-9
+    assert abs(float(ready["operating_margin"]) - 0.2) < 1e-9
+    assert ready["filing_period"] == "2025-12-31"
+    assert ready["official_published_at"] == "2026-02-01"
+    assert ready["available_on"] <= "2026-11-11"
+    too_late = _eight_quarters()
+    too_late["facts"]["us-gaap"]["Revenues"]["units"]["USD"][-1]["filed"] = "2026-11-10"
+    too_late["facts"]["us-gaap"]["OperatingIncomeLoss"]["units"]["USD"][-1]["filed"] = "2026-11-10"
+    too_late["facts"]["us-gaap"]["NetCashProvidedByUsedInOperatingActivities"]["units"]["USD"][-1]["filed"] = "2026-11-10"
+    assert sec_financial(too_late, "2026-11-11")["ok"] is False
+
+
+def test_ytd_filing_is_split_into_the_quarter_that_was_already_public():
+    payload = _eight_quarters()
+    revenue = payload["facts"]["us-gaap"]["Revenues"]["units"]["USD"]
+    revenue[-1] = _fact("2025-01-01", "2025-12-31", "2026-02-01", 600)
+    revenue.append(_fact("2025-01-01", "2025-09-30", "2025-11-01", 450))
+    derived = sec_financial(payload, "2026-11-11")
+    assert derived["ok"] is True
+    assert abs(float(derived["revenue_growth"]) - 0.5) < 1e-9
+
+
+def test_later_financial_version_is_not_an_entry_baseline():
+    reason = late_observation_reason(
+        {"verification": "VERIFIED_OBSERVATION", "firstVerifiedAt": "2026-11-16T01:00:00+00:00"},
+        "2026-11-11")
+    assert "首次驗證晚於建倉日" in reason
+    original = {"id": "buy-1", "portfolio_id": "p", "action": "BUY", "symbol": "AAA",
+                "entry_growth": "", "entry_margin": "0.99"}
+    saved = [{"portfolio_id": "p", "ledger_id": "buy-1", "verification": "OFFICIAL_FILING",
+              "revenue_growth": "0.50", "operating_margin": "0.20", "filing_period": "2025-12-31",
+              "official_published_at": "2026-02-01", "source": "SEC Company Facts",
+              "version_id": "abc", "detail": ""}]
+    copied = apply_official_baselines([original], saved)
+    assert original["entry_growth"] == ""
+    assert original["entry_margin"] == "0.99"
+    assert copied[0]["entry_growth"] == "0.50"
+    assert copied[0]["entry_margin"] == "0.20"
+    assert copied[0]["baseline_verification"] == "OFFICIAL_FILING"
+
+
+def test_missing_baseline_is_undetermined_and_red_funding_still_triggers():
+    holding = {
+        "stock": stock("AAA", 10, 1, reasons=[], growth="0.40", margin="0.20"),
+        "lots": [{"at": "2026-11-11T00:00:00+00:00", "entry_growth": "", "entry_margin": "",
+                  "baseline_reason": "沒有官方申報日可證明的建倉財報基準", "quantity": 1}],
+    }
+    clear = {"decision": "non_red", "categoryStates": {"rates": 0, "conditions": 0, "inflation": 0}}
+    missing = exit_review(holding, clear)
+    assert missing["status"] == "無法判定"
+    assert missing["reasons"] == []
+    assert any("建倉財報基準" in item for item in missing["unknown"])
+    red = exit_review(holding, {"categoryStates": {"rates": 1, "conditions": 1, "inflation": 0},
+                                "decision": "non_red"})
+    assert "全球資金溫度已達紅燈門檻" in red["reasons"]
+    assert red["status"] == "觸發出場條件"
+
+
+def test_unknown_funding_is_not_a_green_light():
+    assert funding_decision({"decision": "non_red"}) == "unknown"
+    assert funding_decision({"decision": "non_red", "categoryStates": {
+        "rates": 1, "conditions": None, "inflation": 0}}) == "unknown"
+    assert funding_decision({"categoryStates": {"rates": 0, "conditions": 0, "inflation": None}}) == "non_red"
+    assert funding_decision({"categoryStates": {"rates": 1, "conditions": 1, "inflation": None}}) == "red"
+
+
+def test_entry_audit_does_not_invent_a_number_without_a_cik():
+    txs = [{"id": "buy-1", "portfolio_id": "p", "action": "BUY", "symbol": "AAA",
+            "trade_date": "2026-11-11", "market": "US"}]
+    rows = missing_baseline_rows(txs, [], [{"symbol": "OTHER", "cik": "1"}], lambda cik: {})
+    assert rows[0]["verification"] == "UNVERIFIED"
+    assert rows[0]["revenue_growth"] == ""
+    assert "CIK" in rows[0]["detail"]
+
+
+def test_exit_transition_records_first_trigger_and_resolution():
+    current = [{"portfolio_id": "p", "market": "US", "symbol": "AAA", "signal_date": "2026-11-13",
+                "batch": "b", "status": "觸發出場條件", "reasons": "全球資金溫度已達紅燈門檻", "unknown": ""}]
+    opened = condition_transitions(current, [])
+    assert opened[0]["state"] == "open"
+    assert opened[0]["condition"] == "全球資金溫度已達紅燈門檻"
+    history = [{**opened[0], "recorded_at": "2026-11-13T00:00:00+00:00", "first_triggered_at": "2026-11-13T00:00:00+00:00"}]
+    assert condition_transitions(current, history) == []
+    cleared = [{**current[0], "status": "未觸發出場條件", "reasons": "", "unknown": ""}]
+    resolved = condition_transitions(cleared, history)
+    assert resolved[0]["state"] == "resolved"
+    assert resolved[0]["first_triggered_at"] == "2026-11-13T00:00:00+00:00"
+
+
 def test_sources_do_not_seed_a_live_book():
     banned = ("NVDA", "AVGO", "MKSI", "VIAV")
-    for name in ("app.py", "core.py", "storage.py", "monitor.py", "monitor_job.py", "setup_landing.py"):
+    for name in ("app.py", "core.py", "storage.py", "monitor.py", "monitor_job.py",
+                 "setup_landing.py", "entry_basis.py"):
         text = (ROOT / "portfolio_portal" / name).read_text()
         assert not any(symbol in text for symbol in banned)
     storage = (ROOT / "portfolio_portal" / "storage.py").read_text()
