@@ -33,6 +33,10 @@ class FakeWorksheet:
     def append_row(self, row, **kwargs):
         self.appended.append(list(row))
 
+    def row_values(self, number):
+        assert number == 1
+        return self.appended[0] if self.appended else []
+
 
 class FakeBook:
     def __init__(self):
