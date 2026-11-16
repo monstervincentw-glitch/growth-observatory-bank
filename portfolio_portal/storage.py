@@ -10,6 +10,7 @@ import threading
 import uuid
 
 import gspread
+from gspread.utils import rowcol_to_a1
 
 PORTFOLIO_HEADERS = ["id", "name", "market", "strategy", "currency", "created_at", "note", "archived"]
 BANK_RESEARCH_SHEET_ID = "1I9Alvyhg4UZXi-AdylJN0pjiLHSMzZUleFK0vsXG1K0"
@@ -103,7 +104,7 @@ class PortfolioSheets:
                 ("nav", "nav_history", NAV_HEADERS),
             )
             ranges = [
-                f"'{name}'!A2:{gspread.utils.rowcol_to_a1(1, len(headers)).rstrip('0123456789')}"
+                f"'{name}'!A2:{rowcol_to_a1(1, len(headers)).rstrip('0123456789')}"
                 for _, name, headers in definitions
             ]
             response = self.book.values_batch_get(ranges)
