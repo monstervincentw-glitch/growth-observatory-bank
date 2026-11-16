@@ -12,7 +12,7 @@ on:
     - cron: '27 13 * * 1-5'
   push:
     branches: [main]
-    paths: ['engine/market-observations.mjs', 'engine/providers.ts']
+    paths: ['engine/market-observations.mjs', 'engine/providers.ts', 'engine/publication.mjs', 'engine/replay-export.mjs']
   workflow_dispatch:
     inputs:
       market:
@@ -53,6 +53,8 @@ jobs:
           if git cat-file -e "FETCH_HEAD:financial-versions/$MARKET.json" 2>/dev/null; then
             git show "FETCH_HEAD:financial-versions/$MARKET.json" > /tmp/financial-versions.json
           fi
+      - name: Check live research cannot bypass historical replay guards
+        run: node --test tests/live-research-separation.test.mjs
       - name: Calculate and validate research
         env:
           PERFORMANCE_INPUT_DIR: /tmp/performance-market-inputs
