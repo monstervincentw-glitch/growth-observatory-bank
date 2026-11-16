@@ -100,7 +100,7 @@ class PortfolioSheets:
         requires a separate owner-audited reconciliation workflow.
         """
         from datetime import date
-        from core import money
+        from core import money, nav_extension
         at_date=date.fromisoformat(str(session_date))
         if at_date>date.today():
             raise ValueError("禁止寫入未來行情")
@@ -110,7 +110,10 @@ class PortfolioSheets:
         with self._lock:
             if portfolio_id not in {r["id"] for r in self.portfolios()}:
                 raise ValueError("私人組合不存在")
-            if any(x["date"]==str(session_date) for x in self.nav_snapshots(portfolio_id)):
+            existing=self.nav_snapshots(portfolio_id)
+            extra=nav_extension(self.transactions(), portfolio_id, existing,
+                                str(session_date), nav, money_cash, equity)
+            if extra is None:
                 return False
             record=dict.fromkeys(NAV_HEADERS,"")
             record.update({
@@ -120,8 +123,12 @@ class PortfolioSheets:
                 "cash":str(money_cash),
                 "equity_value":str(equity),
                 "liabilities":"0",
+                "daily_pnl":extra["daily_pnl"],
+                "daily_return":extra["daily_return"],
+                "cumulative_pnl":extra["cumulative_pnl"],
+                "twr":extra["twr"],
                 "source":str(source),
-                "note":"由已核驗最新收盤價計算；無當日交易現金流調整證據時不推估日報酬與 TWR",
+                "note":extra["note"],
             })
             self.nav_tab.append_row([record[k] for k in NAV_HEADERS],value_input_option="RAW")
             if sum(r["date"]==str(session_date) for r in self.nav_snapshots(portfolio_id))!=1:
