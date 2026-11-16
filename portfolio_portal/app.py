@@ -463,7 +463,6 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 holding = next(h for h in all_holdings if h["symbol"] == focus)
                 review = reviews[holding["symbol"]]
                 st.markdown("#### " + holding["symbol"] + "｜" + review["status"])
-                with st.container(border=True):
                 base = review.get("baseline") or {}
                 latest = review.get("latest") or {}
                 change = review.get("change") or {}
