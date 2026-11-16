@@ -7,17 +7,37 @@
   margin-block: .15rem;
 }
 [data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
-  background: #344A61; color: #F8E4C4;
+  background: #374D66; color: #FFF9ED;
 }
 .st-key-bank-content :is(h1, h2, h3) { color: #263344; letter-spacing: -.012em; }
 .st-key-bank-content div[data-testid="stVerticalBlockBorderWrapper"] {
   border-color: #E7E2D9; border-radius: 1rem;
 }
 .st-key-bank-content [data-testid="stMetric"] { background: #FFFDFA; border: 1px solid #E6E1D7; border-radius: .85rem; padding: .7rem .85rem; }
-.st-key-bank-content [data-testid="stSegmentedControl"] button[aria-pressed="true"] { background: #F1DFC1; color: #61451F; }
+.st-key-bank-content [data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+  background: #E5C895 !important;
+  color: #23384D !important;
+  border-color: #B9843F !important;
+  font-weight: 760;
+}
+.st-key-bank-content [data-testid="stSegmentedControl"] button[aria-pressed="true"] :is(p, span) {
+  color: #23384D !important;
+  font-weight: 760;
+}
 .st-key-bank-content [data-testid="stPopoverButton"],
 .st-key-bank-content [data-testid="stDownloadButton"] button {
   border-radius: .75rem;
+}
+/* Keep charts fully visible in their own workspace and prevent flex overflow. */
+.st-key-bank-content [data-testid="stVegaLiteChart"] {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.st-key-bank-content [data-testid="column"] { min-width: 0; }
+.st-key-bank-content [data-testid="stMetric"] [data-testid="stMetricValue"] {
+  font-size: clamp(1.15rem, 2vw, 1.75rem);
+  overflow-wrap: anywhere;
 }
 @media (max-width: 700px) {
   [data-testid="stMainBlockContainer"]:has(.st-key-bank-content) { padding-inline: .55rem; }
@@ -53,20 +73,38 @@
 .bank-sidebar-brand span, .bank-sidebar-brand small { display: block; }
 .bank-sidebar-brand span { font-size: 1.12rem; font-weight: 750; }
 .bank-sidebar-brand small { margin-top: .26rem; color: #D1D9E4; }
+/* Match the private portfolio: midnight blue idle nav, champagne gold active nav.
+   Include nested Streamlit labels so no low-contrast sidebar text rule wins. */
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a {
   min-height: 2.65rem;
   padding-block: .48rem;
-  border-inline-start: 3px solid transparent;
+  border-inline-start: 4px solid transparent;
   font-weight: 600;
   color: #DFE7F0;
 }
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a :is(p, span) {
+  color: inherit !important;
+}
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a:not([aria-current="page"]):hover {
+  background: #374D66;
+  color: #FFF9ED;
+}
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a[aria-current="page"] {
-  border-inline-start-color: #D4AA71;
-  background: #354B63;
-  color: #F7DFBA;
+  border-inline-start-color: #B9843F;
+  background: #E5C895;
+  color: #23384D;
+  font-weight: 760;
+}
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a[aria-current="page"] :is(p, span) {
+  color: #23384D !important;
+  font-weight: 760;
+}
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a[aria-current="page"]:hover {
+  background: #E9CFA1;
+  color: #23384D;
 }
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a:focus-visible {
-  outline: 2px solid #E4C58D;
+  outline: 2px solid #B9843F;
   outline-offset: -2px;
 }
 
@@ -199,7 +237,12 @@
 .bank-fund-disclosure { display: block; margin-top: .2rem; color: var(--bank-muted); font-size: .88rem; }
 .bank-fund-heading p { margin: .26rem 0 0; font-size: .9rem; color: var(--bank-ink); overflow-wrap: anywhere; }
 
-.bank-table { max-width: 100%; container: bank-table / inline-size; }
+.bank-table {
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  container: bank-table / inline-size;
+}
 .bank-table table {
   width: 100%;
   border: 1px solid var(--bank-border);
@@ -219,6 +262,8 @@
   text-align: left;
   overflow-wrap: anywhere;
 }
+.bank-table-market :is(th, td) { padding: .32rem .44rem; line-height: 1.3; }
+.bank-table-market table { font-size: .85rem; }
 .bank-table th {
   position: sticky;
   top: 0;

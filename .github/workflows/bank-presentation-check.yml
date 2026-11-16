@@ -1,0 +1,38 @@
+name: 銀行版介面與規則驗證
+
+on:
+  push:
+    branches: [preview/bank-private-palette-20261116]
+    paths:
+      - streamlit_app.py
+      - taiwan_fund_research.py
+      - bank_layout.py
+      - bank_layout.css
+      - .streamlit/config.toml
+      - .github/workflows/bank-presentation-check.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - streamlit_app.py
+      - taiwan_fund_research.py
+      - bank_layout.py
+      - bank_layout.css
+      - .streamlit/config.toml
+      - .github/workflows/bank-presentation-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  syntax-and-rules:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Python presentation syntax
+        run: python -m py_compile streamlit_app.py taiwan_fund_research.py bank_layout.py
+      - name: Existing live-market rules
+        run: python -m unittest discover -s tests -p 'test_market_observation.py' -v
