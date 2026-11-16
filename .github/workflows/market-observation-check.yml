@@ -1,0 +1,25 @@
+name: 市場觀測介面驗證
+on:
+  push:
+    branches: [main]
+    paths:
+      - streamlit_app.py
+      - shared/candidates.py
+      - tests/test_market_observation.py
+      - .github/workflows/market-observation-check.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Streamlit and market observation logic
+        run: python -m py_compile streamlit_app.py shared/candidates.py
+      - name: Verify forward-looking entry and exit monitoring
+        run: python -m unittest discover -s tests -p 'test_market_observation.py' -v
