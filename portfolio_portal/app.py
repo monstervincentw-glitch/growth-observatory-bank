@@ -223,12 +223,13 @@ def render_manage(store, active, archived):
         currency = c3.selectbox("幣別", ["USD", "TWD"])
         note = st.text_input("備註（可空白）")
         st.caption("幣別必須配合市場：美股 USD，台股 TWD。")
-        if st.form_submit_button("建立組合", type="primary"):
+        if st.form_submit_button("建立組合", type="primary", disabled=st.session_state.get("_private_stale", False)):
             try:
                 item = store.create_portfolio(name=name, market=market, strategy=strategy,
                                                currency=currency, note=note)
                 st.session_state.portal_view = item["id"]
                 st.success("已儲存至私人 Google Sheets：" + item["name"])
+                invalidate_private_cache()
                 st.rerun()
             except Exception as exc:
                 st.error("建立失敗：" + public_error(exc))
@@ -244,10 +245,11 @@ def render_manage(store, active, archived):
         with st.form("edit-profile-" + current["id"]):
             new_name = st.text_input("名稱", value=current["name"], key="name-" + current["id"])
             new_note = st.text_input("備註", value=current.get("note") or "", key="note-" + current["id"])
-            if st.form_submit_button("儲存名稱與備註"):
+            if st.form_submit_button("儲存名稱與備註", disabled=st.session_state.get("_private_stale", False)):
                 try:
                     changed = store.update_portfolio_profile(current["id"], name=new_name, note=new_note)
                     st.success("已更新" if changed else "沒有變更")
+                    invalidate_private_cache()
                     st.rerun()
                 except Exception as exc:
                     st.error("更新失敗：" + public_error(exc))
@@ -257,10 +259,11 @@ def render_manage(store, active, archived):
                                         if current["strategy"] in STRATEGIES else 0)
             st.warning("變更策略會改變之後的出場與買入判斷。不會改股數、成本、交易紀錄、NAV 或建倉基準。")
             confirmed = st.checkbox("我確認只變更往後規則，不改既有持股資料")
-            if st.form_submit_button("確認變更策略"):
+            if st.form_submit_button("確認變更策略", disabled=st.session_state.get("_private_stale", False)):
                 try:
                     changed = store.update_portfolio_strategy(current["id"], new_strategy, confirmed=confirmed)
                     st.success("策略已記錄變更" if changed else "策略沒有變更")
+                    invalidate_private_cache()
                     st.rerun()
                 except Exception as exc:
                     st.error("策略未變更：" + public_error(exc))
@@ -268,11 +271,12 @@ def render_manage(store, active, archived):
         st.warning("有交易或歷史紀錄的組合不能永久刪除。封存後可以恢復。")
         with st.form("archive-" + current["id"]):
             archive_ok = st.checkbox("我確認封存「" + current["name"] + "」，不是刪除")
-            if st.form_submit_button("封存這個組合"):
+            if st.form_submit_button("封存這個組合", disabled=st.session_state.get("_private_stale", False)):
                 try:
                     store.archive_portfolio(current["id"], confirmed=archive_ok)
                     st.session_state.portal_view = "manage"
                     st.success("已封存")
+                    invalidate_private_cache()
                     st.rerun()
                 except Exception as exc:
                     st.error("未封存：" + public_error(exc))
@@ -283,16 +287,17 @@ def render_manage(store, active, archived):
         left, right = st.columns([4, 1])
         left.write(row["name"] + " · " + row["market"] + " · " + row["strategy"])
         left.caption(row["id"])
-        if right.button("恢復", key="restore-" + row["id"]):
+        if right.button("恢復", key="restore-" + row["id"], disabled=st.session_state.get("_private_stale", False)):
             try:
                 store.restore_portfolio(row["id"])
                 st.session_state.portal_view = row["id"]
+                invalidate_private_cache()
                 st.rerun()
             except Exception as exc:
                 st.error("無法恢復：" + public_error(exc))
 
 
-def render_dashboard(store, portfolio, transactions, block, entry_batch, transitions):
+def render_dashboard(store, portfolio, transactions, block, entry_batch, transitions, nav_cache):
     account = compute_account(transactions, portfolio["id"])
     valued = portfolio_value(account, block)
     macro = block["macro"]
@@ -331,11 +336,8 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
 
     with st.container(border=True):
         st.subheader("淨值與績效")
-        try:
-            nav_rows = store.nav_snapshots(portfolio["id"])
-        except Exception as exc:
-            st.warning("無法讀取帳戶淨值歷史；本次不顯示推估走勢：" + public_error(exc))
-            nav_rows = []
+        # Reuse the validated account snapshot. Opening a holding must never call Google Sheets.
+        nav_rows = [row for row in nav_cache if row["portfolio_id"] == portfolio["id"]]
         period = st.selectbox("區間", ["近 30 天", "近 90 天", "近 1 年", "全部"], index=3)
         valid = [row for row in nav_rows if row.get("date") and row.get("nav") not in (None, "")]
         gaps = weekday_gaps([row["date"] for row in valid])
@@ -519,7 +521,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                                 format_func=lambda x: "核心" if x == "core" else "額外")
             st.caption("新的買入會把建倉當日已正式申報的財報基準寫進稽核表。寫不進去就標無法判定，不會回填今天的財報，也不改舊交易列。")
             note = st.text_input("交易備註", value="")
-            if st.form_submit_button("確認並寫入私人 Google Sheets", type="primary"):
+            if st.form_submit_button("確認並寫入私人 Google Sheets", type="primary", disabled=st.session_state.get("_private_stale", False)):
                 try:
                     record = store.append_transaction(
                         portfolio_id=portfolio["id"], action=action, trade_date=tdate.isoformat(),
@@ -532,6 +534,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                         store.append_entry_baselines([{**basis, "portfolio_id": portfolio["id"],
                                                         "ledger_id": record["id"]}])
                     st.success("已寫入交易流水帳。建倉基準寫在稽核表，原始舊列沒有被改寫。")
+                    invalidate_private_cache()
                     st.rerun()
                 except Exception as exc:
                     st.error("未完成寫入：" + public_error(exc))
@@ -573,12 +576,13 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
         st.subheader("監控與事件歷史")
         st.caption("只在狀態變化時追加一列。研究批次 " + str(entry_batch) + "。")
         mine = [row for row in transitions if row.get("portfolio_id") == portfolio["id"]]
-        if st.button("記錄本次監控變化至私人 Google Sheets"):
+        if st.button("記錄本次監控變化至私人 Google Sheets", disabled=st.session_state.get("_private_stale", False)):
             try:
                 current = portfolio_reviews([portfolio], transactions, {"markets": {portfolio["market"]: block}}, entry_batch)
                 recorded = store.append_monitor_results(current)
                 added = store.append_exit_transitions(current)
                 st.success(f"已儲存 {len(recorded)} 筆狀態變化、{len(added)} 筆條件觸發或解除")
+                invalidate_private_cache()
                 st.rerun()
             except Exception as exc:
                 st.error("寫入監控紀錄失敗：" + public_error(exc))
@@ -604,6 +608,64 @@ def research_snapshot():
     return latest_research(client)
 
 
+@st.cache_data(ttl=180, max_entries=3, show_spinner=False)
+def cached_portfolio_records(research_batch):
+    """One bounded private-Sheets read per cache window, not per Streamlit widget.
+
+    Data are fetched ONLY after Google OIDC ownership verification. The result
+    contains private holdings and must never be logged or published to GitHub.
+    Clear this cache after a successful owner-authorized write.
+    """
+    store = private_store()
+    rows = store.all_portfolios()
+    active = [p for p in rows if str(p.get("archived") or "").lower() != "true"]
+    archived = [p for p in rows if str(p.get("archived") or "").lower() == "true"]
+    transactions = store.transactions()
+    saved_baselines = store.entry_baselines()
+    warnings = []
+
+    # Historical SEC recovery is needed only for BUY lots that still lack a
+    # verified baseline. No repeated SEC or Sheets writes on stock-detail clicks.
+    official_pairs = {
+        (str(b.get("portfolio_id") or ""), str(b.get("ledger_id") or ""))
+        for b in saved_baselines if b.get("verification") == "OFFICIAL_FILING"
+    }
+    has_missing = any(
+        str(tx.get("action") or "").upper() == "BUY"
+        and (str(tx.get("portfolio_id") or ""), str(tx.get("id") or "")) not in official_pairs
+        for tx in transactions
+    )
+    if has_missing:
+        try:
+            research_entry, _, _ = research_snapshot()
+            appended = sync_entry_baselines(
+                store, transactions, active, research_entry["snapshot"])
+            if appended:
+                saved_baselines = [*saved_baselines, *appended]
+        except Exception as exc:
+            warnings.append("部分建倉基準暫未補齊：" + public_error(exc))
+    try:
+        transactions = apply_official_baselines(transactions, saved_baselines)
+    except Exception as exc:
+        warnings.append("無法套用已存建倉基準：" + public_error(exc))
+
+    return {
+        "portfolios": active,
+        "archived": archived,
+        "transactions": transactions,
+        "transitions": store.exit_transitions(),
+        "nav": store.nav_snapshots(),
+        "warnings": warnings,
+    }
+
+
+def invalidate_private_cache():
+    """Call only after a successful owner-initiated mutation."""
+    cached_portfolio_records.clear()
+    st.session_state.pop("_last_good_private_snapshot", None)
+    st.session_state["_private_stale"] = False
+
+
 try:
     store = private_store()
 except Exception as exc:
@@ -621,23 +683,33 @@ except Exception as exc:
 
 snapshot = entry["snapshot"]
 try:
-    portfolios = store.portfolios()
-    archived = store.archived_portfolios()
-    transactions = store.transactions()
-    try:
-        sync_entry_baselines(store, transactions, portfolios, snapshot)
-    except Exception as exc:
-        st.warning("建倉財報基準這次沒有補齊，出場比較不會猜數字：" + public_error(exc))
-    try:
-        transactions = apply_official_baselines(transactions, store.entry_baselines())
-    except Exception as exc:
-        st.warning("無法讀取建倉基準稽核表，這次不套用補登：" + public_error(exc))
-    transitions = store.exit_transitions()
-    live_reviews = portfolio_reviews(portfolios, transactions, snapshot, entry["batch"])
+    private_data = cached_portfolio_records(str(entry["batch"]))
+    st.session_state["_last_good_private_snapshot"] = private_data
+    st.session_state["_private_stale"] = False
 except Exception as exc:
-    st.error("讀取私人交易紀錄失敗，禁止建立建議或寫入新資料。")
-    st.caption(public_error(exc))
-    st.stop()
+    # 429: keep a clearly labelled read-only cached view within this session.
+    if ("429" in str(exc) or "quota" in str(exc).lower()) and "_last_good_private_snapshot" in st.session_state:
+        private_data = st.session_state["_last_good_private_snapshot"]
+        st.session_state["_private_stale"] = True
+        st.warning("Google Sheets 暫時達到讀取額度。現在顯示上次成功讀取的私人資料（僅供檢視，暫停所有寫入）。")
+    else:
+        st.error("讀取私人交易紀錄失敗，禁止建立建議或寫入新資料。")
+        if "429" in str(exc) or "quota" in str(exc).lower():
+            st.caption("Google Sheets 每分鐘讀取次數已達上限，請稍後重新整理；交易及歷史淨值沒有被刪除。")
+        else:
+            st.caption(public_error(exc))
+        st.stop()
+
+portfolios = private_data["portfolios"]
+archived = private_data["archived"]
+transactions = private_data["transactions"]
+transitions = private_data["transitions"]
+nav_cache = private_data["nav"]
+for alert in private_data["warnings"]:
+    st.warning(alert)
+if st.session_state.get("_private_stale"):
+    st.error("私人交易及組合變更目前暫停；僅顯示上次已成功載入的快取內容。")
+live_reviews = portfolio_reviews(portfolios, transactions, snapshot, entry["batch"])
 
 urgent = [row for row in live_reviews if row["status"] == "觸發出場條件"]
 pending = [row for row in live_reviews if row["status"] in ("資料待確認", "無法判定")]
@@ -674,6 +746,7 @@ with st.sidebar:
     st.caption("手機請用左上角控制項展開或收合選單。")
     if st.button("重新讀取最新研究"):
         research_snapshot.clear()
+        cached_portfolio_records.clear()
         st.rerun()
     if st.button("登出"):
         st.logout()
@@ -685,7 +758,7 @@ if st.session_state.portal_view == "manage":
 portfolio = next(item for item in portfolios if item["id"] == st.session_state.portal_view)
 block = snapshot["markets"][portfolio["market"]]
 try:
-    render_dashboard(store, portfolio, transactions, block, entry["batch"], transitions)
+    render_dashboard(store, portfolio, transactions, block, entry["batch"], transitions, nav_cache)
 except Exception as exc:
     st.error("這個組合目前無法完成對帳或顯示，已停止分析：" + public_error(exc))
     st.stop()
