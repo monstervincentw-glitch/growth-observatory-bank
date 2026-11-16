@@ -7,6 +7,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from decimal import Decimal
 
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -27,37 +28,65 @@ st.markdown("""
 <style>
 section[data-testid="stSidebar"] button { width: 100%; text-align: left; }
 /* Compact portfolio V2.1: dense monitor grid and tri-state funding cards */
-/* V2.3 unified portfolio visual language: warm gold + slate blue */
-:root{--portfolio-ink:#26354b;--portfolio-line:#d9e0ea;--portfolio-gold:#8b6b3e}
-section[data-testid="stSidebar"]{width:272px!important;min-width:272px!important;background:#192b44}
-section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{line-height:1.45}
-section[data-testid="stSidebar"] .stButton button{font-size:.92rem;min-height:2.35rem;border-radius:.7rem}
-.sidebar-brand{font-size:1.08rem;font-weight:750;color:#f5f2e9;margin:.15rem 0 1.1rem}
-.sidebar-kicker{font-size:.72rem;letter-spacing:.08em;color:#a9b6c8;text-transform:uppercase;margin:.9rem 0 .35rem}
-.sidebar-note{font-size:.76rem;color:#b4c0d1;margin:.5rem 0}
-h1,h2,h3{letter-spacing:-.014em}
-.asset-hero{background:linear-gradient(120deg,#233954,#354a67);color:#fff;border-radius:1rem;padding:1.1rem 1.25rem;margin:.1rem 0 .75rem}
-.asset-hero .eyebrow{font-size:.82rem;color:#d4dfec;margin-bottom:.3rem}
-.asset-hero .amount{font-size:clamp(1.65rem,2.3vw,2.45rem);font-weight:780;letter-spacing:-.04em;line-height:1.2;overflow-wrap:anywhere}
-.asset-hero .ccy{font-size:.87rem;font-weight:550;letter-spacing:0;color:#d7e3ef}
-.asset-hero .gain{font-size:.9rem;font-weight:650;margin-top:.55rem;color:#fff}
-.asset-hero .stamp{font-size:.73rem;color:#c4d2e1;margin-top:.5rem}
-.asset-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
-.asset-stat{border:1px solid var(--portfolio-line);border-radius:.75rem;background:#f7f9fc;padding:.7rem .8rem;min-width:0}
-.asset-stat .k{font-size:.74rem;color:#68798d;margin-bottom:.3rem}
-.asset-stat .v{font-size:clamp(.93rem,1.18vw,1.12rem);color:var(--portfolio-ink);font-weight:720;overflow-wrap:anywhere}
-.asset-stat .u{font-size:.7rem;font-weight:500;color:#73849b}
-.asset-secondary-note{font-size:.75rem;color:#7e8ba0;margin-top:.55rem}
-div[data-testid="stVerticalBlockBorderWrapper"]{border-radius:1rem}
-.st-key-asset_performance [data-testid="stVerticalBlockBorderWrapper"]{border-color:#d9e0ea}
-.st-key-asset_performance [data-testid="stSelectbox"]{max-width:210px}
-@media(max-width:900px){
-  .st-key-asset_performance div[data-testid="stHorizontalBlock"] > div[data-testid="column"]{flex:1 1 100%!important;min-width:0!important;width:100%!important}
+/* GPT Sites-inspired research workspace: warm paper, soft gold, charcoal ink */
+:root{--portfolio-ink:#263344;--portfolio-line:#e3e4e6;--portfolio-gold:#b28b53;--portfolio-paper:#faf9f6}
+[data-testid="stAppViewContainer"]{background:#faf9f6;color:#263344}
+[data-testid="stHeader"]{background:rgba(250,249,246,.93)}
+section[data-testid="stSidebar"]{
+ width:260px!important;min-width:260px!important;
+ background:#f5f4f0!important;border-right:1px solid #e7e2d9
 }
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{line-height:1.45}
+section[data-testid="stSidebar"] .stButton button{
+ font-size:.92rem;min-height:2.4rem;border-radius:.75rem;
+ background:#fffdfa!important;color:#263344!important;
+ border:1px solid #dcdedc!important
+}
+section[data-testid="stSidebar"] .stButton button[kind="primary"],
+section[data-testid="stSidebar"] .stButton button[data-testid="stBaseButton-primary"]{
+ background:#f0e1c6!important;color:#61451f!important;
+ border-color:#cfaa71!important;box-shadow:inset 3px 0 0 #ad7d3e
+}
+.sidebar-brand{font-size:1.08rem;font-weight:770;color:#263344;margin:.15rem 0 1.05rem}
+.sidebar-kicker{font-size:.74rem;letter-spacing:.04em;color:#7d7e80;margin:.9rem 0 .35rem}
+.sidebar-note{font-size:.76rem;color:#687586;margin:.5rem 0}
+h1,h2,h3{letter-spacing:-.014em;color:#27364a}
+div[data-testid="stVerticalBlockBorderWrapper"]{border-radius:1rem}
+.st-key-asset_performance [data-testid="stVerticalBlockBorderWrapper"]{border-color:#e8e2d8}
+.st-key-asset_performance [data-testid="stSelectbox"]{max-width:170px}
+.asset-hero{
+ background:linear-gradient(120deg,#fff4e1,#fffdf8);color:#263344;
+ border:1px solid #ead7b7;border-radius:.92rem;
+ padding:.95rem 1.15rem;height:100%;min-height:9rem
+}
+.asset-hero .eyebrow{font-size:.81rem;color:#896b42;margin-bottom:.3rem;font-weight:700}
+.asset-hero .amount{font-size:clamp(1.55rem,2.35vw,2.25rem);font-weight:780;letter-spacing:-.035em;line-height:1.2;overflow-wrap:anywhere}
+.asset-hero .ccy{font-size:.8rem;font-weight:550;letter-spacing:0;color:#866b48}
+.asset-hero .gain{font-size:.87rem;font-weight:650;margin-top:.5rem;color:#465566}
+.asset-hero .stamp{font-size:.74rem;color:#7b7e82;margin-top:.46rem}
+.asset-stat-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.6rem}
+.asset-stat{border:1px solid #e5e2dc;border-radius:.75rem;background:#fffdfa;padding:.73rem .83rem;min-width:0}
+.asset-stat .k{font-size:.75rem;color:#687586;margin-bottom:.35rem}
+.asset-stat .v{font-size:clamp(.95rem,1.2vw,1.14rem);color:#263344;font-weight:720;overflow-wrap:anywhere}
+.asset-stat .u{font-size:.7rem;font-weight:500;color:#7a8086}
+.asset-secondary-note{font-size:.75rem;color:#7d8491;margin-top:.5rem}
+.st-key-stock_monitor_selector button[kind="primary"],
+.st-key-stock_monitor_selector button[data-testid="stBaseButton-primary"]{
+ background:#f6ebd6!important;color:#704f23!important;
+ border:1.5px solid #bc8d4f!important;
+ box-shadow:0 0 0 2px rgba(188,141,79,.12)!important;
+ font-weight:760!important
+}
+.st-key-stock_monitor_selector button[kind="secondary"],
+.st-key-stock_monitor_selector button[data-testid="stBaseButton-secondary"]{
+ background:#fffefa!important;border:1px solid #dfe3e6!important;color:#344255!important
+}
+.st-key-stock_monitor_selector button:hover{border-color:#c29a62!important}
 @media(max-width:700px){
-  section[data-testid="stSidebar"]{width:260px!important;min-width:260px!important}
-  .asset-hero .amount{font-size:1.8rem}
-  .asset-stat .v{font-size:1rem}
+ section[data-testid="stSidebar"]{width:250px!important;min-width:250px!important}
+ .asset-hero .amount{font-size:1.85rem}
+ .asset-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .asset-stat .v{font-size:1rem}
 }
 .funding-top{display:flex;justify-content:space-between;align-items:center;gap:0.7rem;flex-wrap:wrap;margin-bottom:0.75rem}
 .funding-title{font-size:1.25rem;font-weight:750;letter-spacing:.01em}
@@ -354,18 +383,29 @@ def render_stock_monitor(portfolio, valued, reviews, macro, transitions):
             st.caption(f"觸發 {len(triggered)} 檔　·　待確認 {len(unresolved) + len(valued['missing_prices'])} 檔"
                        "　·　點選代號查看完整財報與歷史監控。")
             selection_key = "monitor_focus_" + portfolio["id"]
+
+            def toggle_selected_symbol(key, symbol):
+                # Streamlit executes callbacks BEFORE drawing the fragment.
+                # This keeps the selected color and the detail panel synchronized.
+                st.session_state[key] = None if st.session_state.get(key) == symbol else symbol
+
             focus = st.session_state.get(selection_key)
-            buttons = st.columns(5)
-            for i, item in enumerate(all_holdings):
-                symbol = item["symbol"]
-                status = reviews[symbol]["status"]
-                icon = "🔴" if status == "觸發出場條件" else ("🟠" if status in ("無法判定", "資料待確認") else "✓")
-                short = "出場" if status == "觸發出場條件" else ("待確認" if status in ("無法判定", "資料待確認") else "正常")
-                with buttons[i % 5]:
-                    if st.button(f"{icon} {symbol} · {short}", key="monitor-" + portfolio["id"] + "-" + symbol,
-                                 type="primary" if focus == symbol else "secondary", use_container_width=True):
-                        st.session_state[selection_key] = None if focus == symbol else symbol
-                        focus = st.session_state[selection_key]
+            with st.container(key="stock_monitor_selector"):
+                buttons = st.columns(5)
+                for i, item in enumerate(all_holdings):
+                    symbol = item["symbol"]
+                    status = reviews[symbol]["status"]
+                    icon = "🔴" if status == "觸發出場條件" else ("🟠" if status in ("無法判定", "資料待確認") else "✓")
+                    short = "出場" if status == "觸發出場條件" else ("待確認" if status in ("無法判定", "資料待確認") else "正常")
+                    with buttons[i % 5]:
+                        st.button(
+                            f"{icon} {symbol} · {short}",
+                            key="monitor-" + portfolio["id"] + "-" + symbol,
+                            type="primary" if focus == symbol else "secondary",
+                            use_container_width=True,
+                            on_click=toggle_selected_symbol,
+                            args=(selection_key, symbol),
+                        )
             if valued["missing_prices"]:
                 st.warning("無法確認同日收盤價：" + "、".join(valued["missing_prices"]))
             if focus in {h["symbol"] for h in all_holdings}:
@@ -450,108 +490,129 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
             st.error("🚨 持股出場警示｜" + "、".join(immediate)
                      + " 已觸發條件。請優先檢視下方個股監控（不會自動賣出）。")
 
-    # One integrated view: current account NAV appears only once; the adjacent
-    # line chart contains verified historical NAV observations, not a second NAV KPI.
+    # GPT Sites-inspired structure: full-width verified NAV chart above all
+    # account statistics. NAV is shown once in the lower summary block.
     with st.container(border=True, key="asset_performance"):
-        st.subheader("資產與績效")
         from html import escape as safe_html
+        st.subheader("資產與績效")
+        graph_heading, period_picker = st.columns([3.5, 1], vertical_alignment="center")
+        with graph_heading:
+            st.markdown("**每日收盤淨值走勢**")
+        with period_picker:
+            period = st.selectbox(
+                "績效區間", ["近 30 天", "近 90 天", "近 1 年", "全部"],
+                index=3, key="nav_period_" + portfolio["id"],
+                label_visibility="collapsed",
+            )
 
-        def metric_value(value):
+        # Only plot verified dates from the initial, owner-authenticated sheet snapshot.
+        nav_rows = [row for row in nav_cache if row["portfolio_id"] == portfolio["id"]]
+        valid = [row for row in nav_rows if row.get("date") and row.get("nav") not in (None, "")]
+        if valid:
+            latest_date = max(date.fromisoformat(row["date"]) for row in valid)
+            days = {"近 30 天": 30, "近 90 天": 90, "近 1 年": 365}.get(period)
+            shown = (valid if days is None else [
+                row for row in valid if date.fromisoformat(row["date"]) >= latest_date - timedelta(days=days)
+            ])
+            if shown:
+                curve = pd.DataFrame([
+                    {"date": pd.to_datetime(row["date"]), "nav": float(row["nav"])}
+                    for row in shown
+                ]).sort_values("date")
+                lower = float(curve["nav"].min())
+                upper = float(curve["nav"].max())
+                padding = max((upper - lower) * .25, upper * .005, 1)
+                chart = alt.Chart(curve).mark_line(
+                    color="#b28b53", strokeWidth=3, point=alt.OverlayMarkDef(
+                        color="#b28b53", filled=True, size=88)
+                ).encode(
+                    x=alt.X("date:T", title=None,
+                            axis=alt.Axis(format="%m/%d", labelAngle=0, grid=False)),
+                    y=alt.Y("nav:Q", title="淨值 (USD)",
+                            scale=alt.Scale(domain=[max(0, lower - padding), upper + padding], zero=False),
+                            axis=alt.Axis(format=",.0f", tickCount=5, grid=True)),
+                    tooltip=[
+                        alt.Tooltip("date:T", title="收盤日", format="%Y-%m-%d"),
+                        alt.Tooltip("nav:Q", title="淨值", format=",.2f"),
+                    ],
+                ).properties(height=305)
+                st.altair_chart(chart, use_container_width=True, theme=None)
+                st.caption("截至 " + latest_date.isoformat()
+                           + " · 僅含已核驗的交易日；縱軸為局部縮放，以利辨識日間變化。")
+            gaps = weekday_gaps([row["date"] for row in valid])
+            if gaps:
+                st.warning("以下日期仍待核對：" + "、".join(gaps))
+        else:
+            st.info("尚無已核對的歷史淨值；沒有使用推測行情補值。")
+
+        st.divider()
+
+        def display_amount(value):
             if value is None:
                 return "待確認"
             try:
                 return f"{Decimal(str(value)):,.2f}"
-            except (ValueError, TypeError, ArithmeticError):
+            except (TypeError, ValueError, ArithmeticError):
                 return "待確認"
 
-        left, right = st.columns([1, 1.55], gap="medium")
-        with left:
-            nav_display = metric_value(nav_now)
-            pnl_display = metric_value(cumulative)
+        hero_col, stats_col = st.columns([1.12, 2.25], gap="medium")
+        with hero_col:
+            pnl_display = display_amount(cumulative)
+            pnl_signed = ("待確認" if cumulative is None
+                          else ("+" if cumulative > 0 else "") + pnl_display)
             return_display = "待確認" if returns is None else f"{returns:+.2%}"
-            gain_description = ("累計損益 " + ("待確認" if cumulative is None else
-                                ("+" if cumulative > 0 else "") + pnl_display) +
-                                "　·　累計報酬率 " + return_display)
             st.markdown(
                 '<div class="asset-hero">'
-                '<div class="eyebrow">帳戶總淨值</div>'
-                f'<div class="amount">{safe_html(nav_display)} '
+                '<div class="eyebrow">目前帳戶總淨值</div>'
+                f'<div class="amount">{safe_html(display_amount(nav_now))} '
                 f'<span class="ccy">{safe_html(portfolio["currency"])}</span></div>'
-                f'<div class="gain">{safe_html(gain_description)}</div>'
-                f'<div class="stamp">行情日 {safe_html(market_asof or "未知")}</div>'
-                '</div>', unsafe_allow_html=True,
+                f'<div class="gain">累計損益 {safe_html(pnl_signed)}'
+                f' · 報酬率 {safe_html(return_display)}</div>'
+                f'<div class="stamp">最後行情日 {safe_html(market_asof or "未知")}</div>'
+                '</div>', unsafe_allow_html=True
             )
-            small_stats = [
+        with stats_col:
+            metrics = [
                 ("淨投入本金", contributed),
                 ("現金餘額", valued["cash"]),
                 ("持股市值", None if valued["missing_prices"] else valued["market_value"]),
                 ("已實現損益", valued["realized"]),
                 ("未實現損益", unrealized),
             ]
-            tiles = "".join(
+            cards = "".join(
                 '<div class="asset-stat">'
                 f'<div class="k">{safe_html(label)}</div>'
-                f'<div class="v">{safe_html(metric_value(number))} '
+                f'<div class="v">{safe_html(display_amount(number))} '
                 f'<span class="u">{safe_html(portfolio["currency"])}</span></div>'
                 '</div>'
-                for label, number in small_stats
+                for label, number in metrics
             )
-            st.markdown('<div class="asset-stat-grid">' + tiles + '</div>', unsafe_allow_html=True)
-            st.caption("淨值與損益依最新已驗證行情及私人交易帳本計算；"
-                       "累計報酬率並非標準 TWR。")
-            if valued["missing_prices"]:
-                st.warning("以下持股缺少可驗證收盤價，淨值與權重不估算："
-                           + "、".join(valued["missing_prices"]))
-
-        with right:
-            st.markdown("**每日收盤淨值走勢**")
-            # History was fetched with the initial owner-authenticated snapshot.
-            nav_rows = [row for row in nav_cache if row["portfolio_id"] == portfolio["id"]]
-            valid = [row for row in nav_rows
-                     if row.get("date") and row.get("nav") not in (None, "")]
-            period = st.selectbox(
-                "績效區間", ["近 30 天", "近 90 天", "近 1 年", "全部"],
-                index=3, key="nav_period_" + portfolio["id"],
-                label_visibility="collapsed",
-            )
+            st.markdown('<div class="asset-stat-grid">' + cards + '</div>', unsafe_allow_html=True)
+        st.caption("最新淨值由私人帳本與已驗證收盤價計算；圖表為已保存的歷史淨值。"
+                   "累計報酬率並非標準 TWR。")
+        if valued["missing_prices"]:
+            st.warning("這些持股尚無可驗證收盤價，資產與權重不估算："
+                       + "、".join(valued["missing_prices"]))
+        with st.expander("歷史淨值、資料來源與績效算法", expanded=False):
             if valid:
-                latest_date = max(date.fromisoformat(row["date"]) for row in valid)
-                days = {"近 30 天": 30, "近 90 天": 90, "近 1 年": 365}.get(period)
-                shown = (valid if days is None else [
-                    row for row in valid if date.fromisoformat(row["date"]) >=
-                    latest_date - timedelta(days=days)
-                ])
-                if shown:
-                    curve = pd.DataFrame([
-                        {"date": pd.to_datetime(row["date"]), "nav": float(row["nav"])}
-                        for row in shown
-                    ]).sort_values("date")
-                    st.line_chart(curve, x="date", y="nav",
-                                  height=285, use_container_width=True)
-                    st.caption("截至 " + latest_date.isoformat()
-                               + " · 僅顯示已核對的收盤淨值")
-                gaps = weekday_gaps([row["date"] for row in valid])
-                if gaps:
-                    st.warning("尚缺已核對收盤淨值：" + "、".join(gaps))
-                with st.expander("歷史明細、資料來源與績效算法", expanded=False):
-                    linked = modified_dietz(transactions, portfolio["id"], nav_rows) or []
-                    if len(linked) >= 2:
-                        st.caption("自 " + linked[-2]["date"] + " 至 " + linked[-1]["date"]
-                                   + " 的 Modified Dietz 區間估計 "
-                                   + f"{linked[-1]['subperiod_return']:+.2%}"
-                                   + " · 連乘估計 "
-                                   + f"{linked[-1]['modified_dietz']:+.2%}"
-                                   + "。這不是標準 TWR。")
-                    st.dataframe([
-                        {"日期": row["date"], "淨值": row["nav"],
-                         "現金": row["cash"] or "未記錄",
-                         "持股市值": row["equity_value"] or "未記錄",
-                         "累計損益": row.get("cumulative_pnl") or "未記錄",
-                         "來源": row["source"]}
-                        for row in shown
-                    ], hide_index=True, use_container_width=True)
+                linked = modified_dietz(transactions, portfolio["id"], nav_rows) or []
+                if len(linked) >= 2:
+                    st.caption("自 " + linked[-2]["date"] + " 至 " + linked[-1]["date"]
+                               + " 的 Modified Dietz 區間估計 "
+                               + f"{linked[-1]['subperiod_return']:+.2%}"
+                               + " · 連乘估計 "
+                               + f"{linked[-1]['modified_dietz']:+.2%}"
+                               + "。不是標準 TWR。")
+                st.dataframe([
+                    {"日期": row["date"], "淨值": row["nav"],
+                     "現金": row["cash"] or "未記錄",
+                     "持股市值": row["equity_value"] or "未記錄",
+                     "累計損益": row.get("cumulative_pnl") or "未記錄",
+                     "來源": row["source"]}
+                    for row in shown
+                ], hide_index=True, use_container_width=True)
             else:
-                st.info("尚無已核對的歷史淨值。完整行情確認後才會記錄，不補造。")
+                st.caption("尚無歷史明細。")
 
     with st.container(border=True):
         st.subheader("目前持股")
