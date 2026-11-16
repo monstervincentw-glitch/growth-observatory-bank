@@ -27,6 +27,38 @@ st.markdown("""
 <style>
 section[data-testid="stSidebar"] button { width: 100%; text-align: left; }
 /* Compact portfolio V2.1: dense monitor grid and tri-state funding cards */
+/* V2.3 unified portfolio visual language: warm gold + slate blue */
+:root{--portfolio-ink:#26354b;--portfolio-line:#d9e0ea;--portfolio-gold:#8b6b3e}
+section[data-testid="stSidebar"]{width:272px!important;min-width:272px!important;background:#192b44}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{line-height:1.45}
+section[data-testid="stSidebar"] .stButton button{font-size:.92rem;min-height:2.35rem;border-radius:.7rem}
+.sidebar-brand{font-size:1.08rem;font-weight:750;color:#f5f2e9;margin:.15rem 0 1.1rem}
+.sidebar-kicker{font-size:.72rem;letter-spacing:.08em;color:#a9b6c8;text-transform:uppercase;margin:.9rem 0 .35rem}
+.sidebar-note{font-size:.76rem;color:#b4c0d1;margin:.5rem 0}
+h1,h2,h3{letter-spacing:-.014em}
+.asset-hero{background:linear-gradient(120deg,#233954,#354a67);color:#fff;border-radius:1rem;padding:1.1rem 1.25rem;margin:.1rem 0 .75rem}
+.asset-hero .eyebrow{font-size:.82rem;color:#d4dfec;margin-bottom:.3rem}
+.asset-hero .amount{font-size:clamp(1.65rem,2.3vw,2.45rem);font-weight:780;letter-spacing:-.04em;line-height:1.2;overflow-wrap:anywhere}
+.asset-hero .ccy{font-size:.87rem;font-weight:550;letter-spacing:0;color:#d7e3ef}
+.asset-hero .gain{font-size:.9rem;font-weight:650;margin-top:.55rem;color:#fff}
+.asset-hero .stamp{font-size:.73rem;color:#c4d2e1;margin-top:.5rem}
+.asset-stat-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem}
+.asset-stat{border:1px solid var(--portfolio-line);border-radius:.75rem;background:#f7f9fc;padding:.7rem .8rem;min-width:0}
+.asset-stat .k{font-size:.74rem;color:#68798d;margin-bottom:.3rem}
+.asset-stat .v{font-size:clamp(.93rem,1.18vw,1.12rem);color:var(--portfolio-ink);font-weight:720;overflow-wrap:anywhere}
+.asset-stat .u{font-size:.7rem;font-weight:500;color:#73849b}
+.asset-secondary-note{font-size:.75rem;color:#7e8ba0;margin-top:.55rem}
+div[data-testid="stVerticalBlockBorderWrapper"]{border-radius:1rem}
+.st-key-asset_performance [data-testid="stVerticalBlockBorderWrapper"]{border-color:#d9e0ea}
+.st-key-asset_performance [data-testid="stSelectbox"]{max-width:210px}
+@media(max-width:900px){
+  .st-key-asset_performance div[data-testid="stHorizontalBlock"] > div[data-testid="column"]{flex:1 1 100%!important;min-width:0!important;width:100%!important}
+}
+@media(max-width:700px){
+  section[data-testid="stSidebar"]{width:260px!important;min-width:260px!important}
+  .asset-hero .amount{font-size:1.8rem}
+  .asset-stat .v{font-size:1rem}
+}
 .funding-top{display:flex;justify-content:space-between;align-items:center;gap:0.7rem;flex-wrap:wrap;margin-bottom:0.75rem}
 .funding-title{font-size:1.25rem;font-weight:750;letter-spacing:.01em}
 .funding-overall{font-size:.88rem;font-weight:700;border-radius:2rem;padding:.35rem .75rem;border:1px solid #cbd5e1;background:rgba(148,163,184,.12)}
@@ -300,137 +332,9 @@ def render_manage(store, active, archived):
                 st.error("無法恢復：" + public_error(exc))
 
 
-def render_dashboard(store, portfolio, transactions, block, entry_batch, transitions, nav_cache):
-    account = compute_account(transactions, portfolio["id"])
-    valued = portfolio_value(account, block)
-    macro = block["macro"]
-    market_asof = macro.get("marketAsOf") or ""
-    contributed = contributions_through(transactions, portfolio["id"], date.today().isoformat())
-    nav_now = valued["nav"]
-    unrealized = None
-    if not valued["missing_prices"]:
-        unrealized = sum((holding["pnl"] for holding in valued["holdings"]), Decimal("0"))
-    combined = None if unrealized is None else valued["realized"] + unrealized
-    cumulative = None if nav_now is None else nav_now - contributed
-    returns = None
-    if nav_now is not None and contributed > 0:
-        returns = (nav_now - contributed) / contributed
-    reviews = {}
-    for holding in valued["holdings"]:
-        reviews[holding["symbol"]] = shown_review(holding, portfolio["strategy"], macro, market_asof)
-    for symbol in valued["missing_prices"]:
-        reviews[symbol] = {"status": "無法判定", "reasons": [],
-                           "unknown": ["無法判定：沒有同日可驗證收盤價"],
-                           "baseline": {}, "latest": {}, "change": {}}
-
-    st.title(portfolio["name"])
-    st.caption(portfolio["market"] + " · 策略 " + portfolio["strategy"] + " · " + portfolio["currency"]
-               + " · " + (portfolio.get("note") or "無備註"))
-
-    with st.container(border=True):
-        show_funding(macro)
-
-    if portfolio["strategy"] in ("A", "B"):
-        immediate = [h["symbol"] for h in valued["holdings"]
-                     if reviews[h["symbol"]]["status"] == "觸發出場條件"]
-        if immediate:
-            st.error("🚨 持股出場警示｜" + "、".join(immediate)
-                     + " 已觸發條件。請優先檢視下方個股監控（不會自動賣出）。")
-
-    with st.container(border=True):
-        st.subheader("淨值與績效")
-        # Reuse the validated account snapshot. Opening a holding must never call Google Sheets.
-        nav_rows = [row for row in nav_cache if row["portfolio_id"] == portfolio["id"]]
-        period = st.selectbox("區間", ["近 30 天", "近 90 天", "近 1 年", "全部"], index=3)
-        valid = [row for row in nav_rows if row.get("date") and row.get("nav") not in (None, "")]
-        gaps = weekday_gaps([row["date"] for row in valid])
-        if gaps:
-            st.warning("以下交易日沒有已核對淨值，標為待核對，不補造：" + "、".join(gaps))
-        else:
-            st.caption("已保存的淨值日期之間，沒有其他平日缺口。缺日不會用後來的股價回填。")
-        if valid:
-            last_date = max(date.fromisoformat(row["date"]) for row in valid)
-            days = {"近 30 天": 30, "近 90 天": 90, "近 1 年": 365}.get(period)
-            shown = valid
-            if days is not None:
-                shown = [row for row in valid if date.fromisoformat(row["date"]) >= last_date - timedelta(days=days)]
-            if shown:
-                curve = pd.DataFrame([
-                    {"date": pd.to_datetime(row["date"]), "nav": float(row["nav"])} for row in shown
-                ]).sort_values("date")
-                latest = max(shown, key=lambda row: row["date"])
-                st.metric("最新已記錄的收盤淨值", money_text(Decimal(str(latest["nav"])), portfolio["currency"]))
-                st.caption("最近有效收盤：" + latest["date"] + " · 來源 " + (latest.get("source") or "未記錄")
-                           + " · 只畫已核驗的日期")
-                st.line_chart(curve, x="date", y="nav", height=230, use_container_width=True)
-                linked = modified_dietz(transactions, portfolio["id"], nav_rows) or []
-                if len(linked) >= 2:
-                    st.caption("自 " + linked[-2]["date"] + " 至 " + linked[-1]["date"]
-                               + " 的 Modified Dietz 區間估計 " + f"{linked[-1]['subperiod_return']:+.2%}"
-                               + " · 連乘估計 " + f"{linked[-1]['modified_dietz']:+.2%}"
-                               + "。這不是標準 TWR。")
-                with st.expander("交易日逐日淨值明細"):
-                    st.dataframe([
-                        {"日期": row["date"], "淨值": row["nav"], "現金": row["cash"] or "未記錄",
-                         "持股市值": row["equity_value"] or "未記錄", "累計損益": row.get("cumulative_pnl") or "未記錄",
-                         "來源": row["source"]}
-                        for row in shown
-                    ], hide_index=True, use_container_width=True)
-            else:
-                st.info("這個區間沒有已核對的歷史淨值。")
-        else:
-            st.info("尚未建立歷史淨值紀錄。排程只在每一檔都有同日可核對收盤價時才新增一列，已存在的日期不會覆蓋。")
-
-    with st.container(border=True):
-        st.subheader("帳戶資產總覽")
-        cols = st.columns(4)
-        cols[0].metric("帳戶總淨值", "無法完整估值" if nav_now is None else money_text(nav_now, portfolio["currency"]))
-        cols[1].metric("累計投入本金", money_text(contributed, portfolio["currency"]))
-        cols[2].metric("現金餘額", money_text(valued["cash"], portfolio["currency"]))
-        cols[3].metric("持股總市值", "待確認" if valued["missing_prices"] else money_text(valued["market_value"], portfolio["currency"]))
-        more = st.columns(3)
-        more[0].metric("已實現損益", money_text(valued["realized"], portfolio["currency"]))
-        more[1].metric("未實現損益", "待確認" if unrealized is None else money_text(unrealized, portfolio["currency"]))
-        more[2].metric("累計報酬率", "待確認" if returns is None else f"{returns:+.2%}")
-        st.caption("累計損益 " + ("待確認" if cumulative is None else money_text(cumulative, portfolio["currency"]))
-                   + "，是淨值減淨投入。累計報酬率不是標準 TWR。"
-                   + " 已實現加未實現 " + ("待確認" if combined is None else money_text(combined, portfolio["currency"]))
-                   + "。最後行情日 " + (market_asof or "未知") + "。")
-        if valued["missing_prices"]:
-            st.warning("以下持股沒有可核對收盤價，淨值與權重不予計算：" + "、".join(valued["missing_prices"]))
-
-    with st.container(border=True):
-        st.subheader("目前持股")
-        if not valued["holdings"] and not valued["missing_prices"]:
-            st.info("這個組合尚未登錄持股。")
-        else:
-            nav_for_weight = nav_now if nav_now not in (None, 0) else None
-            rows = []
-            for holding in valued["holdings"]:
-                avg = holding["cost"] / holding["quantity"] if holding["quantity"] else None
-                ret = holding["pnl"] / holding["cost"] if holding["cost"] else None
-                weight = holding["value"] / nav_for_weight if nav_for_weight else None
-                rows.append({
-                    "股票代號": holding["symbol"],
-                    "公司名稱": (holding["stock"].get("name") or holding["symbol"]),
-                    "股數": f"{holding['quantity']:.4f}",
-                    "平均成本": money_text(avg),
-                    "最新收盤價": money_text(holding["price"]),
-                    "市值": money_text(holding["value"]),
-                    "未實現損益": money_text(holding["pnl"]),
-                    "報酬率": "待確認" if ret is None else f"{ret:+.2%}",
-                    "組合權重": "待確認" if weight is None else f"{weight:.2%}",
-                    "監控狀態": reviews[holding["symbol"]]["status"],
-                })
-            for symbol in valued["missing_prices"]:
-                rows.append({
-                    "股票代號": symbol, "公司名稱": symbol, "股數": "待確認", "平均成本": "待確認",
-                    "最新收盤價": "待確認", "市值": "待確認", "未實現損益": "待確認",
-                    "報酬率": "待確認", "組合權重": "待確認", "監控狀態": "無法判定",
-                })
-            st.dataframe(rows, hide_index=True, use_container_width=True)
-            st.caption("手機可左右滑動表格。點下方個股可看建倉基準。")
-
+@st.fragment
+def render_stock_monitor(portfolio, valued, reviews, macro, transitions):
+    """All details are prepared on page load; ticker selection reruns only here."""
     with st.container(border=True):
         st.subheader("個股出場監控")
         if portfolio["strategy"] not in ("A", "B"):
@@ -461,7 +365,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                     if st.button(f"{icon} {symbol} · {short}", key="monitor-" + portfolio["id"] + "-" + symbol,
                                  type="primary" if focus == symbol else "secondary", use_container_width=True):
                         st.session_state[selection_key] = None if focus == symbol else symbol
-                        st.rerun()
+                        focus = st.session_state[selection_key]
             if valued["missing_prices"]:
                 st.warning("無法確認同日收盤價：" + "、".join(valued["missing_prices"]))
             if focus in {h["symbol"] for h in all_holdings}:
@@ -506,6 +410,182 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 first_lot = min(holding["lots"], key=lambda lot: (str(lot.get("at") or ""), str(lot.get("entry_filing_period") or "")))
                 if (first_lot.get("ledger_entry_growth") or first_lot.get("ledger_entry_margin")) and base.get("verification") != "OFFICIAL_FILING":
                     st.caption("原始帳本另有人工填寫的進場數字。出場判斷不採用，也沒有改寫那一列。")
+
+
+
+def render_dashboard(store, portfolio, transactions, block, entry_batch, transitions, nav_cache):
+    account = compute_account(transactions, portfolio["id"])
+    valued = portfolio_value(account, block)
+    macro = block["macro"]
+    market_asof = macro.get("marketAsOf") or ""
+    contributed = contributions_through(transactions, portfolio["id"], date.today().isoformat())
+    nav_now = valued["nav"]
+    unrealized = None
+    if not valued["missing_prices"]:
+        unrealized = sum((holding["pnl"] for holding in valued["holdings"]), Decimal("0"))
+    combined = None if unrealized is None else valued["realized"] + unrealized
+    cumulative = None if nav_now is None else nav_now - contributed
+    returns = None
+    if nav_now is not None and contributed > 0:
+        returns = (nav_now - contributed) / contributed
+    reviews = {}
+    for holding in valued["holdings"]:
+        reviews[holding["symbol"]] = shown_review(holding, portfolio["strategy"], macro, market_asof)
+    for symbol in valued["missing_prices"]:
+        reviews[symbol] = {"status": "無法判定", "reasons": [],
+                           "unknown": ["無法判定：沒有同日可驗證收盤價"],
+                           "baseline": {}, "latest": {}, "change": {}}
+
+    st.title(portfolio["name"])
+    st.caption(portfolio["market"] + " · 策略 " + portfolio["strategy"] + " · " + portfolio["currency"]
+               + " · " + (portfolio.get("note") or "無備註"))
+
+    with st.container(border=True):
+        show_funding(macro)
+
+    if portfolio["strategy"] in ("A", "B"):
+        immediate = [h["symbol"] for h in valued["holdings"]
+                     if reviews[h["symbol"]]["status"] == "觸發出場條件"]
+        if immediate:
+            st.error("🚨 持股出場警示｜" + "、".join(immediate)
+                     + " 已觸發條件。請優先檢視下方個股監控（不會自動賣出）。")
+
+    # One integrated view: current account NAV appears only once; the adjacent
+    # line chart contains verified historical NAV observations, not a second NAV KPI.
+    with st.container(border=True, key="asset_performance"):
+        st.subheader("資產與績效")
+        from html import escape as safe_html
+
+        def metric_value(value):
+            if value is None:
+                return "待確認"
+            try:
+                return f"{Decimal(str(value)):,.2f}"
+            except (ValueError, TypeError, ArithmeticError):
+                return "待確認"
+
+        left, right = st.columns([1, 1.55], gap="medium")
+        with left:
+            nav_display = metric_value(nav_now)
+            pnl_display = metric_value(cumulative)
+            return_display = "待確認" if returns is None else f"{returns:+.2%}"
+            gain_description = ("累計損益 " + ("待確認" if cumulative is None else
+                                ("+" if cumulative > 0 else "") + pnl_display) +
+                                "　·　累計報酬率 " + return_display)
+            st.markdown(
+                '<div class="asset-hero">'
+                '<div class="eyebrow">帳戶總淨值</div>'
+                f'<div class="amount">{safe_html(nav_display)} '
+                f'<span class="ccy">{safe_html(portfolio["currency"])}</span></div>'
+                f'<div class="gain">{safe_html(gain_description)}</div>'
+                f'<div class="stamp">行情日 {safe_html(market_asof or "未知")}</div>'
+                '</div>', unsafe_allow_html=True,
+            )
+            small_stats = [
+                ("淨投入本金", contributed),
+                ("現金餘額", valued["cash"]),
+                ("持股市值", None if valued["missing_prices"] else valued["market_value"]),
+                ("已實現損益", valued["realized"]),
+                ("未實現損益", unrealized),
+            ]
+            tiles = "".join(
+                '<div class="asset-stat">'
+                f'<div class="k">{safe_html(label)}</div>'
+                f'<div class="v">{safe_html(metric_value(number))} '
+                f'<span class="u">{safe_html(portfolio["currency"])}</span></div>'
+                '</div>'
+                for label, number in small_stats
+            )
+            st.markdown('<div class="asset-stat-grid">' + tiles + '</div>', unsafe_allow_html=True)
+            st.caption("淨值與損益依最新已驗證行情及私人交易帳本計算；"
+                       "累計報酬率並非標準 TWR。")
+            if valued["missing_prices"]:
+                st.warning("以下持股缺少可驗證收盤價，淨值與權重不估算："
+                           + "、".join(valued["missing_prices"]))
+
+        with right:
+            st.markdown("**每日收盤淨值走勢**")
+            # History was fetched with the initial owner-authenticated snapshot.
+            nav_rows = [row for row in nav_cache if row["portfolio_id"] == portfolio["id"]]
+            valid = [row for row in nav_rows
+                     if row.get("date") and row.get("nav") not in (None, "")]
+            period = st.selectbox(
+                "績效區間", ["近 30 天", "近 90 天", "近 1 年", "全部"],
+                index=3, key="nav_period_" + portfolio["id"],
+                label_visibility="collapsed",
+            )
+            if valid:
+                latest_date = max(date.fromisoformat(row["date"]) for row in valid)
+                days = {"近 30 天": 30, "近 90 天": 90, "近 1 年": 365}.get(period)
+                shown = (valid if days is None else [
+                    row for row in valid if date.fromisoformat(row["date"]) >=
+                    latest_date - timedelta(days=days)
+                ])
+                if shown:
+                    curve = pd.DataFrame([
+                        {"date": pd.to_datetime(row["date"]), "nav": float(row["nav"])}
+                        for row in shown
+                    ]).sort_values("date")
+                    st.line_chart(curve, x="date", y="nav",
+                                  height=285, use_container_width=True)
+                    st.caption("截至 " + latest_date.isoformat()
+                               + " · 僅顯示已核對的收盤淨值")
+                gaps = weekday_gaps([row["date"] for row in valid])
+                if gaps:
+                    st.warning("尚缺已核對收盤淨值：" + "、".join(gaps))
+                with st.expander("歷史明細、資料來源與績效算法", expanded=False):
+                    linked = modified_dietz(transactions, portfolio["id"], nav_rows) or []
+                    if len(linked) >= 2:
+                        st.caption("自 " + linked[-2]["date"] + " 至 " + linked[-1]["date"]
+                                   + " 的 Modified Dietz 區間估計 "
+                                   + f"{linked[-1]['subperiod_return']:+.2%}"
+                                   + " · 連乘估計 "
+                                   + f"{linked[-1]['modified_dietz']:+.2%}"
+                                   + "。這不是標準 TWR。")
+                    st.dataframe([
+                        {"日期": row["date"], "淨值": row["nav"],
+                         "現金": row["cash"] or "未記錄",
+                         "持股市值": row["equity_value"] or "未記錄",
+                         "累計損益": row.get("cumulative_pnl") or "未記錄",
+                         "來源": row["source"]}
+                        for row in shown
+                    ], hide_index=True, use_container_width=True)
+            else:
+                st.info("尚無已核對的歷史淨值。完整行情確認後才會記錄，不補造。")
+
+    with st.container(border=True):
+        st.subheader("目前持股")
+        if not valued["holdings"] and not valued["missing_prices"]:
+            st.info("這個組合尚未登錄持股。")
+        else:
+            nav_for_weight = nav_now if nav_now not in (None, 0) else None
+            rows = []
+            for holding in valued["holdings"]:
+                avg = holding["cost"] / holding["quantity"] if holding["quantity"] else None
+                ret = holding["pnl"] / holding["cost"] if holding["cost"] else None
+                weight = holding["value"] / nav_for_weight if nav_for_weight else None
+                rows.append({
+                    "股票代號": holding["symbol"],
+                    "公司名稱": (holding["stock"].get("name") or holding["symbol"]),
+                    "股數": f"{holding['quantity']:.4f}",
+                    "平均成本": money_text(avg),
+                    "最新收盤價": money_text(holding["price"]),
+                    "市值": money_text(holding["value"]),
+                    "未實現損益": money_text(holding["pnl"]),
+                    "報酬率": "待確認" if ret is None else f"{ret:+.2%}",
+                    "組合權重": "待確認" if weight is None else f"{weight:.2%}",
+                    "監控狀態": reviews[holding["symbol"]]["status"],
+                })
+            for symbol in valued["missing_prices"]:
+                rows.append({
+                    "股票代號": symbol, "公司名稱": symbol, "股數": "待確認", "平均成本": "待確認",
+                    "最新收盤價": "待確認", "市值": "待確認", "未實現損益": "待確認",
+                    "報酬率": "待確認", "組合權重": "待確認", "監控狀態": "無法判定",
+                })
+            st.dataframe(rows, hide_index=True, use_container_width=True)
+            st.caption("手機可左右滑動表格。點下方個股可看建倉基準。")
+
+    render_stock_monitor(portfolio, valued, reviews, macro, transitions)
 
     with st.container(border=True):
         st.subheader("交易與現金")
@@ -726,33 +806,41 @@ if "portal_view" not in st.session_state or (
     st.session_state.portal_view = portfolios[0]["id"] if portfolios else "manage"
 
 with st.sidebar:
-    st.caption("只有經授權的 Google 帳號能存取")
-    st.write("**" + owner_email + "**")
-    if st.button("編輯投資組合", type="primary" if st.session_state.portal_view == "manage" else "secondary"):
+    st.markdown('<div class="sidebar-brand">私人投資組合</div>',
+                unsafe_allow_html=True)
+    if st.button("編輯投資組合",
+                 type="primary" if st.session_state.portal_view == "manage" else "secondary",
+                 use_container_width=True):
         st.session_state.portal_view = "manage"
         st.rerun()
-    st.caption("投資組合")
+    st.markdown('<div class="sidebar-kicker">我的組合</div>',
+                unsafe_allow_html=True)
     for item in portfolios:
         picked = st.session_state.portal_view == item["id"]
-        if st.button(item["name"], key="nav-" + item["id"], type="primary" if picked else "secondary"):
+        if st.button(item["name"], key="nav-" + item["id"],
+                     type="primary" if picked else "secondary",
+                     use_container_width=True):
             st.session_state.portal_view = item["id"]
             st.rerun()
     if not portfolios:
-        st.caption("尚未建立組合。")
-    st.caption("出場條件 " + str(len(urgent)) + " · 無法判定 " + str(len(pending)))
+        st.caption("尚未建立投資組合。")
     if urgent:
-        st.caption("出場：" + "、".join(row["symbol"] for row in urgent[:8]))
-    st.caption("資料來源：" + research_source)
-    st.caption("研究批次：" + str(entry["batch"]))
-    for market_code, market_name in (("US", "美股"), ("TW", "台股")):
-        st.caption(market_name + "：" + str(snapshot["markets"][market_code]["macro"]["marketAsOf"]))
-    st.caption("手機請用左上角控制項展開或收合選單。")
-    if st.button("重新讀取最新研究"):
-        research_snapshot.clear()
-        cached_portfolio_records.clear()
-        st.rerun()
-    if st.button("登出"):
-        st.logout()
+        st.error("⚠️ 出場訊號：" + "、".join(row["symbol"] for row in urgent[:8]))
+    with st.expander("資料來源與帳戶", expanded=False):
+        st.caption("已授權私人登入")
+        st.caption(owner_email)
+        st.caption("研究來源：" + research_source)
+        st.caption("研究批次：" + str(entry["batch"]))
+        st.caption("美股行情日：" +
+                   str(snapshot["markets"]["US"]["macro"].get("marketAsOf") or "未知"))
+        st.caption("台股行情日：" +
+                   str(snapshot["markets"]["TW"]["macro"].get("marketAsOf") or "未知"))
+        if st.button("重新讀取研究與組合資料", use_container_width=True):
+            research_snapshot.clear()
+            cached_portfolio_records.clear()
+            st.rerun()
+        if st.button("登出", use_container_width=True):
+            st.logout()
 
 if st.session_state.portal_view == "manage":
     render_manage(store, portfolios, archived)
