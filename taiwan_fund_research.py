@@ -134,41 +134,52 @@ def render(view):
 
     performance.insert(0, NAME, item[NAME])
     cohort = performance[performance["起始年"].eq(year)]
-    st.subheader("A／B／C／D 績效比較")
-    strategy_comparison(cohort, PLANS)
-    if item["注意事項"]:
-        st.info(item["注意事項"])
-    st.caption(f"封存至 {through} · 新臺幣帳戶 · 摩根、聯博 {summary['primary']} 個主要級別，新增 {summary['new_verified']} 檔已驗證。")
+    section = st.segmented_control(
+        "基金研究區塊", ["績效總覽", "市場事件", "年度比較"],
+        default="績效總覽", key="tw-fund-section",
+        label_visibility="collapsed",
+    ) or "績效總覽"
 
-    with st.expander("各策略明細與年度績效 CSV"):
-        columns = ["方案", "起始日", "結束日", "累積報酬", "CAGR", "最大回撤", "回本日", "高點至回本日數"]
-        percentage = ["累積報酬", "CAGR", "最大回撤"]
-        if cohort["最差年度"].notna().any():
-            columns += ["最差年度", "最差年度報酬", "最差年度為部分區間", "買入次數", "賣出次數", "直接成本TWD"]
-            percentage.append("最差年度報酬")
-        show_table(cohort[columns], percentage, label="基金各策略明細")
-        export(performance, "年度回測績效 CSV", f"{isin}-annual-performance.csv", "tw-fund-perf-download")
-    fund_source(item)
-    fund_catalog(visible)
+    if section == "績效總覽":
+        st.subheader("A／B／C／D 績效比較")
+        strategy_comparison(cohort, PLANS)
+        if item["注意事項"]:
+            st.info(item["注意事項"])
+        st.caption(f"封存至 {through} · 新臺幣帳戶 · 摩根、聯博 {summary['primary']} 個主要級別，新增 {summary['new_verified']} 檔已驗證。")
+        with st.expander("各策略明細與年度績效 CSV"):
+            columns = ["方案", "起始日", "結束日", "累積報酬", "CAGR", "最大回撤", "回本日", "高點至回本日數"]
+            percentage = ["累積報酬", "CAGR", "最大回撤"]
+            if cohort["最差年度"].notna().any():
+                columns += ["最差年度", "最差年度報酬", "最差年度為部分區間", "買入次數", "賣出次數", "直接成本TWD"]
+                percentage.append("最差年度報酬")
+            show_table(cohort[columns], percentage, label="基金各策略明細")
+            export(performance, "年度回測績效 CSV", f"{isin}-annual-performance.csv", "tw-fund-perf-download")
+        fund_source(item)
+        fund_catalog(visible)
+        return
 
-    st.subheader("市場事件回撤")
-    event = st.segmented_control("基金市場事件", list(EVENTS), format_func=EVENTS.__getitem__,
-                                 default="GFC", key="tw-fund-event") or "GFC"
-    history = data["events"]
-    history = history[history["ISIN"].eq(isin)].copy()
-    history.insert(0, NAME, item[NAME])
-    selected = history[history["起始年"].eq(year) & history["事件代碼"].eq(str(event))]
-    if selected.empty:
-        st.caption("此起跑年度在該事件沒有可用區間。")
-    else:
-        event_drawdown_chart(selected, "方案", "事件最大回撤", EVENTS[event])
-        show_table(selected[["方案", "區間起日", "區間迄日", "部分區間", "事件報酬", "事件最大回撤", "紅燈日數"]],
-                   ["事件報酬", "事件最大回撤"], label="共同基金事件回撤")
-    export(history, "市場事件回撤 CSV", f"{isin}-event-drawdowns.csv", "tw-fund-event-download")
+    if section == "市場事件":
+        st.subheader("市場事件回撤")
+        event = st.segmented_control(
+            "基金市場事件", list(EVENTS), format_func=EVENTS.__getitem__,
+            default="GFC", key="tw-fund-event",
+        ) or "GFC"
+        history = data["events"]
+        history = history[history["ISIN"].eq(isin)].copy()
+        history.insert(0, NAME, item[NAME])
+        selected = history[history["起始年"].eq(year) & history["事件代碼"].eq(str(event))]
+        if selected.empty:
+            st.caption("此起跑年度在該事件沒有可用區間。")
+        else:
+            event_drawdown_chart(selected, "方案", "事件最大回撤", EVENTS[event])
+            show_table(selected[["方案", "區間起日", "區間迄日", "部分區間", "事件報酬", "事件最大回撤", "紅燈日數"]],
+                       ["事件報酬", "事件最大回撤"], label="共同基金事件回撤")
+        export(history, "市場事件回撤 CSV", f"{isin}-event-drawdowns.csv", "tw-fund-event-download")
+        return
 
     st.subheader("不同年度起跑比較")
     st.caption("各年度從該基金第一個可用淨值日獨立起跑，統一於封存日結束。")
-    with st.expander("展開各年度 A／B／C／D 比較"):
+    with st.expander("展開各年度 A／B／C／D 比較", expanded=True):
         show_table(performance[["起始年", "方案", "累積報酬", "CAGR", "最大回撤"]],
                    ["累積報酬", "CAGR", "最大回撤"], label="基金年度比較")
     compare = data["compare"].loc[data["compare"]["ISIN"].eq(isin)].copy()
