@@ -4,13 +4,18 @@ from .validation import number
 RESEARCH = "背離研究候選"
 FORMAL = "背離正式買入訊號"
 PENDING = "待驗證"
-SCOPES = ["研究候選", RESEARCH, FORMAL, PENDING, "主策略正式候選", "全部研究池"]
+LIVE = "主策略盤後研究候選"
+SCOPES = ["研究候選", LIVE, RESEARCH, FORMAL, PENDING, "主策略正式候選", "全部研究池"]
 
 
 def candidate_status(stock, macro, signal_available, market_reason=None):
     evaluation = stock["evaluation"]
     research = bool((stock["researchRank"] or {}).get("divergence"))
     formal = signal_available and evaluation["buy_hold"]
+    # A forward-looking research screen, not a historically verified trade.
+    live_primary = bool(signal_available and stock["researchRank"] is not None
+                        and evaluation["fundamental"] and evaluation["funding"]
+                        and evaluation["tradable"] and evaluation["fresh"])
     pending = []
     blocked = []
     if not signal_available:
@@ -46,6 +51,7 @@ def candidate_status(stock, macro, signal_available, market_reason=None):
         blocked.append("舊制資金壓力超過 1 分")
     return {
         "research": research,
+        "live_primary": live_primary,
         "formal": formal,
         "pending": bool(pending),
         "label": "符合正式條件" if formal else "待驗證" if pending else "未達條件",
@@ -57,6 +63,7 @@ def in_scope(stock, state, scope, signal_available):
     return {
         "研究候選": stock["researchRank"] is not None,
         RESEARCH: state["research"],
+        LIVE: state["live_primary"],
         FORMAL: state["formal"],
         PENDING: state["pending"],
         "主策略正式候選": signal_available and stock["evaluation"]["primary"],
