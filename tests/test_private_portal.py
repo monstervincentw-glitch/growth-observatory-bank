@@ -15,6 +15,10 @@ from entry_basis import (  # noqa: E402
 )
 from monitor import changed_events, condition_transitions, data_too_old  # noqa: E402
 from oauth_messages import oauth_error_code, oauth_error_message  # noqa: E402
+from portfolio_admin import (  # noqa: E402
+    condition_timeline, permanent_delete_refused, plan_archive, plan_profile_update,
+    plan_strategy_change, validate_new_portfolio, weekday_gaps,
+)
 from render_entrypoint import BANK_SHEET_ID, create_auth_config, streamlit_env, taipei_slot  # noqa: E402
 
 
@@ -343,10 +347,72 @@ def test_exit_transition_records_first_trigger_and_resolution():
     assert resolved[0]["first_triggered_at"] == "2026-11-13T00:00:00+00:00"
 
 
+def test_v2_portfolio_edits_keep_identity_and_refuse_deletion():
+    existing = {"id": "p", "name": "主組合", "strategy": "A", "note": "", "archived": ""}
+    renamed = plan_profile_update(existing, name="成長組合", note="只改備註")
+    assert ("name", "主組合", "成長組合") in renamed
+    assert all(change[0] != "id" for change in renamed)
+    try:
+        plan_strategy_change(existing, "B", confirmed=False)
+    except ValueError as exc:
+        assert "確認" in str(exc)
+    else:
+        raise AssertionError("strategy change without confirmation was accepted")
+    assert plan_strategy_change(existing, "B", confirmed=True) == ("strategy", "A", "B")
+    assert plan_strategy_change(existing, "A", confirmed=True) is None
+    assert plan_archive(existing, confirmed=True) == ("archived", "", "true")
+    try:
+        permanent_delete_refused()
+    except ValueError as exc:
+        assert "封存" in str(exc)
+    else:
+        raise AssertionError("permanent delete was allowed")
+    created = validate_new_portfolio(name="新組合", market="US", strategy="A", currency="USD", note="")
+    assert created["archived"] == ""
+    assert "quantity" not in created
+    try:
+        validate_new_portfolio(name="新組合", market="US", strategy="A", currency="TWD")
+    except ValueError as exc:
+        assert "幣別" in str(exc)
+    else:
+        raise AssertionError("mismatched currency was accepted")
+
+
+def test_nav_gaps_are_labeled_and_exit_times_survive_resolution():
+    assert weekday_gaps(["2026-11-11", "2026-11-13"]) == ["2026-11-12"]
+    assert weekday_gaps(["2026-11-13"]) == []
+    timeline = condition_timeline([
+        {"portfolio_id": "p", "symbol": "AAA", "condition": "資金", "state": "open",
+         "first_triggered_at": "2026-11-13T00:00:00+00:00"},
+        {"portfolio_id": "p", "symbol": "AAA", "condition": "資金", "state": "resolved",
+         "first_triggered_at": "2026-11-13T00:00:00+00:00", "resolved_at": "2026-11-16T00:00:00+00:00"},
+    ], "p", "AAA")
+    assert timeline[0]["open"] is False
+    assert timeline[0]["first"].startswith("2026-11-13")
+    assert timeline[0]["resolved"].startswith("2026-11-16")
+
+
+def test_v2_page_keeps_baseline_monitor_and_is_not_truncated():
+    text = (ROOT / "portfolio_portal" / "app.py").read_text()
+    compile(text, "app.py", "exec")
+    for marker in ("def show_funding", "def render_dashboard", "def render_manage",
+                   "編輯投資組合", "entry_baselines", "無法判定", "weekday_gaps",
+                   "封存這個組合", "portfolio_id"):
+        assert marker in text
+    assert text.rstrip().endswith("st.stop()")
+    assert len(text) > 25000
+    storage = (ROOT / "portfolio_portal" / "storage.py").read_text()
+    assert "def append_transaction" in storage
+    assert "def append_entry_baselines" in storage
+    assert "portfolio_changes" in storage
+    assert "def delete_portfolio" in storage
+    assert "permanent_delete_refused" in storage
+
+
 def test_sources_do_not_seed_a_live_book():
     banned = ("NVDA", "AVGO", "MKSI", "VIAV")
     for name in ("app.py", "core.py", "storage.py", "monitor.py", "monitor_job.py",
-                 "setup_landing.py", "entry_basis.py"):
+                 "setup_landing.py", "entry_basis.py", "portfolio_admin.py"):
         text = (ROOT / "portfolio_portal" / name).read_text()
         assert not any(symbol in text for symbol in banned)
     storage = (ROOT / "portfolio_portal" / "storage.py").read_text()

@@ -54,7 +54,7 @@ def review_holding(holding, strategy, macro):
             risks.append("目前未具備最新背離觀察條件；不等於原策略賣出訊號")
     else:
         unknown.append("自訂策略尚未設定賣出規則")
-    return {"status":"資料待確認" if unknown else "長抱風險觀察",
+    return {"status":"無法判定" if unknown else "長抱風險觀察",
             "reasons":risks,"unknown":unknown,
             "symbol":s["symbol"],"asof":s.get("priceDate"),
             "financial_period":s.get("financial",{}).get("latest_period"),
@@ -78,8 +78,8 @@ def portfolio_reviews(portfolios, transactions, snapshot, batch, today=None):
         for h in valued["holdings"]:
             found.add(h["symbol"])
             if stale:
-                review={"status":"資料待確認","reasons":[],
-                        "unknown":["市場研究批次已過期，暫停最新買賣判斷"],
+                review={"status":"無法判定","reasons":[],
+                        "unknown":["無法判定：市場研究批次已過期，暫停最新買賣判斷"],
                         "asof":asof,"financial_period":None,"observed_at":None}
             else:
                 review=review_holding(h,p["strategy"],macro)
@@ -87,8 +87,8 @@ def portfolio_reviews(portfolios, transactions, snapshot, batch, today=None):
         for symbol in valued["missing_prices"]:
             if symbol not in found:
                 events.append(_event_row(
-                    p,symbol,{"status":"資料待確認","reasons":[],
-                    "unknown":["這檔持股沒有同日可驗證行情或已停止交易"],
+                    p,symbol,{"status":"無法判定","reasons":[],
+                    "unknown":["無法判定：這檔持股沒有同日可驗證行情或已停止交易"],
                     "financial_period":None,"observed_at":None},
                     asof,batch))
     return events

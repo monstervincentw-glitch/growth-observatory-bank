@@ -27,6 +27,7 @@ BASELINE_HEADERS = ["id", "recorded_at", "portfolio_id", "ledger_id", "symbol", 
                     "source", "version_id", "verification", "detail"]
 EXIT_TRANSITION_HEADERS = ["id", "recorded_at", "portfolio_id", "market", "symbol", "condition",
                            "state", "first_triggered_at", "resolved_at", "signal_date", "batch", "detail"]
+CHANGE_HEADERS = ["id", "recorded_at", "portfolio_id", "field", "before", "after", "note"]
 
 
 def utc_now():
@@ -53,6 +54,7 @@ class PortfolioSheets:
         self.positions_snapshot_tab = self._tab("position_snapshots", POSITION_SNAPSHOT_HEADERS)
         self.baseline_tab = self._tab("entry_baselines", BASELINE_HEADERS)
         self.exit_transition_tab = self._tab("exit_transitions", EXIT_TRANSITION_HEADERS)
+        self.change_tab = self._tab("portfolio_changes", CHANGE_HEADERS)
 
     def _tab(self, name, headers):
         try:
@@ -71,10 +73,19 @@ class PortfolioSheets:
         return [dict(zip(headers, [*row, *([""] * (len(headers)-len(row)))]))
                 for row in rows if row and row[0]]
 
-    def portfolios(self):
+    def all_portfolios(self):
         with self._lock:
-            return [r for r in self._rows(self.portfolios_tab, PORTFOLIO_HEADERS)
-                    if r["archived"].lower() != "true"]
+            return self._rows(self.portfolios_tab, PORTFOLIO_HEADERS)
+
+    def portfolios(self):
+        return [row for row in self.all_portfolios() if str(row.get("archived") or "").lower() != "true"]
+
+    def archived_portfolios(self):
+        return [row for row in self.all_portfolios() if str(row.get("archived") or "").lower() == "true"]
+
+    def portfolio_changes(self):
+        with self._lock:
+            return self._rows(self.change_tab, CHANGE_HEADERS)
 
     def transactions(self):
         with self._lock:
@@ -248,19 +259,94 @@ class PortfolioSheets:
             return rows
 
     def create_portfolio(self, *, name, market, strategy, currency, note=""):
-        if not str(name).strip() or len(name)>80:
-            raise ValueError("請輸入有效的組合名稱")
-        if market not in ("US","TW") or strategy not in ("A","B","背離長抱","自訂"):
-            raise ValueError("策略或市場不支援")
-        if currency != ("USD" if market=="US" else "TWD"):
-            raise ValueError("組合幣別不符合交易市場")
-        entry = {"id":str(uuid.uuid4()),"name":name.strip(),"market":market,
-                 "strategy":strategy,"currency":currency,"created_at":utc_now(),
-                 "note":note.strip()[:300],"archived":""}
+        from portfolio_admin import validate_new_portfolio
+        fields = validate_new_portfolio(name=name, market=market, strategy=strategy,
+                                        currency=currency, note=note)
+        entry = {"id": str(uuid.uuid4()), "created_at": utc_now(), **fields}
         with self._lock:
             self.portfolios_tab.append_row([entry[k] for k in PORTFOLIO_HEADERS],
                                            value_input_option="RAW")
         return entry
+
+    def _portfolio_record(self, portfolio_id, *, include_archived):
+        found = next((row for row in self.all_portfolios() if row["id"] == str(portfolio_id)), None)
+        if found is None:
+            raise ValueError("找不到組合，禁止寫入")
+        archived = str(found.get("archived") or "").lower() == "true"
+        if archived and not include_archived:
+            raise ValueError("組合已封存")
+        return found
+
+    def _apply_portfolio_changes(self, portfolio_id, changes, note):
+        """Update portfolio metadata cells only. Never touches the trade ledger."""
+        if not changes:
+            return []
+        allowed = {"name", "note", "strategy", "archived"}
+        with self._lock:
+            rows = self.portfolios_tab.get_all_values()
+            found = None
+            current = None
+            for index, row in enumerate(rows[1:], start=2):
+                if row and row[0] == str(portfolio_id):
+                    found = index
+                    current = row
+                    break
+            if found is None or current[0] != str(portfolio_id):
+                raise ValueError("找不到組合，禁止寫入")
+            for field, _before, after in changes:
+                if field not in allowed:
+                    raise ValueError("這個欄位不能從組合管理修改")
+                column = PORTFOLIO_HEADERS.index(field) + 1
+                self.portfolios_tab.update_cell(found, column, after)
+            now = utc_now()
+            records = []
+            for field, before, after in changes:
+                record = {
+                    "id": str(uuid.uuid4()),
+                    "recorded_at": now,
+                    "portfolio_id": str(portfolio_id),
+                    "field": field,
+                    "before": str(before),
+                    "after": str(after),
+                    "note": str(note or "")[:300],
+                }
+                records.append(record)
+            self.change_tab.append_rows(
+                [[record[k] for k in CHANGE_HEADERS] for record in records],
+                value_input_option="RAW")
+            return records
+
+    def update_portfolio_profile(self, portfolio_id, *, name, note):
+        from portfolio_admin import plan_profile_update
+        existing = self._portfolio_record(portfolio_id, include_archived=False)
+        changes = plan_profile_update(existing, name=name, note=note)
+        return self._apply_portfolio_changes(portfolio_id, changes, "修改名稱或備註，不改識別碼與交易")
+
+    def update_portfolio_strategy(self, portfolio_id, new_strategy, *, confirmed):
+        from portfolio_admin import plan_strategy_change
+        existing = self._portfolio_record(portfolio_id, include_archived=False)
+        change = plan_strategy_change(existing, new_strategy, confirmed=confirmed)
+        if change is None:
+            return []
+        return self._apply_portfolio_changes(
+            portfolio_id, [change], "策略變更不改股數、成本、交易與淨值")
+
+    def archive_portfolio(self, portfolio_id, *, confirmed):
+        from portfolio_admin import plan_archive
+        existing = self._portfolio_record(portfolio_id, include_archived=False)
+        change = plan_archive(existing, confirmed=confirmed)
+        return self._apply_portfolio_changes(
+            portfolio_id, [change], "封存，不刪除交易、淨值與建倉基準")
+
+    def restore_portfolio(self, portfolio_id):
+        from portfolio_admin import plan_restore
+        existing = self._portfolio_record(portfolio_id, include_archived=True)
+        change = plan_restore(existing)
+        return self._apply_portfolio_changes(portfolio_id, [change], "恢復封存組合")
+
+    def delete_portfolio(self, portfolio_id):
+        from portfolio_admin import permanent_delete_refused
+        permanent_delete_refused()
 
     def append_transaction(self, *, portfolio_id, action, trade_date="", symbol="", quantity="",
                            price="", fee="", cash_amount="", role="core",
