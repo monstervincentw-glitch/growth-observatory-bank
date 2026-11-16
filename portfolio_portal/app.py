@@ -33,20 +33,23 @@ section[data-testid="stSidebar"] button { width: 100%; text-align: left; }
 .funding-overall.red{color:#b91c1c;background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.30)}
 .funding-overall.neutral{color:inherit;background:rgba(148,163,184,.12)}
 .funding-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
-.funding-tile{border:1px solid rgba(148,163,184,.28);border-radius:.8rem;padding:.72rem .85rem;background:rgba(148,163,184,.055);min-width:0}
-.funding-tile .name{font-size:.85rem;opacity:.78}
-.funding-tile .state{font-size:1.15rem;font-weight:750;margin-top:.25rem;white-space:nowrap}
-.funding-tile.ok .state{color:#268b60}
-.funding-tile.unknown .state{color:#ad7917}
-.funding-tile.red .state{color:#c0392b}
+.funding-tile{border:1px solid #cbd5e1;border-radius:.9rem;padding:1rem 1.15rem;min-width:0;min-height:6.6rem}
+.funding-tile .name{font-size:1rem;font-weight:700;letter-spacing:.015em}
+.funding-tile .state{font-size:1.65rem;font-weight:800;margin-top:.33rem;white-space:nowrap}
+.funding-tile.ok{background:#dcebe4;border-color:#c4ddd1;color:#155e45}
+.funding-tile.ok .state{color:#155e45}
+.funding-tile.unknown{background:#e3eaf5;border-color:#d4deed;color:#3e5579}
+.funding-tile.unknown .state{color:#3e5579}
+.funding-tile.red{background:#f7e2e3;border-color:#edc7cb;color:#a02b33}
+.funding-tile.red .state{color:#a02b33}
 .funding-foot{font-size:.78rem;opacity:.66;margin-top:.5rem}
 .monitor-help{color:rgba(148,163,184,.9);font-size:.82rem}
 div[data-testid="stButton"] button[kind="secondary"]{border-radius:.7rem}
 @media (max-width:700px) {
  .funding-cards{gap:.3rem}
- .funding-tile{padding:.45rem .38rem;border-radius:.55rem;text-align:center}
- .funding-tile .name{font-size:.72rem}
- .funding-tile .state{font-size:.91rem;white-space:normal}
+ .funding-tile{padding:.6rem .4rem;border-radius:.6rem;text-align:center;min-height:5rem}
+ .funding-tile .name{font-size:.8rem}
+ .funding-tile .state{font-size:1rem;white-space:normal}
  .funding-overall{font-size:.75rem}
 }
 
@@ -133,11 +136,11 @@ def show_funding(macro):
     def tile(key, title):
         raw = states.get(key)
         if raw in (1, "1", True):
-            klass, label = "red", "● 已觸發"
+            klass, label = "red", "已觸發"
         elif raw in (0, "0", False):
-            klass, label = "ok", "● 未觸發"
+            klass, label = "ok", "未觸發"
         else:
-            klass, label = "unknown", "● 未知"
+            klass, label = "unknown", "未知"
         return (f'<div class="funding-tile {klass}"><div class="name">{title}</div>'
                 f'<div class="state">{label}</div></div>')
 
@@ -147,7 +150,7 @@ def show_funding(macro):
         '<div class="funding-top"><span class="funding-title">全球資金溫度</span>'
         f'<span class="funding-overall {"red" if decision == "red" else "neutral"}">{verdict}</span></div>'
         f'<div class="funding-cards">{tiles}</div>'
-        f'<div class="funding-foot">行情日 {asof}　·　風險觸發範圍 {score_text}／3</div>',
+        f'<div class="funding-foot">部分總經指標可能缺值；依三態規則判定。行情日 {asof}　·　風險觸發範圍 {score_text}／3</div>',
         unsafe_allow_html=True,
     )
     if decision == "red":
@@ -155,7 +158,7 @@ def show_funding(macro):
     elif decision == "unknown":
         st.warning("資金溫度無法判定，不能視為安全。")
 
-    with st.expander("查看資金溫度判斷規則與原始數據", expanded=False):
+    with st.expander("展開查看資金溫度原始數據及判斷規則", expanded=False):
         st.caption("非紅燈不等於全綠，未知不得當作未觸發。個股財報條件仍獨立評估。")
         st.caption("利率：實質殖利率 90 日升逾 0.50 個百分點，或政策利率升逾 0.25 個百分點。")
         st.caption("金融條件：NFCI 高於 0，或 90 日升逾 0.25 指數點。")
