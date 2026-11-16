@@ -16,7 +16,7 @@ from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout
                          readable_table, sidebar_brand, status_line, strategy_comparison, trend_chart)
 from sheets_data import BASE, SnapshotReader, fetch_rows, read_gzip
 from shared.validation import health
-from shared.candidates import FORMAL, PENDING, RESEARCH, SCOPES, candidate_status, in_scope
+from shared.candidates import FORMAL, LIVE, PENDING, RESEARCH, SCOPES, candidate_status, in_scope
 from taiwan_fund_research import render as render_taiwan_fund_research
 from performance_view import Reader as PerformanceReader, fetch as fetch_performance, overlay as overlay_performance
 from performance.publication import decode as decode_performance
@@ -113,8 +113,12 @@ def markets(market, block, signal_available, latest_quotes=None):
     scope = scope_control.selectbox("顯示範圍", SCOPES, key=f"scope-{market}")
     study_count = sum(state["research"] for state in states.values())
     formal_count = sum(state["formal"] for state in states.values())
+    live_count = sum(state["live_primary"] for state in states.values())
     formal_summary = f"{formal_count} 檔" if signal_available else "待驗證"
     st.caption(f"背離研究候選 {study_count} 檔 · 背離正式買入訊號 {formal_summary}")
+    if market == "TW":
+        st.caption(f"台股盤後主策略研究候選 {live_count} 檔；根據實際取得的財報與原基本面、資金規則計算，"
+                   "不是已驗證的歷史交易訊號。資金狀態未核實時不產生買入候選。")
     query = search_control.text_input("搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
     industry = industry_control.selectbox("產業",["全部", *sorted({s["industry"] for s in stocks if s.get("industry")})],key=f"industry-{market}")
     order = order_control.selectbox("排序",["研究排名","營收成長","126 日回撤"],key=f"sort-{market}")
@@ -143,9 +147,13 @@ def markets(market, block, signal_available, latest_quotes=None):
             "營益率":percent(f.get("operating_margin")),"營業現金流率":percent(f.get("cfo_margin")),
             "P/S":stock["features"].get("price_sales"),"財報期":f.get("latest_period"),
             "申報日":f.get("max_input_filed") or f.get("filingEvidence",{}).get("publishedAt"),
-            "資料品質":"待核對" if stock.get("sourceError") or not stock["integrity"] else "已核對",
-            "最新可用財報期":observed.get("latest_period"),
-            "最新可用財報營收年增":percent(observed.get("revenue_growth")),
+            "資料品質":("待核對" if stock.get("sourceError") or not stock["integrity"] else
+                    "行情已核對／財報僅首次取得時間可證" if market=="TW" and not e["filingVerified"]
+                    else "已核對"),
+            "回測可用財報期":observed.get("latest_period"),
+            "回測可用財報營收年增":percent(observed.get("revenue_growth")),
+            "盤後財報取得":stamp(stock.get("financialObservedAt")),
+            "主策略盤後研究":("符合研究條件" if state["live_primary"] else "—"),
             "主策略正式訊號":("符合正式條件" if e["primary"] else "—") if signal_available else "待驗證",
             "背離研究":"符合" if state["research"] else "—",
             "背離正式狀態":state["label"],"背離阻擋原因":"｜".join(state["reasons"])})
@@ -159,8 +167,9 @@ def markets(market, block, signal_available, latest_quotes=None):
             st.info("目前篩選條件沒有符合的標的。")
         return
     main_columns = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增",
-                    "背離正式狀態" if scope in (RESEARCH, FORMAL, PENDING) else "主策略正式訊號"]
-    detail_columns = ["代號", "單季營收年增", "營益率", "營業現金流率", "P/S", "財報期", "申報日", "資料品質", "最新可用財報期", "最新可用財報營收年增"]
+                    "背離正式狀態" if scope in (RESEARCH, FORMAL, PENDING) else
+            "主策略盤後研究" if scope == LIVE else "主策略正式訊號"]
+    detail_columns = ["代號", "單季營收年增", "營益率", "營業現金流率", "P/S", "財報期", "申報日", "資料品質", "盤後財報取得", "回測可用財報期", "回測可用財報營收年增"]
     if scope in (RESEARCH, FORMAL, PENDING):
         detail_columns += ["背離研究", "背離正式狀態", "背離阻擋原因"]
     page_size = 20
@@ -623,6 +632,11 @@ def market_page():
     if data is None:
         return
     block = data["markets"][market]
+    if market == "TW":
+        shown = (quote or {}).get("day") or "待核對"
+        research_day = block["macro"]["marketAsOf"]
+        st.caption(f"台股行情日 {shown} · 即時研究批次 {research_day} · 歷史主策略績效獨立核驗；"
+                   "財報在首次取得後供盤後研究，不表示它於當天收盤前已可得。")
     markets(market, block, state["markets"][market]["usable"], quote)
 
 
