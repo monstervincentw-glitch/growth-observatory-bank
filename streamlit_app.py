@@ -107,7 +107,6 @@ def markets(market, block, signal_available, latest_quotes=None):
     stocks = block["stocks"]
     quotes = (latest_quotes or {}).get("quotes", {})
     macro = block["macro"]
-    funding_dashboard(macro)
     states = {stock["key"]: candidate_status(stock, macro, signal_available)
               for stock in stocks}
 
@@ -119,6 +118,17 @@ def markets(market, block, signal_available, latest_quotes=None):
                f"基本面轉弱需檢查 {exit_count} 檔 · 全球資金 {funding}")
     st.caption("市場觀測使用最新正式發布的行情與已取得財報，供接下來的買賣判斷。"
                "候選不代表帳戶已下單；持股出場仍須核對實際持倉、進場時財報與交易規則。")
+
+    # One major category at a time; keep funding cards out of the chart viewport.
+    section = st.segmented_control(
+        "市場觀測區塊", ["策略清單", "單檔圖表", "資金數據"],
+        default="策略清單", key=f"market-section-{market}",
+        label_visibility="collapsed",
+    ) or "策略清單"
+    if section == "資金數據":
+        funding_dashboard(macro)
+        funding_details(macro)
+        return
 
     scope_control, search_control, industry_control, order_control = st.columns(
         [1.4, 1.4, 1, 1], vertical_alignment="bottom")
@@ -192,17 +202,6 @@ def markets(market, block, signal_available, latest_quotes=None):
         "代號", "單季營收年增", "營益率", "營業現金流率", "P/S",
         "財報期", "實際取得財報時間", "資料品質", "檢查原因",
     ]
-    # Each major purpose gets its own workspace. Long tables no longer push
-    # the single-stock price chart beneath several screens of content.
-    section = st.segmented_control(
-        "市場觀測區塊", ["策略清單", "單檔圖表", "資金數據"],
-        default="策略清單", key=f"market-section-{market}",
-        label_visibility="collapsed",
-    ) or "策略清單"
-    if section == "資金數據":
-        funding_details(macro)
-        return
-
     if section == "策略清單":
         page_size = 10
         page_key = f"stocks-page-{market}"
