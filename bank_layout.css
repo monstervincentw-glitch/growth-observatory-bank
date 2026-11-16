@@ -7,14 +7,23 @@
   margin-block: .15rem;
 }
 [data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
-  background: #344A61; color: #F8E4C4;
+  background: #374D66; color: #FFF9ED;
 }
 .st-key-bank-content :is(h1, h2, h3) { color: #263344; letter-spacing: -.012em; }
 .st-key-bank-content div[data-testid="stVerticalBlockBorderWrapper"] {
   border-color: #E7E2D9; border-radius: 1rem;
 }
 .st-key-bank-content [data-testid="stMetric"] { background: #FFFDFA; border: 1px solid #E6E1D7; border-radius: .85rem; padding: .7rem .85rem; }
-.st-key-bank-content [data-testid="stSegmentedControl"] button[aria-pressed="true"] { background: #F1DFC1; color: #61451F; }
+.st-key-bank-content [data-testid="stSegmentedControl"] button[aria-pressed="true"] {
+  background: #E5C895 !important;
+  color: #23384D !important;
+  border-color: #B9843F !important;
+  font-weight: 760;
+}
+.st-key-bank-content [data-testid="stSegmentedControl"] button[aria-pressed="true"] :is(p, span) {
+  color: #23384D !important;
+  font-weight: 760;
+}
 .st-key-bank-content [data-testid="stPopoverButton"],
 .st-key-bank-content [data-testid="stDownloadButton"] button {
   border-radius: .75rem;
@@ -53,20 +62,38 @@
 .bank-sidebar-brand span, .bank-sidebar-brand small { display: block; }
 .bank-sidebar-brand span { font-size: 1.12rem; font-weight: 750; }
 .bank-sidebar-brand small { margin-top: .26rem; color: #D1D9E4; }
+/* Match the private portfolio: midnight blue idle nav, champagne gold active nav.
+   Include nested Streamlit labels so no low-contrast sidebar text rule wins. */
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a {
   min-height: 2.65rem;
   padding-block: .48rem;
-  border-inline-start: 3px solid transparent;
+  border-inline-start: 4px solid transparent;
   font-weight: 600;
   color: #DFE7F0;
 }
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a :is(p, span) {
+  color: inherit !important;
+}
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a:not([aria-current="page"]):hover {
+  background: #374D66;
+  color: #FFF9ED;
+}
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a[aria-current="page"] {
-  border-inline-start-color: #D4AA71;
-  background: #354B63;
-  color: #F7DFBA;
+  border-inline-start-color: #B9843F;
+  background: #E5C895;
+  color: #23384D;
+  font-weight: 760;
+}
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a[aria-current="page"] :is(p, span) {
+  color: #23384D !important;
+  font-weight: 760;
+}
+[data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a[aria-current="page"]:hover {
+  background: #E9CFA1;
+  color: #23384D;
 }
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a:focus-visible {
-  outline: 2px solid #E4C58D;
+  outline: 2px solid #B9843F;
   outline-offset: -2px;
 }
 
