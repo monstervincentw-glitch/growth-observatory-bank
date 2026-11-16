@@ -34,22 +34,41 @@ section[data-testid="stSidebar"] button { width: 100%; text-align: left; }
 [data-testid="stHeader"]{background:rgba(250,249,246,.93)}
 section[data-testid="stSidebar"]{
  width:260px!important;min-width:260px!important;
- background:#f5f4f0!important;border-right:1px solid #e7e2d9
+ background:#24364a!important;border-right:1px solid #425268
 }
-section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{line-height:1.45}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p{
+ line-height:1.45;color:#dae1eb
+}
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"] a{
+ color:#f1d3a3!important
+}
 section[data-testid="stSidebar"] .stButton button{
  font-size:.92rem;min-height:2.4rem;border-radius:.75rem;
- background:#fffdfa!important;color:#263344!important;
- border:1px solid #dcdedc!important
+ background:#2d4057!important;color:#f0f3f7!important;
+ border:1px solid #52627a!important;box-shadow:none!important
+}
+section[data-testid="stSidebar"] .stButton button:hover{
+ background:#374d66!important;border-color:#ddbe87!important;color:#fff9ed!important
 }
 section[data-testid="stSidebar"] .stButton button[kind="primary"],
 section[data-testid="stSidebar"] .stButton button[data-testid="stBaseButton-primary"]{
- background:#f0e1c6!important;color:#61451f!important;
- border-color:#cfaa71!important;box-shadow:inset 3px 0 0 #ad7d3e
+ background:#f1dfc1!important;color:#5f4525!important;
+ border-color:#d4b17a!important;box-shadow:inset 3px 0 0 #ad7d3e!important;
+ font-weight:720!important
 }
-.sidebar-brand{font-size:1.08rem;font-weight:770;color:#263344;margin:.15rem 0 1.05rem}
-.sidebar-kicker{font-size:.74rem;letter-spacing:.04em;color:#7d7e80;margin:.9rem 0 .35rem}
-.sidebar-note{font-size:.76rem;color:#687586;margin:.5rem 0}
+section[data-testid="stSidebar"] [data-testid="stExpander"]{
+ background:#2c4056!important;border:1px solid #52627a!important;border-radius:.75rem
+}
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary,
+section[data-testid="stSidebar"] [data-testid="stExpander"] summary *{
+ color:#f0f3f7!important
+}
+section[data-testid="stSidebar"] [data-testid="stCaptionContainer"]{
+ color:#c6d1df!important
+}
+.sidebar-brand{font-size:1.08rem;font-weight:770;color:#fbf5eb!important;margin:.15rem 0 1.05rem}
+.sidebar-kicker{font-size:.74rem;letter-spacing:.04em;color:#c0cad7!important;margin:.9rem 0 .35rem}
+.sidebar-note{font-size:.76rem;color:#c0cad7!important;margin:.5rem 0}
 h1,h2,h3{letter-spacing:-.014em;color:#27364a}
 div[data-testid="stVerticalBlockBorderWrapper"]{border-radius:1rem}
 .st-key-asset_performance [data-testid="stVerticalBlockBorderWrapper"]{border-color:#e8e2d8}
