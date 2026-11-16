@@ -500,28 +500,46 @@ def legacy_backtest(market):
 def tracking(snapshot_data, baseline):
     with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
         market = market_picker(st)
-        year=st.selectbox("策略起始年", sorted({p["year"] for p in baseline[market]},reverse=True),key=f"mark-{market}", width=152)
+        year = st.selectbox(
+            "策略起始年",
+            sorted({p["year"] for p in baseline[market]}, reverse=True),
+            key=f"mark-{market}", width=152,
+        )
     block = snapshot_data["markets"][market]
-    marks=block["marks"].get(str(year))
-    estimate=conditional_marks(market)
-    if estimate and str(year) in estimate["years"] and (not marks or estimate["through"]>=marks["date"]):
-        marks={"date":estimate["through"],"portfolios":estimate["years"][str(year)]}
+    marks = block["marks"].get(str(year))
+    estimate = conditional_marks(market)
+    if estimate and str(year) in estimate["years"] and (not marks or estimate["through"] >= marks["date"]):
+        marks = {"date": estimate["through"], "portfolios": estimate["years"][str(year)]}
     st.info(f"最後完整模擬 {baseline['date']}。靜態估值日 {marks['date'] if marks else '待核對'}。封存後採相同還原價格序列，部位與現金固定。")
     plans = []
-    for p in [row for row in baseline[market] if row["year"]==year]:
-        mark=next((r for r in marks["portfolios"] if r["variant"]==p["variant"]),None) if marks else None
-        core=sum(x["role"]=="core" for x in p["positions"])
-        plans.append({"方案":p["variant"],"封存淨值":number(p["nav"]),"靜態估值":number(mark["value"] if mark else None),
-            "封存後變動":percent(mark["value"]/p["nav"]-1 if mark else None),"封存現金":number(p["cash"]),
-            "核心":core,"額外":len(p["positions"])-core,"封存成本":number(p["cost"])})
-        with st.expander(f"{p['variant']} 版核心／額外模擬部位"):
-            marked={x["symbol"]:x["markedValue"] for x in mark["positions"]} if mark else {}
-            table([{"代號":x["symbol"],"分類":"核心" if x["role"]=="core" else "額外","封存市值":number(x["value"]),
-                "靜態市值":number(marked.get(x["symbol"]))} for x in p["positions"]], label=f"{p['variant']} 版模擬部位")
-    table(plans, label="策略估值")
-    csv_button("匯出策略估值 CSV",plans,f"{market}-{year}-tracking.csv",f"track-{market}")
-    st.caption(f"最近訊號計算 {stamp(block['signalAt'])} · {('USD' if market=='US' else 'TWD')}")
-
+    for p in [row for row in baseline[market] if row["year"] == year]:
+        mark = next((r for r in marks["portfolios"] if r["variant"] == p["variant"]), None) if marks else None
+        core = sum(x["role"] == "core" for x in p["positions"])
+        plans.append({"方案": p["variant"], "封存淨值": number(p["nav"]),
+                      "靜態估值": number(mark["value"] if mark else None),
+                      "封存後變動": percent(mark["value"] / p["nav"] - 1 if mark else None),
+                      "封存現金": number(p["cash"]), "核心": core,
+                      "額外": len(p["positions"]) - core, "封存成本": number(p["cost"])})
+    section = st.segmented_control(
+        "策略模擬區塊", ["估值總覽", "模擬持倉"],
+        default="估值總覽", key="bank-tracking-section",
+        label_visibility="collapsed",
+    ) or "估值總覽"
+    if section == "估值總覽":
+        st.subheader("策略估值")
+        table(plans, label="策略估值")
+        csv_button("匯出策略估值 CSV", plans, f"{market}-{year}-tracking.csv", f"track-{market}")
+    else:
+        st.subheader("A／B 模擬部位")
+        for p in [row for row in baseline[market] if row["year"] == year]:
+            mark = next((r for r in marks["portfolios"] if r["variant"] == p["variant"]), None) if marks else None
+            with st.expander(f"{p['variant']} 版核心／額外模擬部位", expanded=p["variant"] == "A"):
+                marked = {x["symbol"]: x["markedValue"] for x in mark["positions"]} if mark else {}
+                table([{"代號": x["symbol"], "分類": "核心" if x["role"] == "core" else "額外",
+                        "封存市值": number(x["value"]),
+                        "靜態市值": number(marked.get(x["symbol"]))}
+                       for x in p["positions"]], label=f"{p['variant']} 版模擬部位")
+    st.caption(f"最近訊號計算 {stamp(block['signalAt'])} · {('USD' if market == 'US' else 'TWD')}")
 @st.cache_resource
 def performance_reader():
     return PerformanceReader(environ.get("PERFORMANCE_CACHE_PATH", "/tmp/growth-bank-performance/release.json"))
