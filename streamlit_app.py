@@ -16,7 +16,7 @@ from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout
                          readable_table, sidebar_brand, status_line, strategy_comparison, trend_chart)
 from sheets_data import BASE, SnapshotReader, fetch_rows, read_gzip
 from shared.validation import health
-from shared.candidates import FORMAL, LIVE, PENDING, RESEARCH, SCOPES, candidate_status, in_scope
+from shared.candidates import DIVERGENCE, SCOPES, candidate_status, in_scope
 from taiwan_fund_research import render as render_taiwan_fund_research
 from performance_view import Reader as PerformanceReader, fetch as fetch_performance, overlay as overlay_performance
 from performance.publication import decode as decode_performance
@@ -103,114 +103,157 @@ def funding_details(macro):
         st.caption("利率、金融條件、通膨各至多一分。最低分已達 2 則觸發，最高分低於 2 則未達門檻，其他為未知。")
 
 def markets(market, block, signal_available, latest_quotes=None):
+    """Forward-looking market watch; historical backtests remain separate."""
     stocks = block["stocks"]
-    quotes=(latest_quotes or {}).get("quotes",{})
-    by_rank = sorted(stocks, key=lambda s: s["researchRank"]["rank"] if s["researchRank"] else 1000)
-    funding_dashboard(block["macro"])
-    states = {stock["key"]: candidate_status(stock, block["macro"], signal_available)
+    quotes = (latest_quotes or {}).get("quotes", {})
+    macro = block["macro"]
+    funding_dashboard(macro)
+    states = {stock["key"]: candidate_status(stock, macro, signal_available)
               for stock in stocks}
-    scope_control, search_control, industry_control, order_control = st.columns([1.4, 1.4, 1, 1], vertical_alignment="bottom")
-    scope = scope_control.selectbox("顯示範圍", SCOPES, key=f"scope-{market}")
-    study_count = sum(state["research"] for state in states.values())
-    formal_count = sum(state["formal"] for state in states.values())
-    live_count = sum(state["live_primary"] for state in states.values())
-    formal_summary = f"{formal_count} 檔" if signal_available else "待驗證"
-    st.caption(f"背離研究候選 {study_count} 檔 · 背離正式買入訊號 {formal_summary}")
-    if market == "TW":
-        st.caption(f"台股盤後主策略研究候選 {live_count} 檔；根據實際取得的財報與原基本面、資金規則計算，"
-                   "不是已驗證的歷史交易訊號。資金狀態未核實時不產生買入候選。")
-    query = search_control.text_input("搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
-    industry = industry_control.selectbox("產業",["全部", *sorted({s["industry"] for s in stocks if s.get("industry")})],key=f"industry-{market}")
-    order = order_control.selectbox("排序",["研究排名","營收成長","126 日回撤"],key=f"sort-{market}")
+
+    ready_count = sum(state["buy_ready"] for state in states.values())
+    exit_count = sum(state["exit_watch"] for state in states.values())
+    funding = {"red": "紅燈", "non_red": "非紅燈", "unknown": "待確認"}.get(
+        macro.get("decision"), "待確認")
+    st.caption(f"主策略符合個股與資金進場條件 {ready_count} 檔 · "
+               f"基本面轉弱需檢查 {exit_count} 檔 · 全球資金 {funding}")
+    st.caption("市場觀測使用最新正式發布的行情與已取得財報，供接下來的買賣判斷。"
+               "候選不代表帳戶已下單；持股出場仍須核對實際持倉、進場時財報與交易規則。"
+               "歷史回測另在「主策略回測」頁面。")
+
+    scope_control, search_control, industry_control, order_control = st.columns(
+        [1.4, 1.4, 1, 1], vertical_alignment="bottom")
+    scope = scope_control.selectbox(
+        "顯示範圍", SCOPES, key=f"market-view-v2-{market}")
+    query = search_control.text_input(
+        "搜尋代號、公司或產業", key=f"query-{market}").strip().casefold()
+    industry = industry_control.selectbox(
+        "產業", ["全部", *sorted({s["industry"] for s in stocks if s.get("industry")})],
+        key=f"industry-{market}")
+    order = order_control.selectbox(
+        "排序", ["研究排名", "營收成長", "126 日回撤"], key=f"sort-{market}")
+
     def visible(stock):
         scope_ok = in_scope(stock, states[stock["key"]], scope, signal_available)
-        return scope_ok and (industry=="全部" or stock.get("industry")==industry) and query in " ".join(str(stock.get(k) or "") for k in ("symbol","name","industry")).casefold()
-    selected_stocks = list(filter(visible, by_rank))
-    if order!="研究排名":
-        field = ("financial","revenue_growth") if order=="營收成長" else ("features","drawdown_126")
+        return (scope_ok and (industry == "全部" or stock.get("industry") == industry)
+                and query in " ".join(str(stock.get(k) or "")
+                for k in ("symbol", "name", "industry")).casefold())
+
+    selected_stocks = list(filter(visible, stocks))
+    selected_stocks.sort(
+        key=lambda s: (s["researchRank"]["rank"] if s["researchRank"] else 10000,
+                       s["symbol"]))
+    if order != "研究排名":
+        field = ("financial", "revenue_growth") if order == "營收成長" else ("features", "drawdown_126")
         def sort_key(stock):
             value = stock[field[0]].get(field[1])
-            return (value is None, 0 if value is None else (-value if order=="營收成長" else value))
+            return (value is None, 0 if value is None else
+                    (-value if order == "營收成長" else value))
         selected_stocks.sort(key=sort_key)
+
+    if not selected_stocks:
+        st.info("這個檢視目前沒有符合篩選條件的股票。")
+        funding_details(macro)
+        return
+
     rows = []
     for stock in selected_stocks:
         rank = stock["researchRank"] or {}
-        f, e = stock["financial"], stock["evaluation"]
+        f = stock["financial"]
+        e = stock["evaluation"]
         state = states[stock["key"]]
-        quote=quotes.get(stock["symbol"],{})
-        price=quote if quote.get("priceDate","")>=stock["priceDate"] else stock
-        # The displayed ranking and candidate flags belong to the formal batch.
-        observed=(price.get("research") or {}).get("financial",{})
-        rows.append({"排名":rank.get("rank"),"代號":stock["symbol"],"公司":stock["name"],"產業":stock.get("industry"),
-            "總分":round(rank["score"],2) if rank else None,"收盤":price["close"],"行情日":price["priceDate"],
-            "TTM 營收年增":percent(f.get("revenue_growth")),"單季營收年增":percent(f.get("quarterly_growth")),
-            "營益率":percent(f.get("operating_margin")),"營業現金流率":percent(f.get("cfo_margin")),
-            "P/S":stock["features"].get("price_sales"),"財報期":f.get("latest_period"),
-            "申報日":f.get("max_input_filed") or f.get("filingEvidence",{}).get("publishedAt"),
-            "資料品質":("待核對" if stock.get("sourceError") or not stock["integrity"] else
-                    "行情已核對／財報僅首次取得時間可證" if market=="TW" and not e["filingVerified"]
-                    else "已核對"),
-            "回測可用財報期":observed.get("latest_period"),
-            "回測可用財報營收年增":percent(observed.get("revenue_growth")),
-            "盤後財報取得":stamp(stock.get("financialObservedAt")),
-            "主策略盤後研究":("符合研究條件" if state["live_primary"] else "—"),
-            "主策略正式訊號":("符合正式條件" if e["primary"] else "—") if signal_available else "待驗證",
-            "背離研究":"符合" if state["research"] else "—",
-            "背離正式狀態":state["label"],"背離阻擋原因":"｜".join(state["reasons"])})
-    if not rows:
-        funding_details(block["macro"])
-        if scope == FORMAL and not signal_available:
-            st.caption("正式訊號待驗證。")
-        elif scope == FORMAL and not formal_count:
-            st.info("本批沒有符合背離正式買入條件的標的。可切換至背離研究候選查看逐檔原因。")
-        else:
-            st.info("目前篩選條件沒有符合的標的。")
-        return
-    main_columns = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增",
-                    "背離正式狀態" if scope in (RESEARCH, FORMAL, PENDING) else
-            "主策略盤後研究" if scope == LIVE else "主策略正式訊號"]
-    detail_columns = ["代號", "單季營收年增", "營益率", "營業現金流率", "P/S", "財報期", "申報日", "資料品質", "盤後財報取得", "回測可用財報期", "回測可用財報營收年增"]
-    if scope in (RESEARCH, FORMAL, PENDING):
-        detail_columns += ["背離研究", "背離正式狀態", "背離阻擋原因"]
+        quote = quotes.get(stock["symbol"], {})
+        price = quote if quote.get("priceDate", "") >= stock["priceDate"] else stock
+        rows.append({
+            "排名": rank.get("rank"), "代號": stock["symbol"], "公司": stock["name"],
+            "產業": stock.get("industry"), "總分": round(rank["score"], 2) if rank else None,
+            "收盤": price["close"], "行情日": price["priceDate"],
+            "TTM 營收年增": percent(f.get("revenue_growth")),
+            "進場檢查": state["entry_label"],
+            "持股出場檢查": state["exit_label"],
+            "背離研究": "符合背離觀察" if state["divergence_research"] else "—",
+            "資金狀態": funding,
+            "單季營收年增": percent(f.get("quarterly_growth")),
+            "營益率": percent(f.get("operating_margin")),
+            "營業現金流率": percent(f.get("cfo_margin")),
+            "P/S": stock["features"].get("price_sales"),
+            "財報期": f.get("latest_period"),
+            "實際取得財報時間": stamp(stock.get("financialObservedAt")),
+            "資料品質": ("待核對" if stock.get("sourceError") or not stock["integrity"]
+                       else "最新行情／財報已取得"),
+            "檢查原因": "｜".join(state["reasons"]) or "目前未觸發共通出場檢查條件",
+        })
+
+    base_cols = ["排名", "代號", "公司", "產業", "總分", "收盤", "行情日", "TTM 營收年增"]
+    if scope == DIVERGENCE:
+        main_columns = base_cols + ["背離研究", "資金狀態"]
+    else:
+        main_columns = base_cols + ["進場檢查", "持股出場檢查"]
+    detail_columns = [
+        "代號", "單季營收年增", "營益率", "營業現金流率", "P/S",
+        "財報期", "實際取得財報時間", "資料品質", "檢查原因",
+    ]
     page_size = 20
     page_key = f"stocks-page-{market}"
-    start = min(st.session_state.get(page_key, 0), (len(rows) - 1) // page_size * page_size)
+    start = min(st.session_state.get(page_key, 0),
+                (len(rows) - 1) // page_size * page_size)
     with st.container(horizontal=True, gap="small", vertical_alignment="center"):
         st.subheader(scope, anchor=False)
         st.write(f"{start + 1}–{min(start + page_size, len(rows))} ／ {len(rows)} 檔")
         if len(rows) > page_size:
             st.button("上一頁", key=f"stocks-prev-{market}", disabled=start == 0,
-                      on_click=st.session_state.__setitem__, args=(page_key, start - page_size))
-            st.button("下一頁", key=f"stocks-next-{market}", disabled=start + page_size >= len(rows),
-                      on_click=st.session_state.__setitem__, args=(page_key, start + page_size))
+                      on_click=st.session_state.__setitem__,
+                      args=(page_key, max(0, start - page_size)))
+            st.button("下一頁", key=f"stocks-next-{market}",
+                      disabled=start + page_size >= len(rows),
+                      on_click=st.session_state.__setitem__,
+                      args=(page_key, start + page_size))
+
     visible_rows = pd.DataFrame(rows[start:start + page_size])
-    readable_table(visible_rows[main_columns], label="市場研究候選", layout="market")
-    with st.expander("本頁候選的財報與資料品質"):
-        readable_table(visible_rows[detail_columns], label="候選財報與資料品質")
-    csv_button("匯出目前篩選 CSV",rows,f"{market}-research.csv",f"export-{market}")
-    funding_details(block["macro"])
-    stock = st.selectbox("查看單檔分數、財報與行情",selected_stocks,
-        format_func=lambda x: f"{x['symbol']} · {x['name']}",key=f"detail-{market}")
-    f,e=stock["financial"],stock["evaluation"]
-    rank=stock["researchRank"]
+    readable_table(visible_rows[main_columns], label="即時市場觀測", layout="market")
+    with st.expander("本頁財報與進出場檢查明細"):
+        readable_table(visible_rows[detail_columns], label="即時研究明細")
+    csv_button("匯出目前篩選 CSV", rows, f"{market}-market-watch.csv", f"export-{market}")
+    funding_details(macro)
+
+    stock = st.selectbox(
+        "查看單檔分數、財報與行情", selected_stocks,
+        format_func=lambda x: f"{x['symbol']} · {x['name']}",
+        key=f"detail-{market}")
+    f = stock["financial"]
+    rank = stock["researchRank"]
     if rank:
-        st.write(f"**#{rank['rank']}　{rank['score']:.2f} 分** · 同業 {rank['detail']['industrySize']} 檔")
-        table([{"因子":FACTORS[p["key"]],"原始值":number(p["value"]) if p["key"]=="value" else percent(p["value"]),
-            "百分位":percent(p["percentile"]),"權重":percent(p["weight"]),
-            "貢獻分":round(p["weight"]*p["percentile"]*100,2)} for p in rank["detail"]["parts"]], label="單檔評分")
-    st.caption(f"財報期 {f.get('latest_period') or '待核對'} · 首次／最近可核對觀測 {stamp(stock.get('financialObservedAt'))} · 行情來源 {stock.get('priceSource') or '待核對'}")
+        st.write(f"**#{rank['rank']}　{rank['score']:.2f} 分** · "
+                 f"同業 {rank['detail']['industrySize']} 檔")
+        table([{
+            "因子": FACTORS[p["key"]],
+            "原始值": number(p["value"]) if p["key"] == "value" else percent(p["value"]),
+            "百分位": percent(p["percentile"]), "權重": percent(p["weight"]),
+            "貢獻分": round(p["weight"] * p["percentile"] * 100, 2),
+        } for p in rank["detail"]["parts"]], label="單檔評分")
+    st.caption(f"財報期 {f.get('latest_period') or '待核對'} · "
+               f"首次／最近取得 {stamp(stock.get('financialObservedAt'))} · "
+               f"行情來源 {stock.get('priceSource') or '待核對'}")
     if stock.get("sourceWarning") or stock.get("sourceError"):
         st.warning(stock.get("sourceWarning") or stock["sourceError"])
+
     state = states[stock["key"]]
-    st.write(f"**背離正式狀態** {state['label']}")
+    st.write(f"**進場條件：** {state['entry_label']}　"
+             f"**持股出場檢查：** {state['exit_label']}")
     if state["reasons"]:
         st.caption("｜".join(state["reasons"]))
+    st.caption("出場檢查只涵蓋最新財報與共通資金規則；"
+               "個股相對實際進場時的成長及營益率變化，需要持股紀錄才能完整判定。")
     technical = stock["features"]
-    st.caption(f"126 日回撤 {percent(technical.get('drawdown_126'))} · 63 日相對報酬 {percent(technical.get('relative_63'))} · 可用交易日 {technical.get('history_sessions','—')}")
+    st.caption(f"126 日回撤 {percent(technical.get('drawdown_126'))} · "
+               f"63 日相對報酬 {percent(technical.get('relative_63'))} · "
+               f"可用交易日 {technical.get('history_sessions','—')}")
     if stock["history"]:
-        history = pd.DataFrame(stock["history"]).rename(columns={"close":"調整收盤"})
+        history = pd.DataFrame(stock["history"]).rename(columns={"close": "調整收盤"})
         history["date"] = pd.to_datetime(history["date"])
-        trend_chart(history.rename(columns={"date": "日期"}), "日期", ["調整收盤"], ylabel="調整收盤", height=315)
+        trend_chart(history.rename(columns={"date": "日期"}), "日期",
+                    ["調整收盤"], ylabel="調整收盤", height=315)
+
 
 def market_picker(column, *, label_visibility="visible"):
     return MARKETS[column.segmented_control("市場", list(MARKETS), default="美股", key="bank-market",
@@ -635,8 +678,8 @@ def market_page():
     if market == "TW":
         shown = (quote or {}).get("day") or "待核對"
         research_day = block["macro"]["marketAsOf"]
-        st.caption(f"台股行情日 {shown} · 即時研究批次 {research_day} · 歷史主策略績效獨立核驗；"
-                   "財報在首次取得後供盤後研究，不表示它於當天收盤前已可得。")
+        st.caption(f"台股最新行情 {shown} · 市場研究批次 {research_day} · "
+                   "盤後取得的財報僅用於取得後的最新判斷，不回填過去交易。")
     markets(market, block, state["markets"][market]["usable"], quote)
 
 
