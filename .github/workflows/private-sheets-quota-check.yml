@@ -1,0 +1,38 @@
+name: 私人持股 Sheets 配額與安全讀取驗證
+
+on:
+  push:
+    branches: [fix/private-sheets-quota-20261117]
+    paths:
+      - portfolio_portal/storage.py
+      - portfolio_portal/app.py
+      - portfolio_portal/render_entrypoint.py
+      - tests/test_private_sheets_quota.py
+      - .github/workflows/private-sheets-quota-check.yml
+  pull_request:
+    branches: [deployment/private-portfolio-v1]
+    paths:
+      - portfolio_portal/storage.py
+      - portfolio_portal/app.py
+      - portfolio_portal/render_entrypoint.py
+      - tests/test_private_sheets_quota.py
+      - .github/workflows/private-sheets-quota-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  quota-safe-private-read:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Sheets client for stubbed tests
+        run: pip install 'gspread>=6.1,<7'
+      - name: Compile owner-only portfolio code
+        run: python -m py_compile portfolio_portal/storage.py portfolio_portal/app.py portfolio_portal/render_entrypoint.py
+      - name: Verify batched reads and strict schema safeguards
+        run: python -m unittest discover -s tests -p 'test_private_sheets_quota.py' -v

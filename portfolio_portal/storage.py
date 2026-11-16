@@ -10,7 +10,7 @@ import threading
 import uuid
 
 import gspread
-from gspread.exceptions import WorksheetNotFound
+from gspread.utils import rowcol_to_a1
 
 PORTFOLIO_HEADERS = ["id", "name", "market", "strategy", "currency", "created_at", "note", "archived"]
 BANK_RESEARCH_SHEET_ID = "1I9Alvyhg4UZXi-AdylJN0pjiLHSMzZUleFK0vsXG1K0"
@@ -47,31 +47,80 @@ class PortfolioSheets:
         self.client = client
         self.book = client.open_by_key(spreadsheet_id)
         self._lock = threading.RLock()
-        self.portfolios_tab = self._tab("portfolios", PORTFOLIO_HEADERS)
-        self.ledger_tab = self._tab("ledger", LEDGER_HEADERS)
-        self.events_tab = self._tab("events", EVENT_HEADERS)
-        self.nav_tab = self._tab("nav_history", NAV_HEADERS)
-        self.positions_snapshot_tab = self._tab("position_snapshots", POSITION_SNAPSHOT_HEADERS)
-        self.baseline_tab = self._tab("entry_baselines", BASELINE_HEADERS)
-        self.exit_transition_tab = self._tab("exit_transitions", EXIT_TRANSITION_HEADERS)
-        self.change_tab = self._tab("portfolio_changes", CHANGE_HEADERS)
+        # One metadata request plus one batched header request. Previously the
+        # eight worksheet lookups and eight header reads could exhaust the
+        # service-account's per-minute read quota during Render cold starts.
+        definitions = (
+            ("portfolios_tab", "portfolios", PORTFOLIO_HEADERS),
+            ("ledger_tab", "ledger", LEDGER_HEADERS),
+            ("events_tab", "events", EVENT_HEADERS),
+            ("nav_tab", "nav_history", NAV_HEADERS),
+            ("positions_snapshot_tab", "position_snapshots", POSITION_SNAPSHOT_HEADERS),
+            ("baseline_tab", "entry_baselines", BASELINE_HEADERS),
+            ("exit_transition_tab", "exit_transitions", EXIT_TRANSITION_HEADERS),
+            ("change_tab", "portfolio_changes", CHANGE_HEADERS),
+        )
+        available = {sheet.title: sheet for sheet in self.book.worksheets()}
+        existing = [name for _, name, _ in definitions if name in available]
+        checks = self.book.values_batch_get([f"'{name}'!1:1" for name in existing]) if existing else {"valueRanges": []}
+        returned = checks.get("valueRanges", [])
+        if len(returned) != len(existing):
+            raise RuntimeError("私人工作表標頭檢查未完整回傳，已停止操作")
+        actual_headers = {name: (item.get("values") or [[]])[0]
+                          for name, item in zip(existing, returned)}
+        for attribute, name, headers in definitions:
+            setattr(self, attribute, self._tab(name, headers, available, actual_headers))
 
-    def _tab(self, name, headers):
-        try:
-            sheet = self.book.worksheet(name)
-        except WorksheetNotFound:
+    def _tab(self, name, headers, available, actual_headers):
+        sheet = available.get(name)
+        if sheet is None:
             sheet = self.book.add_worksheet(title=name, rows=2000, cols=len(headers))
             sheet.append_row(headers, value_input_option="RAW")
-        got = sheet.row_values(1)
-        if got != headers:
+            # Only newly created sheets require a follow-up read. Existing
+            # worksheet headers were already verified with one batch request.
+            if sheet.row_values(1) != headers:
+                raise ValueError(f"{name} 新增後標頭驗證失敗，已停止寫入")
+        elif actual_headers.get(name) != headers:
             raise ValueError(f"{name} 欄位與預期不符，已停止寫入以保護現有資料")
         return sheet
 
     @staticmethod
-    def _rows(sheet, headers):
-        rows = sheet.get_all_values()[1:]
+    def _decode_rows(rows, headers):
         return [dict(zip(headers, [*row, *([""] * (len(headers)-len(row)))]))
                 for row in rows if row and row[0]]
+
+    @classmethod
+    def _rows(cls, sheet, headers):
+        return cls._decode_rows(sheet.get_all_values()[1:], headers)
+
+    def read_snapshot(self):
+        """Read five owner-only private tables in one quota-counted API request.
+
+        This is strictly read-only. Keep the exact same header/row semantics as
+        the existing individual readers, and never log or persist row contents.
+        """
+        with self._lock:
+            definitions = (
+                ("portfolios", "portfolios", PORTFOLIO_HEADERS),
+                ("transactions", "ledger", LEDGER_HEADERS),
+                ("baselines", "entry_baselines", BASELINE_HEADERS),
+                ("transitions", "exit_transitions", EXIT_TRANSITION_HEADERS),
+                ("nav", "nav_history", NAV_HEADERS),
+            )
+            ranges = [
+                f"'{name}'!A2:{rowcol_to_a1(1, len(headers)).rstrip('0123456789')}"
+                for _, name, headers in definitions
+            ]
+            response = self.book.values_batch_get(ranges)
+            results = response.get("valueRanges", [])
+            if len(results) != len(definitions):
+                raise RuntimeError("私人資料批次讀取不完整，已停止分析及寫入")
+            output = {
+                key: self._decode_rows(part.get("values") or [], headers)
+                for (key, _name, headers), part in zip(definitions, results)
+            }
+            output["nav"].sort(key=lambda row: (row["date"], row["portfolio_id"]))
+            return output
 
     def all_portfolios(self):
         with self._lock:
