@@ -53,7 +53,12 @@ export async function archiveObservations(folder,{market,context,stocks,previous
     status:pending.includes(s.symbol)?'RETAINED_PRIOR_VERSION':'VERIFIED_AT_DECISION',
     evaluation:evaluate(s,context.macro,new Date(at))
   }]));
+  // A post-close live publication is not evidence that its financial version
+  // was already accessible at the market close used for historical replay.
+  const liveResearchStatus=attempt.status==='published'
+    ?'LIVE_RESEARCH_PUBLISHED':'LIVE_RESEARCH_NOT_PUBLISHED';
   const output={schema:1,market,day,batch,runId:attempt.runId,observedAt:at,decisionAt:close,
+    liveResearchStatus,
     status:complete?'PRICES_VERIFIED':'PARTIAL_PRICES',decisionStatus,
     researchStatus:rankReady?'FULL_OBSERVATION_INPUT':'PARTIAL_OBSERVATION_INPUT',
     pendingFinancial:pending.sort(),macro:context.macro,quotes:quote,observations,
@@ -68,7 +73,7 @@ export async function archiveObservations(folder,{market,context,stocks,previous
       status:decisionStatus,decisionAt:close,observedAt:at,macro:context.macro,stocks:replayStocks})+'\n');
   }
   const publicPrices={schema:1,market,day,observedAt:at,runId:attempt.runId,
-    status:output.status,expected:previous.length,quotes:Object.fromEntries(Object.entries(quote).map(([s,q])=>
+    liveResearchStatus,status:output.status,expected:previous.length,quotes:Object.fromEntries(Object.entries(quote).map(([s,q])=>
       [s,{priceDate:q.priceDate,close:q.close,source:q.source,adjustedClose:q.bars.at(-1).adjClose,
         research:observations[s] ? {status:observations[s].status,financial:observations[s].financial} : null}]))};
   for(const [path,name,value] of [
