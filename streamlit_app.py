@@ -783,6 +783,12 @@ def records(data, source, batch):
 
 def market_page():
     market = market_picker(market_controls, label_visibility="collapsed")
+    # Current funding temperature is a live market-observation signal, not
+    # historical backtest context. Keep it prominent ONLY on this page.
+    if data is not None:
+        funding_dashboard(data["markets"][market]["macro"])
+    else:
+        st.warning("全球資金溫度資料目前無法驗證，請勿將未知狀態視為未觸發。")
     # Load the two independent public files concurrently.
     with ThreadPoolExecutor(max_workers=2) as pool:
         attempts=pool.submit(runner_attempts)
@@ -831,13 +837,6 @@ page = st.navigation([
 
 with st.container(key="bank-content"):
     header(page.title)
-    # Highest-priority global risk context: displayed before controls and tables
-    # on every bank page, using the market already selected in this session.
-    if data:
-        funding_market = MARKETS.get(st.session_state.get("bank-market", "美股"), "US")
-        funding_dashboard(data["markets"][funding_market]["macro"])
-    else:
-        st.warning("全球資金溫度資料目前無法驗證，請勿將未知狀態視為未觸發。")
     if page.title == "市場觀測":
         status, market_controls, refresh = st.columns([5, 1, 1.2], vertical_alignment="center")
     else:
