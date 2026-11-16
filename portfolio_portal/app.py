@@ -11,13 +11,31 @@ import json
 import pandas as pd
 import streamlit as st
 
-from core import buy_plan, compute_account, portfolio_value
+from core import buy_plan, compute_account, contributions_through, divergence_plan, modified_dietz, owner_allowed, portfolio_value
 from monitor import portfolio_reviews, review_holding, data_too_old
 from research import latest_research
 from storage import PortfolioSheets, sheets_client
 
 st.set_page_config(page_title="我的投資組合｜私人版", page_icon="🔐",
                    layout="wide", initial_sidebar_state="expanded")
+st.markdown("""
+<style>
+@media (max-width: 700px) {
+  .block-container { padding-top: 0.8rem; padding-left: 0.6rem; padding-right: 0.6rem; }
+  div[data-testid="stHorizontalBlock"] { flex-wrap: wrap; gap: 0.4rem; }
+  div[data-testid="column"] { flex: 1 1 46% !important; min-width: 140px; }
+  button { min-height: 2.6rem; }
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+def public_error(exc):
+    text = str(exc)
+    lowered = text.lower()
+    if any(word in lowered for word in ("private_key", "client_secret", "begin private", "token", "secret")):
+        return "設定無法使用。請只在 Render 的 Environment 修正，不要把密鑰貼到聊天或 GitHub。"
+    return text[:300]
 
 
 def auth_gate():
@@ -27,15 +45,15 @@ def auth_gate():
         if st.button("使用 Google 帳號登入", type="primary"):
             st.login()
         st.stop()
-    allowed = str(st.secrets.get("owner_email", "")).strip().casefold()
-    email = str(st.user.get("email", "")).strip().casefold()
+    allowed = str(st.secrets.get("owner_email", ""))
+    email = str(st.user.get("email", ""))
     verified = st.user.get("email_verified", False)
-    if not allowed or not email or email != allowed or verified is not True:
+    if not owner_allowed(email, verified, allowed):
         st.error("已登入，但不是經授權且已驗證的擁有者。")
         if st.button("登出"):
             st.logout()
         st.stop()
-    return email
+    return email.strip().casefold()
 
 
 owner_email = auth_gate()
@@ -67,16 +85,15 @@ try:
     store = private_store()
 except Exception as exc:
     st.error("私人 Google Sheets 尚未完成授權或設定。")
-    st.caption("請先依 README 設定 owner_email、private_portfolio_sheet_id、"
-               "google_service_account 及 Google OIDC，並將工作表分享給服務帳號。")
-    st.exception(exc)
+    st.caption("請先在 Render Environment 設定擁有者信箱、私人試算表與服務帳號，並把表分享給該服務帳號。")
+    st.caption(public_error(exc))
     st.stop()
 
 try:
     entry, research_source, research_issues = research_snapshot()
 except Exception as exc:
     st.error("銀行版研究資料無法讀取或驗證；不會依過期行情產生新交易建議。")
-    st.exception(exc)
+    st.caption(public_error(exc))
     st.stop()
 
 snapshot = entry["snapshot"]
@@ -93,7 +110,7 @@ try:
     transactions = store.transactions()
 except Exception as exc:
     st.error("讀取私人交易紀錄失敗，禁止建立建議或寫入新資料。")
-    st.exception(exc)
+    st.caption(public_error(exc))
     st.stop()
 
 # Review all real holdings first, before offering any new purchase candidates.
@@ -102,7 +119,7 @@ try:
     event_history=store.monitor_history()
 except Exception as exc:
     st.error("持股監控或歷史交易資料驗證失敗，已停止提供交易建議。")
-    st.exception(exc)
+    st.caption(public_error(exc))
     st.stop()
 urgent=[r for r in live_reviews if r["status"]=="觸發出場條件"]
 pending=[r for r in live_reviews if r["status"]=="資料待確認"]
@@ -161,15 +178,19 @@ try:
     account = compute_account(transactions, selected_id)
     valued = portfolio_value(account, block)
 except Exception as exc:
-    st.error("組合交易帳本無法對帳，為避免錯誤買賣訊號已停止分析："+str(exc))
+    st.error("組合交易帳本無法對帳，為避免錯誤買賣訊號已停止分析："+public_error(exc))
     st.stop()
 
 cols=st.columns(4)
-cols[0].metric("現金餘額", f"{valued['cash']:,.2f} {portfolio['currency']}")
-cols[1].metric("持股數", len(valued["holdings"]))
-cols[2].metric("組合估值", "無法完整估值" if valued["nav"] is None else
-               f"{valued['nav']:,.2f} {portfolio['currency']}")
-cols[3].metric("累計已實現損益", f"{valued['realized']:,.2f}")
+nav_now = valued["nav"]
+contributed = contributions_through(transactions, selected_id, date.today().isoformat())
+cumulative = None if nav_now is None or contributed <= 0 else nav_now - contributed
+cols[0].metric("帳戶淨值", "無法完整估值" if nav_now is None else f"{nav_now:,.2f} {portfolio['currency']}")
+cols[1].metric("現金", f"{valued['cash']:,.2f}")
+cols[2].metric("持股市值", "待確認" if valued["missing_prices"] else f"{valued['market_value']:,.2f}")
+cols[3].metric("累計損益", "待確認" if cumulative is None else f"{cumulative:,.2f}")
+st.caption(f"持股 {len(account['positions'])} 檔 · 已實現 {valued['realized']:,.2f} · "
+           f"淨投入 {contributed:,.2f} · 累計損益是淨值減淨投入，不是報酬率")
 
 # Maintain original private site's closing NAV chart from actual snapshots.
 # Never manufacture missing trading-day values or compute historical NAV from
@@ -177,7 +198,7 @@ cols[3].metric("累計已實現損益", f"{valued['realized']:,.2f}")
 try:
     nav_rows=store.nav_snapshots(selected_id)
 except Exception as exc:
-    st.warning("無法讀取帳戶淨值歷史；本次不顯示推估走勢："+str(exc))
+    st.warning("無法讀取帳戶淨值歷史；本次不顯示推估走勢："+public_error(exc))
     nav_rows=[]
 with st.container(border=True):
     heading,selector=st.columns([3,1],vertical_alignment="center")
@@ -195,13 +216,21 @@ with st.container(border=True):
                 {"date":pd.to_datetime(r["date"]), "nav":float(r["nav"])}
                 for r in valid
             ]).sort_values("date")
-            latest=valid[-1]
-            st.metric("最新已記錄的收盤淨值",f"{float(latest['nav']):,.2f} {portfolio['currency']}")
-            st.caption("最近有效收盤："+latest["date"]+" · 歷史數據不進行缺日補值")
-            st.line_chart(curve,x="date",y="nav",height=230,use_container_width=True)
+            latest=max(valid, key=lambda r: r["date"])
+            st.metric("最新已記錄的收盤淨值", f"{float(latest['nav']):,.2f} {portfolio['currency']}")
+            st.caption("最近有效收盤："+latest["date"]+" · 只畫已核驗的日期，不補造中間缺日")
+            st.line_chart(curve, x="date", y="nav", height=230, use_container_width=True)
+            linked=modified_dietz(transactions, selected_id, nav_rows) or []
+            if len(linked) >= 2:
+                st.caption("自 "+linked[-2]["date"]+" 至 "+linked[-1]["date"]
+                           +" 的 Modified Dietz 區間估計 "+f"{linked[-1]['subperiod_return']:+.2%}"
+                           +" · 連乘估計 "+f"{linked[-1]['modified_dietz']:+.2%}"
+                           +"。這不是標準 TWR；外部存提已從估計報酬扣除。")
+            elif linked:
+                st.caption("Modified Dietz 估計 "+f"{linked[-1]['modified_dietz']:+.2%}"
+                           +"（相對已入帳淨投入，不是標準 TWR）")
             if latest.get("twr"):
-                st.caption("累計 TWR："+f"{float(latest['twr']):+.2%}"
-                           +"（依原網站已確認的淨值基準與計算方式）")
+                st.caption("試算表原有 twr 欄留著，這次不重寫，也不把它顯示成標準 TWR。")
             with st.expander("最近完整收盤紀錄"):
                 st.dataframe([
                     {"日期":r["date"],"淨值":r["nav"],
@@ -239,8 +268,15 @@ with tab_hold:
             ],hide_index=True,use_container_width=True)
         else:
             st.caption("沒有保存的歷史個股快照。")
-    if not valued["holdings"]:
+    if not valued["holdings"] and not valued["missing_prices"]:
         st.info("目前尚未登錄持股；可以先至「交易與現金」補登。")
+    if valued["holdings"]:
+        st.dataframe([
+            {"代號":h["symbol"],"股數":f"{h['quantity']:.4f}",
+             "成本":f"{h['cost']:,.2f}","市值":f"{h['value']:,.2f}",
+             "未實現損益":f"{h['pnl']:,.2f}"}
+            for h in valued["holdings"]
+        ], hide_index=True, use_container_width=True)
     for holding in valued["holdings"]:
         with st.expander(f"{holding['symbol']}｜{holding['quantity']} 股｜"
                          f"未實現 {holding['pnl']:,.2f}", expanded=True):
@@ -287,12 +323,30 @@ with tab_plan:
             if result.get("threshold") is not None:
                 st.caption(f"B 額外加碼門檻：新候選分數必須嚴格高於 {result['threshold']}")
             if result["candidates"]:
-                st.dataframe(result["candidates"],hide_index=True,use_container_width=True)
-                st.caption("金額為當時淨值的 10% 目標值，未計入隔日實際成交滑價。"
-                           "下單前需另外確認可用現金及交易成本。")
+                st.dataframe([
+                    {"代號":c["symbol"],"名稱":c["name"],"分數":c["score"],
+                     "建議金額":f"{c['target']:,.2f}","角色":"核心" if c["role"]=="core" else "額外",
+                     "行情日":c["price_date"]}
+                    for c in result["candidates"]
+                ], hide_index=True, use_container_width=True)
+                st.caption("新買入目標是當時淨值的 10%。核心部位在現金不足 10%、但仍至少有 2% 時，"
+                           "沿用原引擎，只用剩餘現金。B 的額外部位必須有完整 10%，且分數要嚴格高於全部核心。")
             else:
                 st.caption("本方案此次不新增。")
-        st.caption("組合選擇 A 或 B 不會被自動改變；僅供你比較。")
+        st.caption("這裡只比較 A 與 B，不會改你的組合，也不會下單。")
+    if data_too_old(block["macro"]["marketAsOf"]):
+        divergence={"status":"市場研究資料已過期，暫停背離買入", "candidates":[], "hold_rule":""}
+    else:
+        divergence=divergence_plan(account, valued, block)
+    st.subheader("背離長抱｜"+divergence["status"])
+    st.caption(divergence.get("hold_rule") or "")
+    if divergence["candidates"]:
+        st.dataframe([
+            {"代號":c["symbol"],"名稱":c["name"],"分數":c["score"],
+             "建議金額":"觀望" if c["target"] is None else f"{c['target']:,.2f}",
+             "行情日":c["price_date"]}
+            for c in divergence["candidates"]
+        ], hide_index=True, use_container_width=True)
 
 with tab_trades:
     st.subheader("新增交易／存提資金")
