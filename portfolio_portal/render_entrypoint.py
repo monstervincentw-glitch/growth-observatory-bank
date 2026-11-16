@@ -94,8 +94,10 @@ def _safe_monitor():
 def monitor_loop():
     import time
     from zoneinfo import ZoneInfo
+    # Do not run a full Sheets scan on every cold start: if the server boots
+    # inside a scheduled slot the previous code ran the same monitor twice
+    # within seconds, colliding with the owner opening the app.
     time.sleep(20)
-    _safe_monitor()
     seen = set()
     zone = ZoneInfo("Asia/Taipei")
     while True:
