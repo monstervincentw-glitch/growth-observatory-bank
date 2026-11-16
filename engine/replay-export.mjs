@@ -19,11 +19,17 @@ export async function archiveResearch(folder, {market, context, batch, bars, ins
     evaluation:s.evaluation, researchRank:s.researchRank, marketEvent:s.marketEvent,
     industry:s.industry, benchmark:s.benchmark, name:s.name, features:s.features
   }]));
-  const verified=attempt.status==='published';
+  // A published TW live-research batch must NEVER be mistaken for a PIT
+  // close-time input. The primary replay accepts only RESEARCH_VERIFIED.
+  const verified=attempt.status==='published'&&(market==='US'||
+    (macro.status==='vintage_verified'&&
+     instruments.every(s=>s.marketEvent||s.evaluation.filingVerified)));
   const directory=verified?'primary-inputs':'unverified-primary-inputs';
+  const inputStatus=verified?'RESEARCH_VERIFIED':
+    attempt.status==='published'&&market==='TW'?'LIVE_RESEARCH_ONLY':'RESEARCH_REJECTED';
   await save(join(folder,directory,market),cutoff+'.json',{
     schema:1, market, cutoff, batch, observedAt:createdAt, runId:attempt.runId,
-    status:verified?'RESEARCH_VERIFIED':'RESEARCH_REJECTED', errors:attempt.errors,
+    status:inputStatus, errors:attempt.errors,
     priceBasis:'adjusted total return', benchmarks, calendar:marketDates??benchmarks.QQQ.map(b=>b.date),
     stocks, macro
   });
