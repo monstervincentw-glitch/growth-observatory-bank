@@ -76,6 +76,10 @@ class PortfolioSheets:
         if sheet is None:
             sheet = self.book.add_worksheet(title=name, rows=2000, cols=len(headers))
             sheet.append_row(headers, value_input_option="RAW")
+            # Only newly created sheets require a follow-up read. Existing
+            # worksheet headers were already verified with one batch request.
+            if sheet.row_values(1) != headers:
+                raise ValueError(f"{name} 新增後標頭驗證失敗，已停止寫入")
         elif actual_headers.get(name) != headers:
             raise ValueError(f"{name} 欄位與預期不符，已停止寫入以保護現有資料")
         return sheet
