@@ -119,14 +119,14 @@ def markets(market, block, signal_available, latest_quotes=None):
     st.caption("市場觀測使用最新正式發布的行情與已取得財報，供接下來的買賣判斷。"
                "候選不代表帳戶已下單；持股出場仍須核對實際持倉、進場時財報與交易規則。")
 
-    # One major category at a time; keep funding cards out of the chart viewport.
+    # The global funding dashboard is always visible above every bank page.
+    # This control only opens the diagnostic values without duplicating the cards.
     section = st.segmented_control(
         "市場觀測區塊", ["策略清單", "單檔圖表", "資金數據"],
         default="策略清單", key=f"market-section-{market}",
         label_visibility="collapsed",
     ) or "策略清單"
     if section == "資金數據":
-        funding_dashboard(macro)
         funding_details(macro)
         return
 
@@ -831,6 +831,13 @@ page = st.navigation([
 
 with st.container(key="bank-content"):
     header(page.title)
+    # Highest-priority global risk context: displayed before controls and tables
+    # on every bank page, using the market already selected in this session.
+    if data:
+        funding_market = MARKETS.get(st.session_state.get("bank-market", "美股"), "US")
+        funding_dashboard(data["markets"][funding_market]["macro"])
+    else:
+        st.warning("全球資金溫度資料目前無法驗證，請勿將未知狀態視為未觸發。")
     if page.title == "市場觀測":
         status, market_controls, refresh = st.columns([5, 1, 1.2], vertical_alignment="center")
     else:

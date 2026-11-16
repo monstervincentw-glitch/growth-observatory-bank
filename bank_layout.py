@@ -87,11 +87,21 @@ def funding_dashboard(macro):
             f'<dl class="bank-readings">{"".join(readings)}</dl>'
             f'<small>資料日 <b>{escape(dated)}</b></small></div></details>'
         )
+    # The published overall macro decision remains the source of truth.
+    # Never derive a reassuring state from missing category information.
+    overall_class, overall_label = {
+        "red": ("triggered", "整體紅燈"),
+        "non_red": ("clear", "整體非紅燈"),
+        "unknown": ("unknown", "整體待確認"),
+    }.get(macro.get("decision"), ("unknown", "整體待確認"))
     warning = macro.get("warning")
-    note = f'<p class="bank-funding-note" role="status">{escape(warning)}</p>' if warning else ""
+    note = f'<p class="bank-funding-note" role="status">{escape(str(warning))}</p>' if warning else ""
     st.html(
         '<section class="bank-funding" aria-label="全球資金溫度">'
+        '<div class="bank-funding-heading">'
         '<h2>全球資金溫度</h2>'
+        f'<strong class="bank-funding-overall bank-funding-overall-{overall_class}" role="status">{overall_label}</strong>'
+        '</div>'
         f'<div class="bank-funding-cards">{"".join(cards)}</div>'
         f'{note}</section>'
     )

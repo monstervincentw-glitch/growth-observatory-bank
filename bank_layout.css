@@ -141,12 +141,39 @@
 .bank-status span { white-space: nowrap; }
 .bank-status b { color: var(--bank-ink); }
 
-.bank-funding { margin-block: .7rem .35rem; }
-.bank-funding h2 { margin-bottom: .48rem; font-size: 1rem; color: var(--bank-ink); }
+/* Permanent high-priority risk strip, before every page's controls/content. */
+.bank-funding {
+  margin-block: .35rem .5rem;
+  padding: .7rem .8rem .8rem;
+  border: 1.5px solid #D8BF93;
+  border-radius: .95rem;
+  background: #FFFDF8;
+  box-shadow: 0 3px 12px rgba(84, 66, 35, .05);
+}
+.bank-funding-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  margin-bottom: .5rem;
+  flex-wrap: wrap;
+}
+.bank-funding h2 { margin: 0; font-size: 1.12rem; font-weight: 800; color: var(--bank-ink); }
+.bank-funding-overall {
+  display: inline-block;
+  padding: .22rem .65rem;
+  border: 1px solid;
+  border-radius: 999px;
+  font-size: .88rem;
+  font-weight: 800;
+}
+.bank-funding-overall-clear { background: #DCEBE4; border-color: #C4DDD1; color: #155E45; }
+.bank-funding-overall-triggered { background: #F7E2E3; border-color: #EDC7CB; color: #A02B33; }
+.bank-funding-overall-unknown { background: #E3EAF5; border-color: #D4DEED; color: #3E5579; }
 .bank-funding-cards {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: .85rem;
+  gap: .55rem;
   align-items: start;
 }
 .bank-funding-card {
@@ -172,8 +199,8 @@
 .bank-funding-card summary {
   position: relative;
   display: block;
-  padding: .65rem .9rem;
-  min-height: 6.7rem;
+  padding: .5rem .75rem;
+  min-height: 5.8rem;
   border-radius: inherit;
   list-style: none;
   cursor: pointer;
@@ -183,7 +210,7 @@
 .bank-funding-card summary::after {
   content: "";
   position: absolute;
-  inset: 1rem .95rem auto auto;
+  inset: .88rem .85rem auto auto;
   width: .42rem;
   height: .42rem;
   border-block-start: 1.5px solid currentColor;
@@ -194,8 +221,8 @@
 .bank-funding-card summary:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
 .bank-card-name, .bank-funding-card summary strong, .bank-funding-card small { display: block; }
 .bank-card-name { font-size: .86rem; font-weight: 650; }
-.bank-funding-card summary strong { font-size: 1.54rem; line-height: 1.3; letter-spacing: -.025em; }
-.bank-funding-card small { margin-top: .32rem; color: #4C5C6F; font-size: .72rem; line-height: 1.4; }
+.bank-funding-card summary strong { font-size: 1.42rem; line-height: 1.25; letter-spacing: -.025em; }
+.bank-funding-card small { margin-top: .25rem; color: #4C5C6F; font-size: .7rem; line-height: 1.35; }
 .bank-card-detail { padding: .65rem .9rem; border-top: 1px solid var(--card-border); }
 .bank-funding-card .bank-readings {
   display: grid;
