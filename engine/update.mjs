@@ -74,7 +74,10 @@ try{
     const ranks=new Map(scores.map((s,i)=>[s.key,{rank:i+1,score:s.rankScore,detail:s.rankDetail,date:context.cutoff,archived:false,divergence:evaluate(s,macro).divergence}]));
     const instruments=stocks.map(s=>({...s,evaluation:evaluate(s,macro),researchRank:ranks.get(s.key)||null}));
     const financialReview=verifyMarketInputs(instruments,before.stocks);
-    attempt.health={...financialReview.counts, macro:macro.status};
+    attempt.health={...financialReview.counts,
+      liveOnlyFinance:financialReview.warnings.length,macro:macro.status};
+    attempt.publicationBasis=market==='TW'&&financialReview.counts.filingPending>0
+      ?'LIVE_FIRST_OBSERVED_NOT_PIT':'ORIGINAL_VERIFIED_RULES';
     for (const {symbol,code} of financialReview.errors) {
       affected.add(symbol);
       financialFailed.add(symbol);
@@ -91,7 +94,9 @@ try{
       strategySignalTimes:{...Object.fromEntries(Object.entries(old.markets).map(([k,v])=>[k,v.signalAt])),[market]:now}};
     snapshot=project(dashboard,baseline,old.qa);
     attempt.status='published';
-    attempt.detail='收盤已驗證並發布排名。財報及總經狀態：'+JSON.stringify(attempt.health);
+    attempt.detail=(attempt.publicationBasis==='LIVE_FIRST_OBSERVED_NOT_PIT'
+      ?'已發布即時研究與收盤行情；新財報自首次取得後可供研究，尚未證明收盤前可得，不得直接延伸歷史回測。'
+      :'收盤已驗證並發布排名。')+'財報及總經狀態：'+JSON.stringify(attempt.health);
   }
 }catch(error){
   attempt.status='failed';
