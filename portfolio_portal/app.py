@@ -793,11 +793,12 @@ def cached_portfolio_records(research_batch):
     Clear this cache after a successful owner-authorized write.
     """
     store = private_store()
-    rows = store.all_portfolios()
+    private_rows = store.read_snapshot()
+    rows = private_rows["portfolios"]
     active = [p for p in rows if str(p.get("archived") or "").lower() != "true"]
     archived = [p for p in rows if str(p.get("archived") or "").lower() == "true"]
-    transactions = store.transactions()
-    saved_baselines = store.entry_baselines()
+    transactions = private_rows["transactions"]
+    saved_baselines = private_rows["baselines"]
     warnings = []
 
     # Historical SEC recovery is needed only for BUY lots that still lack a
@@ -829,8 +830,8 @@ def cached_portfolio_records(research_batch):
         "portfolios": active,
         "archived": archived,
         "transactions": transactions,
-        "transitions": store.exit_transitions(),
-        "nav": store.nav_snapshots(),
+        "transitions": private_rows["transitions"],
+        "nav": private_rows["nav"],
         "warnings": warnings,
     }
 
@@ -842,12 +843,23 @@ def invalidate_private_cache():
     st.session_state["_private_stale"] = False
 
 
+def is_sheets_quota_error(exc):
+    """Distinguish a temporary Google Sheets 429 from invalid credentials."""
+    response = getattr(exc, "response", None)
+    code = getattr(response, "status_code", None)
+    return code == 429 or "429" in str(exc) or "quota" in str(exc).lower()
+
+
 try:
     store = private_store()
 except Exception as exc:
-    st.error("私人 Google Sheets 尚未完成授權或設定。")
-    st.caption("請先在 Render Environment 設定擁有者信箱、私人試算表與服務帳號，並把表分享給該服務帳號。")
-    st.caption(public_error(exc))
+    if is_sheets_quota_error(exc):
+        st.error("Google Sheets 讀取次數暫時超過每分鐘額度，私人組合目前無法載入。")
+        st.caption("這不是 Google 授權或試算表設定失效；請約一分鐘後再重新整理。不要為此更換服務帳號或重建試算表。")
+    else:
+        st.error("私人 Google Sheets 無法連線或驗證設定。")
+        st.caption("請在 Render 檢查私人試算表與服務帳號權限，勿在聊天室張貼密鑰。")
+        st.caption(public_error(exc))
     st.stop()
 
 try:
@@ -864,13 +876,13 @@ try:
     st.session_state["_private_stale"] = False
 except Exception as exc:
     # 429: keep a clearly labelled read-only cached view within this session.
-    if ("429" in str(exc) or "quota" in str(exc).lower()) and "_last_good_private_snapshot" in st.session_state:
+    if is_sheets_quota_error(exc) and "_last_good_private_snapshot" in st.session_state:
         private_data = st.session_state["_last_good_private_snapshot"]
         st.session_state["_private_stale"] = True
         st.warning("Google Sheets 暫時達到讀取額度。現在顯示上次成功讀取的私人資料（僅供檢視，暫停所有寫入）。")
     else:
         st.error("讀取私人交易紀錄失敗，禁止建立建議或寫入新資料。")
-        if "429" in str(exc) or "quota" in str(exc).lower():
+        if is_sheets_quota_error(exc):
             st.caption("Google Sheets 每分鐘讀取次數已達上限，請稍後重新整理；交易及歷史淨值沒有被刪除。")
         else:
             st.caption(public_error(exc))
