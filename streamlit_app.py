@@ -118,8 +118,7 @@ def markets(market, block, signal_available, latest_quotes=None):
     st.caption(f"主策略符合個股與資金進場條件 {ready_count} 檔 · "
                f"基本面轉弱需檢查 {exit_count} 檔 · 全球資金 {funding}")
     st.caption("市場觀測使用最新正式發布的行情與已取得財報，供接下來的買賣判斷。"
-               "候選不代表帳戶已下單；持股出場仍須核對實際持倉、進場時財報與交易規則。"
-               "歷史回測另在「主策略回測」頁面。")
+               "候選不代表帳戶已下單；持股出場仍須核對實際持倉、進場時財報與交易規則。")
 
     scope_control, search_control, industry_control, order_control = st.columns(
         [1.4, 1.4, 1, 1], vertical_alignment="bottom")
@@ -678,8 +677,8 @@ def market_page():
     if market == "TW":
         shown = (quote or {}).get("day") or "待核對"
         research_day = block["macro"]["marketAsOf"]
-        st.caption(f"台股最新行情 {shown} · 市場研究批次 {research_day} · "
-                   "盤後取得的財報僅用於取得後的最新判斷，不回填過去交易。")
+        st.caption(f"台股最新行情 {shown} · 最新市場研究批次 {research_day} · "
+                   "以已取得的最新股價、財報與資金條件監測進出場。")
     markets(market, block, state["markets"][market]["usable"], quote)
 
 
