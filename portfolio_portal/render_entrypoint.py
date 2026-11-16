@@ -26,34 +26,39 @@ def conf_line(k, v):
     return f"{k} = {json.dumps(str(v), ensure_ascii=False)}"
 
 
+def _env(name):
+    return str(os.environ.get(name, "")).strip()
+
+
 def create_auth_config():
-    missing=[key for key in REQUIRED if not os.environ.get(key)]
+    missing=[key for key in REQUIRED if not _env(key)]
     if missing:
         return False
-    sa=json.loads(os.environ["GOOGLE_SERVICE_ACCOUNT_JSON"])
+    sa=json.loads(_env("GOOGLE_SERVICE_ACCOUNT_JSON"))
     if sa.get("type")!="service_account":
         raise ValueError("Invalid Google service account")
     for field in ("client_email","private_key","token_uri","project_id"):
         if not sa.get(field):
             raise ValueError("Service account missing required field")
     base=os.environ.get("PORTFOLIO_PUBLIC_URL",
-                       "https://growth-portfolio-private-v1.onrender.com").rstrip("/")
+                       "https://growth-portfolio-private-v1.onrender.com").strip().rstrip("/")
     if not base.startswith("https://"):
         raise ValueError("Google OIDC redirect must use HTTPS")
-    private_id = os.environ["PRIVATE_PORTFOLIO_SHEET_ID"]
+    private_id = _env("PRIVATE_PORTFOLIO_SHEET_ID")
     if private_id == BANK_SHEET_ID:
         raise ValueError("Refusing to use the bank research sheet as the private ledger")
     target=Path(".streamlit/secrets.toml")
     target.parent.mkdir(parents=True,exist_ok=True)
+    # Safe mode: failure generating secrets means the private app never starts.
     lines=[
-        conf_line("owner_email",os.environ["PORTFOLIO_OWNER_EMAIL"]),
+        conf_line("owner_email", _env("PORTFOLIO_OWNER_EMAIL")),
         conf_line("private_portfolio_sheet_id", private_id),
         "",
         "[auth]",
         conf_line("redirect_uri",base+"/oauth2callback"),
-        conf_line("cookie_secret",os.environ["STREAMLIT_COOKIE_SECRET"]),
-        conf_line("client_id",os.environ["GOOGLE_OIDC_CLIENT_ID"]),
-        conf_line("client_secret",os.environ["GOOGLE_OIDC_CLIENT_SECRET"]),
+        conf_line("cookie_secret", _env("STREAMLIT_COOKIE_SECRET")),
+        conf_line("client_id", _env("GOOGLE_OIDC_CLIENT_ID")),
+        conf_line("client_secret", _env("GOOGLE_OIDC_CLIENT_SECRET")),
         conf_line("server_metadata_url","https://accounts.google.com/.well-known/openid-configuration"),
         "",
         "[google_service_account]",
@@ -82,6 +87,7 @@ def _safe_monitor():
         from monitor_job import run
         run()
     except Exception as exc:
+        # Class name only: exception text can contain sheet cells or key fragments.
         print(json.dumps({"result": "monitor_error", "error": exc.__class__.__name__}), flush=True)
 
 
@@ -100,6 +106,14 @@ def monitor_loop():
         time.sleep(60)
 
 
+def streamlit_env():
+    env = os.environ.copy()
+    portal = str(Path(__file__).resolve().parent)
+    current = env.get("PYTHONPATH", "")
+    env["PYTHONPATH"] = portal if not current else portal + os.pathsep + current
+    return env
+
+
 def main():
     secure = create_auth_config()
     if secure:
@@ -112,6 +126,7 @@ def main():
          "--server.address","0.0.0.0","--server.port",port,
          "--server.headless","true"],
         check=True,
+        env=streamlit_env(),
     )
 
 
