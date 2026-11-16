@@ -26,6 +26,30 @@ st.set_page_config(page_title="我的投資組合｜私人版", page_icon="🔐"
 st.markdown("""
 <style>
 section[data-testid="stSidebar"] button { width: 100%; text-align: left; }
+/* Compact portfolio V2.1: dense monitor grid and tri-state funding cards */
+.funding-top{display:flex;justify-content:space-between;align-items:center;gap:0.7rem;flex-wrap:wrap;margin-bottom:0.75rem}
+.funding-title{font-size:1.25rem;font-weight:750;letter-spacing:.01em}
+.funding-overall{font-size:.88rem;font-weight:700;border-radius:2rem;padding:.35rem .75rem;border:1px solid #cbd5e1;background:rgba(148,163,184,.12)}
+.funding-overall.red{color:#b91c1c;background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.30)}
+.funding-overall.neutral{color:inherit;background:rgba(148,163,184,.12)}
+.funding-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+.funding-tile{border:1px solid rgba(148,163,184,.28);border-radius:.8rem;padding:.72rem .85rem;background:rgba(148,163,184,.055);min-width:0}
+.funding-tile .name{font-size:.85rem;opacity:.78}
+.funding-tile .state{font-size:1.15rem;font-weight:750;margin-top:.25rem;white-space:nowrap}
+.funding-tile.ok .state{color:#268b60}
+.funding-tile.unknown .state{color:#ad7917}
+.funding-tile.red .state{color:#c0392b}
+.funding-foot{font-size:.78rem;opacity:.66;margin-top:.5rem}
+.monitor-help{color:rgba(148,163,184,.9);font-size:.82rem}
+div[data-testid="stButton"] button[kind="secondary"]{border-radius:.7rem}
+@media (max-width:700px) {
+ .funding-cards{gap:.3rem}
+ .funding-tile{padding:.45rem .38rem;border-radius:.55rem;text-align:center}
+ .funding-tile .name{font-size:.72rem}
+ .funding-tile .state{font-size:.91rem;white-space:normal}
+ .funding-overall{font-size:.75rem}
+}
+
 @media (max-width: 700px) {
   .block-container { padding-top: 0.6rem; padding-left: 0.45rem; padding-right: 0.45rem; max-width: 100%; }
   div[data-testid="stHorizontalBlock"] { flex-wrap: wrap; gap: 0.35rem; }
@@ -97,63 +121,66 @@ def shown_review(holding, strategy, macro, market_asof):
 
 
 def show_funding(macro):
+    """Compact at-a-glance funding temperature; all technical details are optional."""
+    from html import escape
     decision = funding_decision(macro)
-    labels = {"red": "紅燈", "non_red": "非紅燈", "unknown": "未知"}
-    names = (("rates", "利率", "90 日實質利率升逾 0.50 個百分點，或政策利率升逾 0.25 個百分點。"),
-             ("conditions", "金融條件", "NFCI 高於 0，或 90 日升逾 0.25 指數點。"),
-             ("inflation", "通膨", "CPI 年增逾 4%，且近 3 個月年化高於年增率。"))
     states = macro.get("categoryStates") if isinstance(macro.get("categoryStates"), dict) else {}
-
-    def flag(raw):
-        if raw in (1, "1", True):
-            return "已觸發"
-        if raw in (0, "0", False):
-            return "未觸發"
-        return "未知"
-
-    st.subheader("全球資金溫度")
-    cols = st.columns(3)
-    for col, (key, label, rule) in zip(cols, names):
-        col.metric(label, flag(states.get(key)))
-        col.caption(rule)
     score = macro.get("scoreRange")
-    score_text = f"{score[0]}–{score[1]}" if isinstance(score, (list, tuple)) and len(score) == 2 else "無法計算"
-    st.write(f"綜合判斷：**{labels[decision]}** · 目前風險數量範圍 {score_text}")
+    score_text = f"{score[0]}–{score[1]}" if isinstance(score, (list, tuple)) and len(score) == 2 else "未知"
+    verdict = {"red": "紅燈｜觸發出場條件", "non_red": "非紅燈｜持續觀察", "unknown": "未知｜資料待確認"}.get(decision, "未知")
+    asof = escape(str(macro.get("marketAsOf") or "未知"))
+
+    def tile(key, title):
+        raw = states.get(key)
+        if raw in (1, "1", True):
+            klass, label = "red", "● 已觸發"
+        elif raw in (0, "0", False):
+            klass, label = "ok", "● 未觸發"
+        else:
+            klass, label = "unknown", "● 未知"
+        return (f'<div class="funding-tile {klass}"><div class="name">{title}</div>'
+                f'<div class="state">{label}</div></div>')
+
+    tiles = "".join(tile(key, name) for key, name in (
+        ("rates", "利率"), ("conditions", "金融條件"), ("inflation", "通膨")))
+    st.markdown(
+        '<div class="funding-top"><span class="funding-title">全球資金溫度</span>'
+        f'<span class="funding-overall {"red" if decision == "red" else "neutral"}">{verdict}</span></div>'
+        f'<div class="funding-cards">{tiles}</div>'
+        f'<div class="funding-foot">行情日 {asof}　·　風險觸發範圍 {score_text}／3</div>',
+        unsafe_allow_html=True,
+    )
     if decision == "red":
-        st.error("紅燈已達主策略出場條件。這不會自動賣出。")
+        st.error("已達主策略 A／B 資金紅燈出場條件；提醒不代表自動賣出。")
     elif decision == "unknown":
-        st.warning("未知不是綠燈，也不等於未觸發出場。")
-    else:
-        st.caption("非紅燈只代表已判定的觸發數到不了兩項，不是全綠。個股財報出場仍分開檢查。")
-    stale_market = not macro.get("marketAsOf") or data_too_old(macro["marketAsOf"])
-    st.caption("行情日 " + str(macro.get("marketAsOf") or "未知")
-               + " · 觀測 " + str(macro.get("observedAt") or macro.get("calculatedAt") or "未知")
-               + " · 規則 " + str(macro.get("ruleVersion") or "未知")
-               + " · 新鮮度 " + ("過期，只供核對" if stale_market else "仍在可核對窗口"))
-    impact = {
-        "red": "對持股：主策略 A／B 將此紅燈列入出場條件。",
-        "non_red": "對持股：資金溫度這一項未構成出場。營收與營益率仍依建倉基準單獨判斷。",
-        "unknown": "對持股：資金溫度無法判定。此項不計為未觸發，其他已證實的出場條件仍有效。",
-    }[decision]
-    st.caption(impact)
+        st.warning("資金溫度無法判定，不能視為安全。")
 
-    def level(value, digits):
-        if value in (None, ""):
-            return "未知"
-        try:
-            return f"{float(value):.{digits}f}"
-        except (TypeError, ValueError):
-            return "未知"
-
-    readings = [
-        ("實質殖利率", level(macro.get("real_yield"), 2), level(macro.get("real_yield_90d_change"), 2)),
-        ("政策利率", level(macro.get("fed_funds"), 2), level(macro.get("fed_funds_90d_change"), 2)),
-        ("NFCI", level(macro.get("financial_conditions"), 3), level(macro.get("financial_conditions_90d_change"), 3)),
-        ("CPI 年增", pct(macro.get("cpi_yoy")), "—"),
-        ("CPI 近 3 個月年化", pct(macro.get("cpi_3m_annualized")), "—"),
-    ]
-    st.dataframe([{"項目": name, "讀數": value, "90 日變化": change} for name, value, change in readings],
-                 hide_index=True, use_container_width=True)
+    with st.expander("查看資金溫度判斷規則與原始數據", expanded=False):
+        st.caption("非紅燈不等於全綠，未知不得當作未觸發。個股財報條件仍獨立評估。")
+        st.caption("利率：實質殖利率 90 日升逾 0.50 個百分點，或政策利率升逾 0.25 個百分點。")
+        st.caption("金融條件：NFCI 高於 0，或 90 日升逾 0.25 指數點。")
+        st.caption("通膨：CPI 年增逾 4%，且近 3 個月年化高於年增率。")
+        def number(value, digits=2, pct_value=False):
+            if value in (None, ""):
+                return "未知"
+            try:
+                return f"{float(value):.2%}" if pct_value else f"{float(value):.{digits}f}"
+            except (TypeError, ValueError):
+                return "未知"
+        st.dataframe([
+            {"指標": "實質殖利率", "目前值": number(macro.get("real_yield")),
+             "90 日變化": number(macro.get("real_yield_90d_change"))},
+            {"指標": "政策利率", "目前值": number(macro.get("fed_funds")),
+             "90 日變化": number(macro.get("fed_funds_90d_change"))},
+            {"指標": "金融條件 NFCI", "目前值": number(macro.get("financial_conditions"), 3),
+             "90 日變化": number(macro.get("financial_conditions_90d_change"), 3)},
+            {"指標": "CPI 年增", "目前值": number(macro.get("cpi_yoy"), pct_value=True), "90 日變化": "—"},
+            {"指標": "CPI 近 3 月年化", "目前值": number(macro.get("cpi_3m_annualized"), pct_value=True), "90 日變化": "—"},
+        ], hide_index=True, use_container_width=True)
+        st.caption("觀測 " + str(macro.get("observedAt") or macro.get("calculatedAt") or "未知")
+                   + "　·　規則 " + str(macro.get("ruleVersion") or "未知")
+                   + ("　·　資料已過期，只供核對" if not macro.get("marketAsOf")
+                      or data_too_old(macro["marketAsOf"]) else "　·　行情仍在可核對窗口"))
 
 
 def auth_gate():
@@ -295,6 +322,60 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
     with st.container(border=True):
         show_funding(macro)
 
+    if portfolio["strategy"] in ("A", "B"):
+        immediate = [h["symbol"] for h in valued["holdings"]
+                     if reviews[h["symbol"]]["status"] == "觸發出場條件"]
+        if immediate:
+            st.error("🚨 持股出場警示｜" + "、".join(immediate)
+                     + " 已觸發條件。請優先檢視下方個股監控（不會自動賣出）。")
+
+    with st.container(border=True):
+        st.subheader("淨值與績效")
+        try:
+            nav_rows = store.nav_snapshots(portfolio["id"])
+        except Exception as exc:
+            st.warning("無法讀取帳戶淨值歷史；本次不顯示推估走勢：" + public_error(exc))
+            nav_rows = []
+        period = st.selectbox("區間", ["近 30 天", "近 90 天", "近 1 年", "全部"], index=3)
+        valid = [row for row in nav_rows if row.get("date") and row.get("nav") not in (None, "")]
+        gaps = weekday_gaps([row["date"] for row in valid])
+        if gaps:
+            st.warning("以下交易日沒有已核對淨值，標為待核對，不補造：" + "、".join(gaps))
+        else:
+            st.caption("已保存的淨值日期之間，沒有其他平日缺口。缺日不會用後來的股價回填。")
+        if valid:
+            last_date = max(date.fromisoformat(row["date"]) for row in valid)
+            days = {"近 30 天": 30, "近 90 天": 90, "近 1 年": 365}.get(period)
+            shown = valid
+            if days is not None:
+                shown = [row for row in valid if date.fromisoformat(row["date"]) >= last_date - timedelta(days=days)]
+            if shown:
+                curve = pd.DataFrame([
+                    {"date": pd.to_datetime(row["date"]), "nav": float(row["nav"])} for row in shown
+                ]).sort_values("date")
+                latest = max(shown, key=lambda row: row["date"])
+                st.metric("最新已記錄的收盤淨值", money_text(Decimal(str(latest["nav"])), portfolio["currency"]))
+                st.caption("最近有效收盤：" + latest["date"] + " · 來源 " + (latest.get("source") or "未記錄")
+                           + " · 只畫已核驗的日期")
+                st.line_chart(curve, x="date", y="nav", height=230, use_container_width=True)
+                linked = modified_dietz(transactions, portfolio["id"], nav_rows) or []
+                if len(linked) >= 2:
+                    st.caption("自 " + linked[-2]["date"] + " 至 " + linked[-1]["date"]
+                               + " 的 Modified Dietz 區間估計 " + f"{linked[-1]['subperiod_return']:+.2%}"
+                               + " · 連乘估計 " + f"{linked[-1]['modified_dietz']:+.2%}"
+                               + "。這不是標準 TWR。")
+                with st.expander("交易日逐日淨值明細"):
+                    st.dataframe([
+                        {"日期": row["date"], "淨值": row["nav"], "現金": row["cash"] or "未記錄",
+                         "持股市值": row["equity_value"] or "未記錄", "累計損益": row.get("cumulative_pnl") or "未記錄",
+                         "來源": row["source"]}
+                        for row in shown
+                    ], hide_index=True, use_container_width=True)
+            else:
+                st.info("這個區間沒有已核對的歷史淨值。")
+        else:
+            st.info("尚未建立歷史淨值紀錄。排程只在每一檔都有同日可核對收盤價時才新增一列，已存在的日期不會覆蓋。")
+
     with st.container(border=True):
         st.subheader("帳戶資產總覽")
         cols = st.columns(4)
@@ -346,14 +427,43 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
             st.caption("手機可左右滑動表格。點下方個股可看建倉基準。")
 
     with st.container(border=True):
-        st.subheader("持股出場監控")
+        st.subheader("個股出場監控")
         if portfolio["strategy"] not in ("A", "B"):
-            st.info("這個組合不是主策略 A／B，不套用銀行版主策略的強制出場規則。資金與研究觀察仍會列出。")
+            st.info("非主策略 A／B：僅提供風險觀察，不套用主策略的強制出場規則。")
         if not valued["holdings"] and not valued["missing_prices"]:
-            st.caption("沒有持股可監控。")
-        for holding in valued["holdings"]:
-            review = reviews[holding["symbol"]]
-            with st.expander(holding["symbol"] + "｜" + review["status"], expanded=False):
+            st.caption("目前沒有持股。")
+        else:
+            priorities = {"觸發出場條件": 0, "無法判定": 1, "資料待確認": 1, "未觸發出場條件": 2}
+            all_holdings = sorted(valued["holdings"],
+                                  key=lambda h: (priorities.get(reviews[h["symbol"]]["status"], 2), h["symbol"]))
+            triggered = [h["symbol"] for h in all_holdings
+                         if reviews[h["symbol"]]["status"] == "觸發出場條件"]
+            unresolved = [h["symbol"] for h in all_holdings
+                          if reviews[h["symbol"]]["status"] in ("無法判定", "資料待確認")]
+            if triggered:
+                st.error("⚠️ 優先檢查： " + "、".join(triggered) + " 觸發出場條件。")
+            st.caption(f"觸發 {len(triggered)} 檔　·　待確認 {len(unresolved) + len(valued['missing_prices'])} 檔"
+                       "　·　點選代號查看完整財報與歷史監控。")
+            selection_key = "monitor_focus_" + portfolio["id"]
+            focus = st.session_state.get(selection_key)
+            buttons = st.columns(5)
+            for i, item in enumerate(all_holdings):
+                symbol = item["symbol"]
+                status = reviews[symbol]["status"]
+                icon = "🔴" if status == "觸發出場條件" else ("🟠" if status in ("無法判定", "資料待確認") else "✓")
+                short = "出場" if status == "觸發出場條件" else ("待確認" if status in ("無法判定", "資料待確認") else "正常")
+                with buttons[i % 5]:
+                    if st.button(f"{icon} {symbol} · {short}", key="monitor-" + portfolio["id"] + "-" + symbol,
+                                 type="primary" if focus == symbol else "secondary", use_container_width=True):
+                        st.session_state[selection_key] = None if focus == symbol else symbol
+                        st.rerun()
+            if valued["missing_prices"]:
+                st.warning("無法確認同日收盤價：" + "、".join(valued["missing_prices"]))
+            if focus in {h["symbol"] for h in all_holdings}:
+                holding = next(h for h in all_holdings if h["symbol"] == focus)
+                review = reviews[holding["symbol"]]
+                st.markdown("#### " + holding["symbol"] + "｜" + review["status"])
+                with st.container(border=True):
                 base = review.get("baseline") or {}
                 latest = review.get("latest") or {}
                 change = review.get("change") or {}
@@ -392,53 +502,6 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 first_lot = min(holding["lots"], key=lambda lot: (str(lot.get("at") or ""), str(lot.get("entry_filing_period") or "")))
                 if (first_lot.get("ledger_entry_growth") or first_lot.get("ledger_entry_margin")) and base.get("verification") != "OFFICIAL_FILING":
                     st.caption("原始帳本另有人工填寫的進場數字。出場判斷不採用，也沒有改寫那一列。")
-
-    with st.container(border=True):
-        st.subheader("淨值與績效")
-        try:
-            nav_rows = store.nav_snapshots(portfolio["id"])
-        except Exception as exc:
-            st.warning("無法讀取帳戶淨值歷史；本次不顯示推估走勢：" + public_error(exc))
-            nav_rows = []
-        period = st.selectbox("區間", ["近 30 天", "近 90 天", "近 1 年", "全部"], index=3)
-        valid = [row for row in nav_rows if row.get("date") and row.get("nav") not in (None, "")]
-        gaps = weekday_gaps([row["date"] for row in valid])
-        if gaps:
-            st.warning("以下交易日沒有已核對淨值，標為待核對，不補造：" + "、".join(gaps))
-        else:
-            st.caption("已保存的淨值日期之間，沒有其他平日缺口。缺日不會用後來的股價回填。")
-        if valid:
-            last_date = max(date.fromisoformat(row["date"]) for row in valid)
-            days = {"近 30 天": 30, "近 90 天": 90, "近 1 年": 365}.get(period)
-            shown = valid
-            if days is not None:
-                shown = [row for row in valid if date.fromisoformat(row["date"]) >= last_date - timedelta(days=days)]
-            if shown:
-                curve = pd.DataFrame([
-                    {"date": pd.to_datetime(row["date"]), "nav": float(row["nav"])} for row in shown
-                ]).sort_values("date")
-                latest = max(shown, key=lambda row: row["date"])
-                st.metric("最新已記錄的收盤淨值", money_text(Decimal(str(latest["nav"])), portfolio["currency"]))
-                st.caption("最近有效收盤：" + latest["date"] + " · 來源 " + (latest.get("source") or "未記錄")
-                           + " · 只畫已核驗的日期")
-                st.line_chart(curve, x="date", y="nav", height=230, use_container_width=True)
-                linked = modified_dietz(transactions, portfolio["id"], nav_rows) or []
-                if len(linked) >= 2:
-                    st.caption("自 " + linked[-2]["date"] + " 至 " + linked[-1]["date"]
-                               + " 的 Modified Dietz 區間估計 " + f"{linked[-1]['subperiod_return']:+.2%}"
-                               + " · 連乘估計 " + f"{linked[-1]['modified_dietz']:+.2%}"
-                               + "。這不是標準 TWR。")
-                with st.expander("交易日逐日淨值明細"):
-                    st.dataframe([
-                        {"日期": row["date"], "淨值": row["nav"], "現金": row["cash"] or "未記錄",
-                         "持股市值": row["equity_value"] or "未記錄", "累計損益": row.get("cumulative_pnl") or "未記錄",
-                         "來源": row["source"]}
-                        for row in shown
-                    ], hide_index=True, use_container_width=True)
-            else:
-                st.info("這個區間沒有已核對的歷史淨值。")
-        else:
-            st.info("尚未建立歷史淨值紀錄。排程只在每一檔都有同日可核對收盤價時才新增一列，已存在的日期不會覆蓋。")
 
     with st.container(border=True):
         st.subheader("交易與現金")
