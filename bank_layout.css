@@ -1,14 +1,40 @@
+/* Shared GPT Sites-inspired bank workspace — layout only, no research logic. */
+[data-testid="stAppViewContainer"] { background: #FAF9F6; color: #263344; }
+[data-testid="stHeader"] { background: rgba(250, 249, 246, .93); }
+[data-testid="stSidebar"] { background: #24364A; border-right: 1px solid #425268; }
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a {
+  border-radius: .7rem;
+  margin-block: .15rem;
+}
+[data-testid="stSidebar"] [data-testid="stSidebarNav"] a:hover {
+  background: #344A61; color: #F8E4C4;
+}
+.st-key-bank-content :is(h1, h2, h3) { color: #263344; letter-spacing: -.012em; }
+.st-key-bank-content div[data-testid="stVerticalBlockBorderWrapper"] {
+  border-color: #E7E2D9; border-radius: 1rem;
+}
+.st-key-bank-content [data-testid="stMetric"] { background: #FFFDFA; border: 1px solid #E6E1D7; border-radius: .85rem; padding: .7rem .85rem; }
+.st-key-bank-content [data-testid="stSegmentedControl"] button[aria-pressed="true"] { background: #F1DFC1; color: #61451F; }
+.st-key-bank-content [data-testid="stPopoverButton"],
+.st-key-bank-content [data-testid="stDownloadButton"] button {
+  border-radius: .75rem;
+}
+@media (max-width: 700px) {
+  [data-testid="stMainBlockContainer"]:has(.st-key-bank-content) { padding-inline: .55rem; }
+  .bank-hero { padding: .72rem .8rem; }
+}
+
 /* Bank display components. Streamlit owns the sidebar, routing and widgets. */
 .st-key-bank-content,
 .bank-sidebar-brand {
-  --bank-ink: #303849;
-  --bank-muted: #536074;
-  --bank-gold: #C5A46D;
-  --bank-deep-gold: #71562F;
-  --bank-border: #CBD3E0;
-  --bank-rule: #DDE4ED;
-  --bank-paper: #FFFFFF;
-  --bank-tint: #E8EDF4;
+  --bank-ink: #263344;
+  --bank-muted: #687586;
+  --bank-gold: #B28B53;
+  --bank-deep-gold: #795831;
+  --bank-border: #E0E1E2;
+  --bank-rule: #E9E5DD;
+  --bank-paper: #FFFDFA;
+  --bank-tint: #F4EFE6;
 }
 
 [data-testid="stMainBlockContainer"]:has(.st-key-bank-content) {
@@ -21,40 +47,41 @@
 }
 .bank-sidebar-brand {
   padding: .75rem .15rem;
-  border-bottom: 1px solid #3B4B62;
-  color: #F3F6FB;
+  border-bottom: 1px solid #52627A;
+  color: #FBF5EB;
 }
 .bank-sidebar-brand span, .bank-sidebar-brand small { display: block; }
 .bank-sidebar-brand span { font-size: 1.12rem; font-weight: 750; }
-.bank-sidebar-brand small { margin-top: .26rem; color: #B7C5D8; }
+.bank-sidebar-brand small { margin-top: .26rem; color: #D1D9E4; }
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a {
   min-height: 2.65rem;
   padding-block: .48rem;
   border-inline-start: 3px solid transparent;
   font-weight: 600;
-  color: #C4D0E1;
+  color: #DFE7F0;
 }
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a[aria-current="page"] {
-  border-inline-start-color: #D8B885;
-  background: #32445B;
-  color: #F4DDBA;
+  border-inline-start-color: #D4AA71;
+  background: #354B63;
+  color: #F7DFBA;
 }
 [data-testid="stSidebar"]:has(.bank-sidebar-brand) [data-testid="stSidebarNav"] a:focus-visible {
-  outline: 2px solid #D8B885;
+  outline: 2px solid #E4C58D;
   outline-offset: -2px;
 }
 
 .bank-hero {
   display: flex;
   flex-wrap: wrap;
-  gap: .2rem .85rem;
+  gap: .24rem 1rem;
   align-items: baseline;
-  padding: .55rem .9rem;
-  border: 1px solid var(--bank-rule);
-  border-inline-start: 3px solid var(--bank-gold);
-  border-radius: .5rem;
-  background: rgba(255, 255, 255, .72);
+  padding: .85rem 1.15rem;
+  border: 1px solid #E7DED0;
+  border-inline-start: 4px solid var(--bank-gold);
+  border-radius: .95rem;
+  background: var(--bank-paper);
   color: var(--bank-ink);
+  box-shadow: 0 3px 12px rgba(75, 64, 42, .035);
 }
 .bank-hero span { color: var(--bank-deep-gold); font-size: .84rem; font-weight: 650; }
 .bank-hero h1, .bank-funding h2, .bank-fund-heading h3 {
@@ -64,7 +91,7 @@
   letter-spacing: normal;
   overflow-wrap: anywhere;
 }
-.bank-hero h1 { font-size: 1.5rem; color: var(--bank-ink); }
+.bank-hero h1 { font-size: clamp(1.35rem, 2.2vw, 1.72rem); color: var(--bank-ink); font-weight: 770; }
 .bank-status {
   display: flex;
   flex-wrap: wrap;
@@ -76,7 +103,7 @@
 .bank-status span { white-space: nowrap; }
 .bank-status b { color: var(--bank-ink); }
 
-.bank-funding { margin-block: .55rem .25rem; }
+.bank-funding { margin-block: .7rem .35rem; }
 .bank-funding h2 { margin-bottom: .48rem; font-size: 1rem; color: var(--bank-ink); }
 .bank-funding-cards {
   display: grid;
@@ -85,30 +112,30 @@
   align-items: start;
 }
 .bank-funding-card {
-  --card-background: rgba(133, 156, 187, .17);
-  --card-border: #D9E2EF;
-  --card-status-ink: #45546E;
+  --card-background: #E3EAF5;
+  --card-border: #D4DEED;
+  --card-status-ink: #3E5579;
   min-width: 0;
   border: 1px solid var(--card-border);
-  border-radius: .75rem;
+  border-radius: .95rem;
   background: var(--card-background);
   color: var(--bank-ink);
 }
 .bank-funding-card-clear {
-  --card-background: rgba(97, 167, 125, .19);
-  --card-border: #CDDFD5;
-  --card-status-ink: #205944;
+  --card-background: #DCEBE4;
+  --card-border: #C4DDD1;
+  --card-status-ink: #155E45;
 }
 .bank-funding-card-triggered {
-  --card-background: rgba(195, 108, 101, .19);
-  --card-border: #E8CAC7;
-  --card-status-ink: #853F3B;
+  --card-background: #F7E2E3;
+  --card-border: #EDC7CB;
+  --card-status-ink: #A02B33;
 }
 .bank-funding-card summary {
   position: relative;
   display: block;
   padding: .65rem .9rem;
-  min-height: 7rem;
+  min-height: 6.7rem;
   border-radius: inherit;
   list-style: none;
   cursor: pointer;
@@ -129,7 +156,7 @@
 .bank-funding-card summary:focus-visible { outline: 2px solid currentColor; outline-offset: -3px; }
 .bank-card-name, .bank-funding-card summary strong, .bank-funding-card small { display: block; }
 .bank-card-name { font-size: .86rem; font-weight: 650; }
-.bank-funding-card summary strong { font-size: 1.44rem; line-height: 1.3; }
+.bank-funding-card summary strong { font-size: 1.54rem; line-height: 1.3; letter-spacing: -.025em; }
 .bank-funding-card small { margin-top: .32rem; color: #4C5C6F; font-size: .72rem; line-height: 1.4; }
 .bank-card-detail { padding: .65rem .9rem; border-top: 1px solid var(--card-border); }
 .bank-funding-card .bank-readings {
@@ -165,7 +192,7 @@
   padding: .62rem .85rem;
   border-left: 3px solid var(--bank-gold);
   border-radius: .25rem;
-  background: var(--bank-tint);
+  background: #FFF9F0;
   color: var(--bank-ink);
 }
 .bank-fund-heading h3 { font-size: clamp(1rem, 2.5vw, 1.28rem); color: var(--bank-ink); }
@@ -176,13 +203,13 @@
 .bank-table table {
   width: 100%;
   border: 1px solid var(--bank-border);
-  border-radius: .5rem;
+  border-radius: .78rem;
   border-collapse: separate;
   border-spacing: 0;
   background: var(--bank-paper);
   color: var(--bank-ink);
   font-size: .92rem;
-  line-height: 1.4;
+  line-height: 1.48;
   font-variant-numeric: tabular-nums;
 }
 .bank-table :is(th, td) {
@@ -200,11 +227,11 @@
   color: var(--bank-ink);
   font-weight: 700;
 }
-.bank-table tbody tr:nth-child(even) td { background: #F3F6FA; }
+.bank-table tbody tr:nth-child(even) td { background: #FAF7F1; }
 .bank-table tbody tr:last-child td { border-bottom: 0; }
 .bank-table .bank-number { text-align: right; }
-.bank-table td.bank-positive { color: #345779; font-weight: 650; }
-.bank-table td.bank-negative { color: #87423E; font-weight: 650; }
+.bank-table td.bank-positive { color: #41688E; font-weight: 650; }
+.bank-table td.bank-negative { color: #A2514B; font-weight: 650; }
 .bank-table-named td:first-child { width: 28%; font-weight: 600; }
 .bank-table-market td:nth-child(3) { width: 27%; font-weight: 600; }
 .bank-table-strategies :is(th, td):not(:first-child) { text-align: right; }
@@ -224,7 +251,7 @@
   .bank-table table, .bank-table tbody { display: block; }
   .bank-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .bank-table tbody tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: .35rem .5rem; border-bottom: 1px solid var(--bank-border); }
-  .bank-table tbody tr:nth-child(even) { background: #F3F6FA; }
+  .bank-table tbody tr:nth-child(even) { background: #FAF7F1; }
   .bank-table tbody tr:last-child { border: 0; }
   .bank-table tbody td { width: auto; padding: .3rem .35rem; border: 0; }
   .bank-table tbody td:first-child, .bank-table-market tbody td:nth-child(3) { grid-column: 1 / -1; width: auto; }
