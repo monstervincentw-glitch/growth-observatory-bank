@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from pathlib import Path
-import secrets
 import subprocess
 import sys
 
@@ -19,7 +19,7 @@ REQUIRED = [
     "GOOGLE_OIDC_CLIENT_SECRET", "STREAMLIT_COOKIE_SECRET",
     "GOOGLE_SERVICE_ACCOUNT_JSON", "PRIVATE_PORTFOLIO_SHEET_ID",
 ]
-PRIVATE_SHEET_ID = os.environ.get("PRIVATE_PORTFOLIO_SHEET_ID", "")
+BANK_SHEET_ID = "1I9Alvyhg4UZXi-AdylJN0pjiLHSMzZUleFK0vsXG1K0"
 
 
 def conf_line(k, v):
@@ -40,12 +40,14 @@ def create_auth_config():
                        "https://growth-portfolio-private-v1.onrender.com").rstrip("/")
     if not base.startswith("https://"):
         raise ValueError("Google OIDC redirect must use HTTPS")
+    private_id = os.environ["PRIVATE_PORTFOLIO_SHEET_ID"]
+    if private_id == BANK_SHEET_ID:
+        raise ValueError("Refusing to use the bank research sheet as the private ledger")
     target=Path(".streamlit/secrets.toml")
     target.parent.mkdir(parents=True,exist_ok=True)
-    # Safe mode: failure generating secrets means the private app never starts.
     lines=[
         conf_line("owner_email",os.environ["PORTFOLIO_OWNER_EMAIL"]),
-        conf_line("private_portfolio_sheet_id",PRIVATE_SHEET_ID),
+        conf_line("private_portfolio_sheet_id", private_id),
         "",
         "[auth]",
         conf_line("redirect_uri",base+"/oauth2callback"),
@@ -64,8 +66,45 @@ def create_auth_config():
     return True
 
 
+def taipei_slot(now):
+    """US research lands in the Taipei morning; TW research lands in the evening."""
+    minute = (now.hour, now.minute)
+    if minute >= (6, 40) and now.hour < 8:
+        return now.date().isoformat() + "-us"
+    if minute >= (21, 40) and now.hour < 23:
+        return now.date().isoformat() + "-tw"
+    return None
+
+
+def _safe_monitor():
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from monitor_job import run
+        run()
+    except Exception as exc:
+        print(json.dumps({"result": "monitor_error", "error": exc.__class__.__name__}), flush=True)
+
+
+def monitor_loop():
+    import time
+    from zoneinfo import ZoneInfo
+    time.sleep(20)
+    _safe_monitor()
+    seen = set()
+    zone = ZoneInfo("Asia/Taipei")
+    while True:
+        slot = taipei_slot(datetime.now(zone))
+        if slot and slot not in seen:
+            _safe_monitor()
+            seen.add(slot)
+        time.sleep(60)
+
+
 def main():
     secure = create_auth_config()
+    if secure:
+        import threading
+        threading.Thread(target=monitor_loop, daemon=True).start()
     mode = "app.py" if secure else "setup_landing.py"
     port=os.environ.get("PORT","10000")
     subprocess.run(
