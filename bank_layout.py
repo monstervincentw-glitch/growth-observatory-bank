@@ -10,10 +10,10 @@ import pandas as pd
 import streamlit as st
 
 STYLE = Path(__file__).with_name("bank_layout.css")
-INK = "#303849"
-GRID = "#DFE5EE"
-PLOT = "#FFFFFF"
-SERIES = ["#48698C", "#947341", "#657286", "#B76B64"]
+INK = "#263344"
+GRID = "#E9E5DD"
+PLOT = "#FFFDFA"
+SERIES = ["#B28B53", "#4F718F", "#688F87", "#BB736B"]
 
 # Values and their units come from the same published macro snapshot as the detail table.
 FUNDING_INDICATORS = (
