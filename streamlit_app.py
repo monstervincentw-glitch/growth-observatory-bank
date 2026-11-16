@@ -227,7 +227,7 @@ def markets(market, block, signal_available, latest_quotes=None):
                               else ["進場檢查", "持股出場檢查"]))
         readable_table(visible_rows[summary_columns], label="即時市場觀測", layout="market")
         with st.expander("本頁完整行情、產業與財報檢查明細"):
-            readable_table(visible_rows[main_columns + detail_columns],
+            readable_table(visible_rows[list(dict.fromkeys(main_columns + detail_columns))],
                            label="即時市場觀測完整明細")
         csv_button("匯出全部篩選結果 CSV", rows, f"{market}-market-watch.csv", f"export-{market}")
         st.caption("切換「單檔圖表」可查看個股走勢與評分；本頁只顯示 10 檔，匯出仍包含全部篩選結果。")
@@ -366,37 +366,68 @@ def backtest(research, nav):
     with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
         market = market_picker(st)
         rows = research[market.lower()]
-        year = st.selectbox("歷史淨值起始年", [r["start_year"] for r in reversed(rows)], key=f"curve-{market}", width=152)
-    live=primary_performance(market)
+        year = st.selectbox("歷史淨值起始年", [r["start_year"] for r in reversed(rows)],
+                            key=f"curve-{market}", width=152)
+    live = primary_performance(market)
     if live:
-        summary={(r['year'],r['variant']):r for r in live['summary']}
-        rows=[r | {f"{plan}_{field}":summary[r["start_year"],plan][field]
-                   for plan in 'AB' for field in ('cumulative','cagr','max_drawdown')} for r in rows]
-    st.subheader("A／B 歷史淨值")
-    curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
-    curve["日期"] = pd.to_datetime(curve["日期"])
-    if live:
-        updated=pd.DataFrame({plan:dict(live['curves'][f'{market}_{year}_{plan}']) for plan in 'AB'}).rename_axis("日期").reset_index()
-        updated["日期"]=pd.to_datetime(updated["日期"])
-        curve=pd.concat([curve,updated],ignore_index=True)
-    trend_chart(curve, "日期", ["A", "B"], ylabel="淨值倍數")
-    if live:
-        st.caption(f"已驗證主策略回測 · 結算 {live['through']} · GitHub 正式績效")
-        for plan in 'AB':
-            info=live['latest'][f'{market}_{year}_{plan}']
-            with st.expander(f"{plan} 版最新模擬持倉與交易"):
-                if info['positions']:
-                    table(info['positions'],label=f"{plan} 版模擬持倉")
-                if info['orders']:
-                    table(info['orders'],label=f"{plan} 版模擬交易")
-    else:
-        st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
+        summary = {(r["year"], r["variant"]): r for r in live["summary"]}
+        rows = [r | {f"{plan}_{field}": summary[r["start_year"], plan][field]
+                     for plan in "AB" for field in ("cumulative", "cagr", "max_drawdown")}
+                for r in rows]
+
+    section = st.segmented_control(
+        "回測內容區塊", ["淨值總覽", "歷年績效", "歷史研究"],
+        default="淨值總覽", key="bank-backtest-section",
+        label_visibility="collapsed",
+    ) or "淨值總覽"
+
+    if section == "淨值總覽":
+        st.subheader("A／B 歷史淨值")
+        curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
+        curve["日期"] = pd.to_datetime(curve["日期"])
+        if live:
+            updated = pd.DataFrame({
+                plan: dict(live["curves"][f"{market}_{year}_{plan}"])
+                for plan in "AB"
+            }).rename_axis("日期").reset_index()
+            updated["日期"] = pd.to_datetime(updated["日期"])
+            curve = pd.concat([curve, updated], ignore_index=True)
+        # The complete chart belongs to the first viewport, not below tables.
+        trend_chart(curve, "日期", ["A", "B"], ylabel="淨值倍數", height=305)
+        selected = next(r for r in rows if r["start_year"] == year)
+        metrics = st.columns(4, gap="small")
+        metrics[0].metric("A 累積報酬", percent(selected["A_cumulative"]))
+        metrics[1].metric("B 累積報酬", percent(selected["B_cumulative"]))
+        metrics[2].metric("A 最大回撤", percent(selected["A_max_drawdown"]))
+        metrics[3].metric("B 最大回撤", percent(selected["B_max_drawdown"]))
+        if live:
+            st.caption(f"已驗證主策略回測 · 結算 {live['through']} · GitHub 正式績效")
+            for plan in "AB":
+                info = live["latest"][f"{market}_{year}_{plan}"]
+                with st.expander(f"{plan} 版最新模擬持倉與交易"):
+                    if info["positions"]:
+                        table(info["positions"], label=f"{plan} 版模擬持倉")
+                    if info["orders"]:
+                        table(info["orders"], label=f"{plan} 版模擬交易")
+        else:
+            st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
+        if market == "TW":
+            st.caption("台股 2016–2026 起跑組為研究版；早期財報可用性與成交時點仍有限制。")
+        else:
+            st.caption("早期美股信用利差代理及財報發布時點有限制；詳見「歷年績效」。")
+        return
+
+    if section == "歷史研究":
+        legacy_backtest(market)
+        return
+
+    st.subheader("歷年回測比較")
     marks = (data or {}).get("markets", {}).get(market, {}).get("marks", {}).get(str(year))
-    estimate=conditional_marks(market)
-    if estimate and str(year) in estimate["years"] and (not marks or estimate["through"]>=marks["date"]):
-        marks={"date":estimate["through"],"portfolios":estimate["years"][str(year)]}
+    estimate = conditional_marks(market)
+    if estimate and str(year) in estimate["years"] and (not marks or estimate["through"] >= marks["date"]):
+        marks = {"date": estimate["through"], "portfolios": estimate["years"][str(year)]}
     if live:
-        marks=None
+        marks = None
     if marks:
         selected = next(row for row in rows if row["start_year"] == year)
         block = []
@@ -407,24 +438,36 @@ def backtest(research, nav):
                           "相對封存日變動": percent(row["value"] / original - 1)})
         st.caption(f"條件式持倉估值 {marks['date']} · 策略回測 2026-11-04 · 封存持股與現金固定")
         table(block, label="封存持股最新估值")
-    status=performance_status().get(market,{})
-    if status.get('status') == 'WAITING_FOR_CONTINUITY':
+    status = performance_status().get(market, {})
+    if status.get("status") == "WAITING_FOR_CONTINUITY":
         st.warning(f"主策略交易績效待銜接 · 結算 {status['through']} · 研究 {status['requested']}")
-    if market=="TW":
+    if market == "TW":
         st.warning("台股 2016–2026 起跑組為研究版。現有封存驗收沒有確認符合公告時點、財報版本及成交證據的可信起始年。")
     else:
         st.info("2006 起跑可同時參考發布時點延後情境。早期金融條件採信用利差代理，存在發布時點限制。")
         with st.expander("2006 發布時點敏感度"):
-            table([{**row,"cumulative":percent(row["cumulative"]),"cagr":percent(row["cagr"]),"max_drawdown":percent(row["max_drawdown"])} for row in research["usDelay"]], label="2006 發布時點敏感度")
-    table([{"起始年":r["start_year"],"A 累積":percent(r["A_cumulative"]),"B 累積":percent(r["B_cumulative"]),
-        "A CAGR":percent(r["A_cagr"]),"B CAGR":percent(r["B_cagr"]),"A 最大回撤":percent(r["A_max_drawdown"]),
-        "B 最大回撤":percent(r["B_max_drawdown"]),"B 額外買入":r["B_extras"]} for r in rows], label="年度回測比較")
-    csv_button("匯出每月歷史淨值",curve,f"{market}-{year}-nav.csv",f"nav-{market}")
-    report_file("年度回測比較 CSV","us-ab.csv" if market=="US" else "tw-ab-research.csv")
-    if market=="US":
-        report_file("2006 發布時點敏感度 CSV","us-2006-release-delay.csv")
-    legacy_backtest(market)
-
+            table([{**r, "cumulative": percent(r["cumulative"]),
+                    "cagr": percent(r["cagr"]), "max_drawdown": percent(r["max_drawdown"])}
+                   for r in research["usDelay"]], label="2006 發布時點敏感度")
+    table([{"起始年": r["start_year"], "A 累積": percent(r["A_cumulative"]),
+            "B 累積": percent(r["B_cumulative"]), "A CAGR": percent(r["A_cagr"]),
+            "B CAGR": percent(r["B_cagr"]), "A 最大回撤": percent(r["A_max_drawdown"]),
+            "B 最大回撤": percent(r["B_max_drawdown"]), "B 額外買入": r["B_extras"]}
+           for r in rows], label="年度回測比較")
+    with st.expander("匯出回測資料"):
+        curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
+        curve["日期"] = pd.to_datetime(curve["日期"])
+        if live:
+            updated = pd.DataFrame({
+                plan: dict(live["curves"][f"{market}_{year}_{plan}"])
+                for plan in "AB"
+            }).rename_axis("日期").reset_index()
+            updated["日期"] = pd.to_datetime(updated["日期"])
+            curve = pd.concat([curve, updated], ignore_index=True)
+        csv_button("匯出每月歷史淨值", curve, f"{market}-{year}-nav.csv", f"nav-{market}")
+        report_file("年度回測比較 CSV", "us-ab.csv" if market == "US" else "tw-ab-research.csv")
+        if market == "US":
+            report_file("2006 發布時點敏感度 CSV", "us-2006-release-delay.csv")
 
 def legacy_backtest(market):
     with st.expander("歷史研究存檔、比較基準與逐筆出場"):
