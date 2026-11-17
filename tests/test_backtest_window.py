@@ -67,7 +67,8 @@ class BacktestWindowTest(unittest.TestCase):
 
     def test_conflicting_overlapping_live_nav_refused(self):
         amended = {**LIVE, "curves": {**LIVE["curves"],
-                   "TW_2018_A": [["2020-11-04", 12.0]]}}
+                   "TW_2018_A": [["2020-11-04", 12.0], ["2020-11-05", 1.46], ["2020-11-06", 1.48]],
+                   "TW_2018_B": [["2020-11-04", 1.42], ["2020-11-05", 1.43], ["2020-11-06", 1.45]]}}
         with self.assertRaisesRegex(ValueError, "衝突"):
             cohort_window(NAV, amended, "TW", 2018, 2020)
 
