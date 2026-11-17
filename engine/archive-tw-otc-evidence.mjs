@@ -56,15 +56,28 @@ export function adaptOTCNoticeRow(raw) {
   };
 }
 
-async function jsonSource(fetcher,url){
-  const response=await fetcher(url,{headers:{Accept:'application/json'},
-    signal:AbortSignal.timeout(20000)});
-  if(!response.ok)throw Error('Official TPEx endpoint HTTP '+response.status+': '+url);
-  const body=await response.text();
-  if(body.length>15_000_000)throw Error('TPEx official response is too large');
-  const rows=JSON.parse(body);
-  if(!Array.isArray(rows)||rows.length===0)throw Error('TPEx official response is empty');
-  return {rows,hash:sha256(body)};
+async function jsonSource(fetcher,url,{pause=(ms)=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
+  // OTC endpoints sometimes stall. Retry only transient transport errors and
+  // 502/503/504. Never hammer a 429 rate limit or retry invalid JSON/schema.
+  for(let attempt=0;attempt<3;attempt++){
+    try{
+      const response=await fetcher(url,{headers:{Accept:'application/json'},
+        signal:AbortSignal.timeout(20000+15000*attempt)});
+      if(!response.ok)throw Error('Official TPEx endpoint HTTP '+response.status+': '+url);
+      const body=await response.text();
+      if(body.length>15_000_000)throw Error('TPEx official response is too large');
+      const rows=JSON.parse(body);
+      if(!Array.isArray(rows)||rows.length===0)throw Error('TPEx official response is empty');
+      return {rows,hash:sha256(body)};
+    }catch(error){
+      const msg=String(error?.message??error);
+      const transient=/timeout|aborted|ECONNRESET|fetch failed|network error|HTTP 50[234]\b/i.test(msg);
+      if(!transient||attempt===2)throw error;
+      console.warn('TPEx transient source error; retry '+(attempt+2)+' of 3 for '+url.split('/').at(-1));
+      await pause(1500*(attempt+1));
+    }
+  }
+  throw Error('Unreachable TPEx retry state');
 }
 async function existingJson(path, fallback){
   try{return JSON.parse(await readFile(path,'utf8'));}
