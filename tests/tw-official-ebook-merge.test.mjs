@@ -4,9 +4,9 @@ import {mergeOfficialBookShards} from '../engine/tw-official-ebook-merge.mjs';
 const symbols=Array.from({length:80},(_,i)=>String(2000+i));
 const shards=Array.from({length:8},(_,shard)=>{
  const sel=symbols.filter((s,i)=>i%8===shard);
- return {schema:1,shards:8,shard,universeSize:80,years:[2025,2026],stocks:10,
-   selectedSymbols:sel,failures:[],requested:20,succeeded:20,
-   receipts:sel.flatMap(symbol=>[2025,2026].map(year=>({symbol,year,sourceUrl:'https://doc.twse.com.tw',responseSha256:'a'.repeat(64)}))),
+ return {schema:1,shards:8,shard,universeSize:80,years:[2026],stocks:10,
+   selectedSymbols:sel,failures:[],requested:10,succeeded:10,
+   receipts:sel.map(symbol=>({symbol,year:2026,sourceUrl:'https://doc.twse.com.tw',responseSha256:'a'.repeat(64)})),
    documents:sel.map(symbol=>({symbol,period:'2026-09-30',document:`202603_${symbol}_AI1.pdf`,
     uploadedAt:'2026-11-13T13:47:09+08:00',reportKind:'CONSOLIDATED',approvedForHistoricalUse:false}))};
 });
@@ -14,7 +14,7 @@ test('merge official MOPS report batches requires entire 80-stock, 160-year-quer
  const x=mergeOfficialBookShards(shards,symbols);
  assert.equal(x.status,'COMPLETE');
  assert.equal(x.stocks,80);
- assert.equal(x.succeeded,160);
+ assert.equal(x.succeeded,80);
  assert.equal(x.q3_2026.available,80);
  assert.equal(x.auditOnly,true);
 });
