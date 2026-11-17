@@ -407,8 +407,8 @@ def backtest(research, nav):
 
     if section == "淨值總覽":
         conditional=conditional_nav_curve(market) if market=="TW" else None
-        if (conditional and live and conditional["anchor"]==live["through"] and
-                conditional["through"]>live["through"]):
+        if (conditional and conditional["through"]>conditional["anchor"] and
+                (not live or conditional["anchor"]==live["through"])):
             st.subheader(f"A／B 固定持倉逐日估值 · {conditional['through']}")
             st.caption(
                 f"從 {conditional['anchor']} 正式封存帳戶延伸；"
@@ -427,7 +427,7 @@ def backtest(research, nav):
                 mark_cols[idx].metric(f"{plan} 估值累積報酬",percent(info["cumulative"]))
                 mark_cols[idx+2].metric(f"{plan} 封存後估值變動",percent(info["changeSinceSeal"]))
             st.warning(
-                f"正式主策略交易回測仍結算到 {live['through']}；"
+                f"正式主策略交易回測仍結算到 {live['through'] if live else conditional['anchor']}；"
                 f"{conditional['through']} 只代表固定持股估值。"
                 "缺少 11/5–11/13 的逐日有效策略決策證據，不能把此圖說成交易策略收益。"
             )
