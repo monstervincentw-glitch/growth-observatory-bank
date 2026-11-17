@@ -428,7 +428,8 @@ def backtest(research, nav):
     ) or "淨值總覽"
 
     if section == "淨值總覽":
-        provisional=reconstructed_tw_strategy() if market=="TW" else None
+        provisional=(reconstructed_tw_strategy() if market=="TW" and
+                     (not live or live["through"]=="2026-11-04") else None)
         if provisional:
             st.subheader("A／B 策略交易重建 · 2026/11/16（非正式績效）")
             st.warning(
