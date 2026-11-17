@@ -5,7 +5,9 @@ on:
     branches: [fix/tw-filing-release-evidence-20261117]
     paths:
       - engine/archive-tw-disclosures.mjs
+      - engine/archive-tw-financial-statements.mjs
       - tests/tw-official-disclosure-archive.test.mjs
+      - tests/tw-official-financial-statements.test.mjs
       - .github/workflows/tw-filing-evidence.yml
       - .github/workflows/tw-filing-evidence-check.yml
       - .github/workflows/research-update.yml
@@ -33,7 +35,7 @@ jobs:
         with:
           node-version: '24'
       - name: Test release timestamps, no-lookahead and idempotent audit archives
-        run: node --test tests/tw-official-disclosure-archive.test.mjs
+        run: node --test tests/tw-official-disclosure-archive.test.mjs tests/tw-official-financial-statements.test.mjs
       - name: Verify no silent failure when archiving Taiwan research inputs
         shell: bash
         run: |
