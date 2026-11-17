@@ -93,9 +93,11 @@ export function compareWithOfficial(finmind,official){
   };
 }
 
-async function latestJson(folder){
+async function latestJson(folder,sourceRuns=false){
   let names;
-  try{names=(await readdir(folder)).filter(x=>/^\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort();}
+  try{names=(await readdir(folder)).filter(x=>sourceRuns
+    ? /^\d{4}-\d{2}-\d{2}--[A-Za-z0-9_-]+\.json$/.test(x)
+    : /^\d{4}-\d{2}-\d{2}\.json$/.test(x)).sort();}
   catch(e){if(e.code==='ENOENT')return null;throw e;}
   if(!names.length)return null;
   return JSON.parse(await readFile(join(folder,names.at(-1)),'utf8'));
@@ -106,7 +108,7 @@ export async function reconcileOfficialAndFinMind(researchRoot,outputRoot,now=ne
   const versions=JSON.parse(await readFile(join(researchRoot,'financial-versions','TW.json'),'utf8'));
   const symbols=Object.keys(versions).sort();
   if(symbols.length!==80)throw Error('Unexpected Taiwan stock universe');
-  const input=await latestJson(join(researchRoot,'financial-source-rows','TW'));
+  const input=await latestJson(join(researchRoot,'financial-source-rows','TW'),true);
   const listed=await latestJson(join(outputRoot,'financial-statements'));
   const otc=await latestJson(join(outputRoot,'otc-financial-statements'));
   const officialRows=[...(listed?.observations?.at(-1)?.data??[]),
