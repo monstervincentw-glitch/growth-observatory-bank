@@ -85,7 +85,8 @@ jobs:
             node engine/replay-export.mjs /tmp/performance-etf-context.json /tmp/performance-market-inputs /tmp/research-weekly.txt
           fi
       - name: Save verified inputs for the performance engine
-        continue-on-error: true
+        # This is the audit chain for future primary replay. Do not hide failed
+        # copies or pushes behind a green market-research workflow.
         shell: bash
         run: |
           if [[ -d /tmp/performance-market-inputs ]]; then
