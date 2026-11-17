@@ -1,0 +1,34 @@
+name: 台股財報電子書官方申報時分探測
+on:
+  push:
+    branches: [fix/tw-official-upload-pit-20261117]
+    paths:
+      - .github/workflows/tw-official-upload-probe.yml
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Probe exact official electronic report timestamp
+        run: |
+          node --input-type=module <<'NODE'
+          for(const symbol of ['2330','3081','6223']){
+            const url='https://doc.twse.com.tw/server-java/t57sb01?co_id='+symbol+'&colorchg=1&mtype=A&step=1&year=115';
+            try{
+              const resp=await fetch(url,{headers:{'User-Agent':'Mozilla/5.0 (compatible; audit-research/1.0)','Accept':'text/html,application/xhtml+xml','Accept-Language':'zh-TW,zh;q=0.9'},signal:AbortSignal.timeout(18000)});
+              const bin=await resp.arrayBuffer();
+              const charset=resp.headers.get('content-type')||'';
+              const decoder=/big5/i.test(charset)?'big5':'utf-8';
+              let html=new TextDecoder(decoder,{fatal:false}).decode(bin);
+              if(!html.includes('財務報告書')&&decoder==='utf-8')html=new TextDecoder('big5',{fatal:false}).decode(bin);
+              const index=html.indexOf('202603_');
+              console.log(JSON.stringify({symbol,status:resp.status,ctype:charset,length:bin.byteLength,hasReport:html.includes('財務報告書'),index,htmlExcerpt:index>=0?html.slice(Math.max(0,index-650),index+900):html.slice(0,240)}));
+            }catch(error){console.log(JSON.stringify({symbol,error:String(error)}));}
+          }
+          NODE
