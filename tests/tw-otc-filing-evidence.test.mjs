@@ -58,3 +58,24 @@ test('official OTC financial outage blocks archival and is not silently reported
   }),/HTTP 429/);
  } finally{await rm(root,{recursive:true,force:true});}
 });
+
+test('official TPEx transient timeout retries once and still archives exact values',async()=>{
+ const root=await mkdtemp(join(tmpdir(),'otc-retry-'));
+ try{
+  await writeFile(join(root,'registry.json'),JSON.stringify(Object.fromEntries(universe.map(s=>[s,{}]))));
+  let statementRequests=0;
+  const fetcher=async url=>{
+    if(url===OTC_FINANCIALS&&++statementRequests===1)
+      throw new Error('The operation was aborted due to timeout');
+    return {ok:true,text:async()=>JSON.stringify(url===OTC_FINANCIALS?[financial]:[disclosure])};
+  };
+  const report=await archiveOTC(join(root,'registry.json'),join(root,'data'),{
+    fetcher,clock:()=>new Date('2026-11-17T03:40:00Z')
+  });
+  assert.equal(statementRequests,2);
+  assert.equal(report.matchedFinancialStatements,1);
+  assert.equal(report.noticeCount,1);
+  const file=JSON.parse(await readFile(join(root,'data','otc-financial-statements','2026-11-17.json'),'utf8'));
+  assert.equal(file.observations[0].data[0].eligibleForHistoricalPointInTimeBacktest,false);
+ }finally{await rm(root,{recursive:true,force:true});}
+});
