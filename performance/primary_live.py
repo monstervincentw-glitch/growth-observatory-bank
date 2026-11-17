@@ -36,6 +36,7 @@ def load_archive(inputs, market, days):
     historical_tw = {
         '2026-11-04','2026-11-05','2026-11-06','2026-11-09',
         '2026-11-10','2026-11-11','2026-11-12','2026-11-13',
+        '2026-11-16',
     }
     for date in days:
         day = str(date.date())
