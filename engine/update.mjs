@@ -132,7 +132,12 @@ if(archiveDir&&observations){
     Object.assign(attempt,info);
     if(market==='TW'&&attempt.status==='failed'&&info.quoteCount===attempt.expected&&financialFailed.size===attempt.failed&&attempt.failed>0)
       attempt.status='quotes_only';
-  }catch(error){console.warn('Market observation archive: '+String(error.message||error));}
+  }catch(error){
+      // A failed archive is a blocking provenance failure for TW replay:
+      // previously this warning was ignored and entire trading dates vanished.
+      if(market==='TW')throw error;
+      console.warn('Market observation archive: '+String(error.message||error));
+    }
 }
 const priorAttempts=prior.attempts??(prior.attempt?.market?{[prior.attempt.market]:prior.attempt}:{});
 await writeFile(outputPath,JSON.stringify({snapshot,rows,attempt,attempts:{...priorAttempts,[market]:attempt}})+'\n');
