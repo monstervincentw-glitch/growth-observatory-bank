@@ -69,7 +69,7 @@ export function chooseQuarterDocuments(rows){
  }
  return [...map.values()].sort((a,b)=>a.symbol.localeCompare(b.symbol)||a.period.localeCompare(b.period));
 }
-export async function archiveOfficialBooks(registryPath,output,{years=[2025,2026],fetcher=fetch,
+export async function archiveOfficialBooks(registryPath,output,{years=[2026],fetcher=fetch,
  clock=()=>new Date(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),shard=0,shards=1}={}){
  const registry=JSON.parse(await readFile(registryPath,'utf8'));
  const symbols=Object.keys(registry).filter(x=>/^\d{4}$/.test(x)).sort();
@@ -106,10 +106,10 @@ export async function archiveOfficialBooks(registryPath,output,{years=[2025,2026
          else await sleep(500);
        }
      }
-     await sleep(200);
+     await sleep(600);
    }
  }
- await Promise.all([worker(),worker(),worker()]);
+ await worker();
  const byYear={};
  for(const record of records){
    const y=record.period.slice(0,4);
