@@ -54,7 +54,7 @@ jobs:
             git show "FETCH_HEAD:financial-versions/$MARKET.json" > /tmp/financial-versions.json
           fi
       - name: Check live research cannot bypass historical replay guards
-        run: node --test tests/live-research-separation.test.mjs
+        run: node --test tests/live-research-separation.test.mjs tests/tw-financial-reconciliation.test.mjs
       - name: Calculate and validate research
         env:
           PERFORMANCE_INPUT_DIR: /tmp/performance-market-inputs

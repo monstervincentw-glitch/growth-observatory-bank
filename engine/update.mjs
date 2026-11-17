@@ -42,13 +42,14 @@ try{
     const stocks=[];
     const bars={};
     const errors=[];
-    observations={market,context,stocks,previous:before.stocks,bars};
+    observations={market,context,stocks,previous:before.stocks,bars,financialAudit:{}};
     for(let n=0;n<before.stocks.length;n+=3){
       const group=before.stocks.slice(n,n+3);
       const results=await Promise.allSettled(group.map(stock=>refreshInstrument(stock,context,false,[],type=>report(type,stock.symbol),market==='TW')));
       for(const [i,result] of results.entries()){
         if(result.status==='fulfilled'){
-          const {_bars,...data}=result.value;
+          const {_bars,_financialAudit,...data}=result.value;
+          if(_financialAudit)observations.financialAudit[data.symbol]=_financialAudit;
           stocks.push(data);
           if(_bars)bars[data.symbol]=_bars;
           attempt.updated++;
