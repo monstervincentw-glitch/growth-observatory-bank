@@ -1,0 +1,53 @@
+name: 台股逐日財報可得性與價格缺口稽核
+on:
+  push:
+    branches: [fix/tw-pit-daily-availability-matrix-20261117, main]
+    paths:
+      - engine/tw-pit-daily-availability.mjs
+      - tests/tw-pit-daily-availability.test.mjs
+      - .github/workflows/tw-pit-daily-availability.yml
+  workflow_run:
+    workflows: [台股財報電子書原始上傳時間驗證]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: research-publish
+  cancel-in-progress: false
+jobs:
+  matrix:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test official PDF-availability and quote-date audit guards
+        run: node --test tests/tw-pit-daily-availability.test.mjs
+      - name: Load official upload and market price observations
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          git fetch --depth=1 origin research-data
+          git worktree add --detach /tmp/research-data FETCH_HEAD
+          test -s /tmp/research-data/filing-evidence/TW/official-book-upload-review-2026-11-17.json
+          test -s /tmp/research-data/observed-primary-inputs/TW/2026-11-16.json
+      - name: Generate 11/5–11/16 strict historical document availability matrix
+        if: github.ref == 'refs/heads/main'
+        run: |
+          node engine/tw-pit-daily-availability.mjs /tmp/research-data /tmp/research-data/filing-evidence/TW/official-book-upload-review-2026-11-17.json /tmp/research-data/filing-evidence/TW/daily-availability
+      - name: Preserve separate evidence matrix without changing formal backtest
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/research-data add filing-evidence/TW/daily-availability/
+          if ! git -C /tmp/research-data diff --cached --quiet; then
+            git -C /tmp/research-data commit -m "Audit historical TW financial PDF visibility and daily close availability"
+            git -C /tmp/research-data push origin HEAD:refs/heads/research-data
+          fi
