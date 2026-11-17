@@ -70,11 +70,13 @@ export function chooseQuarterDocuments(rows){
  return [...map.values()].sort((a,b)=>a.symbol.localeCompare(b.symbol)||a.period.localeCompare(b.period));
 }
 export async function archiveOfficialBooks(registryPath,output,{years=[2025,2026],fetcher=fetch,
- clock=()=>new Date(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}){
+ clock=()=>new Date(),sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),shard=0,shards=1}={}){
  const registry=JSON.parse(await readFile(registryPath,'utf8'));
  const symbols=Object.keys(registry).filter(x=>/^\d{4}$/.test(x)).sort();
- if(symbols.length!==80)throw Error('Expected complete 80-stock research universe');
- const at=clock().toISOString(),cases=years.flatMap(year=>symbols.map(symbol=>({year,symbol})));
+ if(symbols.length!==80||!Number.isInteger(shard)||!Number.isInteger(shards)||shards<1||shard<0||shard>=shards)
+   throw Error('Expected 80 tracked symbols and valid independent MOPS shard');
+ const selectedSymbols=symbols.filter((s,i)=>i%shards===shard);
+ const at=clock().toISOString(),cases=years.flatMap(year=>selectedSymbols.map(symbol=>({year,symbol})));
  const records=[],failures=[],receipts=[];
  // Slow bounded concurrency avoids creating a burst of hundreds of requests.
  let next=0;
@@ -116,23 +118,24 @@ export async function archiveOfficialBooks(registryPath,output,{years=[2025,2026
  const selected=chooseQuarterDocuments(records);
  const latest=selected.filter(r=>r.period==='2026-09-30');
  const result={schema:1,generatedAt:at,status:failures.length?'PARTIAL':'COMPLETE',
-   years,stocks: symbols.length,requested:cases.length,succeeded:receipts.length,
+   shard,shards,years,stocks:selectedSymbols.length,selectedSymbols,universeSize:80,
+   requested:cases.length,succeeded:receipts.length,
    failures,receipts:receipts.sort((a,b)=>a.symbol.localeCompare(b.symbol)||a.year-b.year),
    selected,documents:records.sort((a,b)=>a.symbol.localeCompare(b.symbol)||a.period.localeCompare(b.period)),
    q3_2026:{available:latest.length,publishedByClose:latest.filter(x=>x.uploadedAt<='2026-11-16T13:30:00+08:00').length,
-     notYetObserved:symbols.filter(s=>!latest.some(x=>x.symbol===s))},
+     notYetObserved:selectedSymbols.filter(s=>!latest.some(x=>x.symbol===s))},
    auditOnly:true,
    caution:'A PDF upload timestamp cannot authenticate a reconstructed FinMind numeric version or transaction without original-version evidence.'
  };
  await mkdir(output,{recursive:true});
- await writeFile(join(output,'official-book-upload-review-2026-11-17.json'),
+ await writeFile(join(output,`official-book-upload-review-2026-11-17.shard-${shard}.json`),
    JSON.stringify(result,null,2)+'\n');
  return {status:result.status,requested:result.requested,success:result.succeeded,
    documents:records.length,selected: selected.length,q3:result.q3_2026,failed:failures.slice(0,15)};
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
- const [, ,registry,destination]=process.argv;
- archiveOfficialBooks(registry,destination)
+ const [, ,registry,destination,shardRaw='0',shardsRaw='1']=process.argv;
+ archiveOfficialBooks(registry,destination,{shard:Number(shardRaw),shards:Number(shardsRaw)})
   .then(x=>{console.log(JSON.stringify(x));if(x.status!=='COMPLETE')process.exitCode=1;})
   .catch(e=>{console.error(e);process.exitCode=1;});
 }
