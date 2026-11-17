@@ -16,6 +16,10 @@ on:
     # Next-morning recheck captures announcements after the evening collection.
     - cron: '45 0 * * 1-6'
   workflow_dispatch:
+  workflow_run:
+    workflows: ["收盤研究更新"]
+    types: [completed]
+    branches: [main]
 
 permissions:
   contents: write
@@ -28,6 +32,9 @@ concurrency:
 
 jobs:
   archive-twse-disclosures:
+    # Reconcile immediately after a successful research run. Failed research
+    # must never be mistaken for a successful source observation.
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
