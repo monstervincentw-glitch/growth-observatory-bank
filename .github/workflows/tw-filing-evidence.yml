@@ -1,6 +1,11 @@
 name: 台股官方公告時間存檔
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - engine/archive-tw-disclosures.mjs
+      - .github/workflows/tw-filing-evidence.yml
   schedule:
     # Monday-Friday 21:45 Asia/Taipei (13:45 UTC).
     - cron: '45 13 * * 1-5'
