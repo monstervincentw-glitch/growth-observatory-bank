@@ -44,12 +44,14 @@ def load_archive(inputs, market, days):
         if not path.exists():
             path = folder/f'{day}.json'
         historical = False
-        if not path.exists() and market=='TW' and day in historical_tw:
-            # Historical backtests are by nature calculated later. Use the
-            # archived official PDF upload times to select each day's fiscal
-            # vintage, but never pretend these are live-captured market files.
-            path = inputs/'reconstructed-primary-inputs'/'TW'/f'{day}.json'
-            historical = path.exists()
+        if market=='TW' and day in historical_tw:
+            # A consistent historical fiscal vintage (from the original PDF
+            # upload day) is used across the whole initial 11/04–11/16 span.
+            # From the next close onward, use the regular daily input stream.
+            candidate = inputs/'reconstructed-primary-inputs'/'TW'/f'{day}.json'
+            if candidate.exists():
+                path = candidate
+                historical = True
         if path.exists():
             data = json.loads(path.read_text())
             if data.get('market')!=market or data.get('cutoff')!=day:
