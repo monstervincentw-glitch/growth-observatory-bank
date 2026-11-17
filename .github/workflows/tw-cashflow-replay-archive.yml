@@ -1,0 +1,46 @@
+name: 台股回測歷史營業現金流來源存檔
+on:
+  push:
+    branches: [fix/tw-replay-finmind-source-cashflow-20261117, main]
+    paths:
+      - engine/tw-cashflow-replay-source.mjs
+      - tests/tw-cashflow-replay-source.test.mjs
+      - .github/workflows/tw-cashflow-replay-archive.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: research-publish
+  cancel-in-progress: false
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test cashflow source freshness and integrity safeguards
+        run: node --test tests/tw-cashflow-replay-source.test.mjs
+      - name: Load audit branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git fetch --depth=1 origin research-data
+          git worktree add --detach /tmp/research-data FETCH_HEAD
+      - name: Capture original quarterly operating cashflow from FinMind
+        if: github.ref == 'refs/heads/main'
+        run: |
+          node engine/tw-cashflow-replay-source.mjs /tmp/research-data/financial-versions/TW.json /tmp/research-data/filing-evidence/TW/replay-source
+      - name: Preserve observed vendor cashflow rows without changing the strategy release
+        if: always() && github.ref == 'refs/heads/main'
+        run: |
+          if [[ -f /tmp/research-data/filing-evidence/TW/replay-source/cashflow-reconstructed-2026-11-17.json ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C /tmp/research-data add filing-evidence/TW/replay-source/
+            if ! git -C /tmp/research-data diff --cached --quiet; then
+              git -C /tmp/research-data commit -m "Store historical FinMind cashflow inputs with actual acquisition time"
+              git -C /tmp/research-data push origin HEAD:refs/heads/research-data
+            fi
+          fi
