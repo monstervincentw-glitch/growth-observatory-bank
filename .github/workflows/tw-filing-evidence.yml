@@ -59,6 +59,18 @@ jobs:
         # This records first-seen official figures, not each issuer's exact
         # original filing timestamp. Never auto-approve strategy replay.
         run: node engine/archive-tw-financial-statements.mjs /tmp/research-data/financial-versions/TW.json /tmp/research-data/filing-evidence/TW
+      - name: Commit verified TWSE observations before starting OTC network requests
+        # OTC timeout must never discard already validated listed-company evidence.
+        # If OTC later fails, this workflow STILL fails visibly.
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/research-data add filing-evidence/TW/
+          if ! git -C /tmp/research-data diff --cached --quiet; then
+            git -C /tmp/research-data commit -m "Preserve verified TWSE disclosure and financial observation"
+            git -C /tmp/research-data push origin HEAD:refs/heads/research-data
+          fi
       - name: Archive official TPEx OTC quarterly statements and disclosure timestamps
         # Listed and OTC are different exchanges and APIs.
         # Missing OTC data is a visible failure, never treated as company non-filing.
