@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "market": "TW",
+  "anchor": "2026-11-04",
+  "through": "2026-11-16",
+  "status": "COMPLETE_RESEARCH_RECONSTRUCTION",
+  "dates": [
+    {
+      "date": "2026-11-04",
+      "stocks": 80,
+      "issues": 0
+    },
+    {
+      "date": "2026-11-05",
+      "stocks": 80,
+      "issues": 0
+    },
+    {
+      "date": "2026-11-06",
+      "stocks": 80,
+      "issues": 0
+    },
+    {
+      "date": "2026-11-09",
+      "stocks": 80,
+      "issues": 0
+    },
+    {
+      "date": "2026-11-10",
+      "stocks": 80,
+      "issues": 0
+    },
+    {
+      "date": "2026-11-11",
+      "stocks": 80,
+      "issues": 0
+    },
+    {
+      "date": "2026-11-12",
+      "stocks": 80,
+      "issues": 0
+    },
+    {
+      "date": "2026-11-13",
+      "stocks": 80,
+      "issues": 0
+    },
+    {
+      "date": "2026-11-16",
+      "stocks": 80,
+      "issues": 0
+    }
+  ],
+  "sourceObservedAt": "2026-11-17T05:05:02.259Z",
+  "officialDocumentUploadTimesVerified": true,
+  "historicalPricesPresent": true,
+  "contemporaneousFinancialNumbersVerified": false,
+  "strategyTradingReplayVerified": false
+}
