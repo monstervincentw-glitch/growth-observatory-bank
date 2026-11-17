@@ -1,0 +1,33 @@
+name: 櫃買中心官方財報來源檢查
+
+on:
+  push:
+    branches: [fix/tw-otc-filing-evidence-20261117]
+
+permissions:
+  contents: read
+
+jobs:
+  probe-official-otc:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check official TPEx financial statement and material-news endpoints
+        run: |
+          node --input-type=module <<'NODE'
+          for(const [kind,url] of [
+            ['financial','https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci'],
+            ['disclosure','https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap04_O']
+          ]){
+            const resp=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(15000)});
+            if(!resp.ok)throw Error(kind+' HTTP '+resp.status);
+            const data=await resp.json();
+            if(!Array.isArray(data)||data.length===0)throw Error(kind+' malformed or empty');
+            const head=data[0];
+            console.log(JSON.stringify({kind,count:data.length,columns:Object.keys(head).slice(0,12),hasTimeField:Object.keys(head).some(k=>k.includes('時間'))}));
+          }
+          NODE
