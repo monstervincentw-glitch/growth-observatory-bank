@@ -28,7 +28,7 @@ jobs:
               let html=new TextDecoder(decoder,{fatal:false}).decode(bin);
               if(!html.includes('財務報告書')&&decoder==='utf-8')html=new TextDecoder('big5',{fatal:false}).decode(bin);
               const index=html.indexOf('202603_');
-              console.log(JSON.stringify({symbol,status:resp.status,ctype:charset,length:bin.byteLength,hasReport:html.includes('財務報告書'),index,excerpt:index>=0?html.slice(Math.max(0,index-150),index+380).replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').slice(0,370):html.slice(0,200).replace(/<[^>]*>/g,' ')}));
+              console.log(JSON.stringify({symbol,status:resp.status,ctype:charset,length:bin.byteLength,hasReport:html.includes('財務報告書'),index,htmlExcerpt:index>=0?html.slice(Math.max(0,index-650),index+900):html.slice(0,240)}));
             }catch(error){console.log(JSON.stringify({symbol,error:String(error)}));}
           }
           NODE
