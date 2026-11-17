@@ -3,6 +3,7 @@ from hashlib import sha256
 import json
 import math
 from pathlib import Path
+from conditional_curve import build_conditional_curve
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -55,6 +56,8 @@ def mark_valuation(inputs, release, output, market):
     latest = directory/'latest.json'
     prior = json.loads(latest.read_text()) if latest.exists() else None
     if prior and days[-1]<=prior['through']:
+        if market=='TW':
+            build_conditional_curve(directory, baseline, market, expected_dates=days)
         return prior['through']
     from production import save
     groups = {}
@@ -70,4 +73,6 @@ def mark_valuation(inputs, release, output, market):
             years={year:[value(a,day) for a in accounts] for year,accounts in groups.items()})
         save(directory/'sessions'/f'{day}.json',result)
     save(latest,result)
+    if market=='TW':
+        build_conditional_curve(directory, baseline, market, expected_dates=days)
     return result['through']
