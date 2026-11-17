@@ -1,14 +1,19 @@
-name: 台股日策略重建來源檢查
+name: 台股原策略交易重建與隔離研究報告
 on:
   push:
-    branches: [fix/tw-historical-replay-reconstruct-20261117]
+    branches: [fix/tw-historical-replay-reconstruct-20261117, main]
     paths:
       - .github/workflows/tw-replay-schema-probe.yml
       - engine/tw-rebuild-research-inputs.mjs
       - tests/tw-rebuild-research-inputs.test.mjs
       - performance/tw_provisional_replay.py
+      - streamlit_app.py
+  workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
+concurrency:
+  group: research-publish
+  cancel-in-progress: false
 jobs:
   probe:
     runs-on: ubuntu-latest
@@ -46,6 +51,30 @@ jobs:
           cp /tmp/reconstructed-audit/2026-*.json /tmp/research-data/reconstructed-primary-inputs/TW/
           cp /tmp/reconstructed-audit/status.json /tmp/research-data/filing-evidence/TW/reconstructed-daily/status.json
           python performance/tw_provisional_replay.py /tmp/research-data /tmp/provisional-simulation
+          python -m py_compile streamlit_app.py
+      - name: Publish clearly labeled reconstruction separately from verified performance
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          mkdir -p /tmp/research-data/reconstructed-primary/TW
+          cp -R /tmp/provisional-simulation/. /tmp/research-data/reconstructed-primary/TW/
+          node - <<'NODE'
+          const fs=require('fs');
+          const doc=JSON.parse(fs.readFileSync('/tmp/research-data/reconstructed-primary/TW/release.json'));
+          if(doc.status!=='RECONSTRUCTED_TRADES_NUMERIC_VINTAGE_PENDING'||
+            doc.verifiedOfficialTradingPerformance!==false||
+            doc.historicalVendorValuesAtOriginalCloseVerified!==false||
+            doc.through!=='2026-11-16'||doc.summary.length!==22)
+            throw Error('Never publish an incomplete or falsely verified retrospective Taiwan replay');
+          NODE
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/research-data add reconstructed-primary-inputs/TW/ \
+            filing-evidence/TW/reconstructed-daily/ reconstructed-primary/TW/
+          if ! git -C /tmp/research-data diff --cached --quiet; then
+            git -C /tmp/research-data commit -m "Publish separate Taiwan A/B reconstructed research replay to Nov 16"
+            git -C /tmp/research-data push origin HEAD:refs/heads/research-data
+          fi
       - name: Show fiscal and price-history structure without source data dumps
         run: |
           node --input-type=module <<'NODE'
