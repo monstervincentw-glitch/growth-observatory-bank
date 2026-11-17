@@ -335,6 +335,31 @@ def conditional_marks(market):
 
 
 @st.cache_data(ttl=90, show_spinner=False)
+def conditional_nav_curve(market):
+    """Post-seal fixed-position values: never treated as verified trade P&L."""
+    try:
+        doc=fetch_published(f"primary-marks/{market}/curve.json")
+        years=range(2006 if market=="US" else 2016,2027)
+        expected={f"{market}_{year}_{plan}" for year in years for plan in "AB"}
+        if (doc.get("schema")!=1 or doc.get("market")!=market or
+            doc.get("status")!="CONDITIONAL_FIXED_HOLDINGS" or
+            doc.get("noPostAnchorTrading") is not True or
+            doc.get("tradingReplayVerified") is not False or
+            set(doc.get("curves",{}))!=expected or
+            set(doc.get("latest",{}))!=expected or
+            doc.get("accountCount")!=len(expected)):
+            return None
+        for name,points in doc["curves"].items():
+            if (len(points)<2 or points[0][0]!=doc["anchor"] or points[-1][0]!=doc["through"] or
+                any(len(p)!=2 or not isinstance(p[1],(float,int)) or p[1]<=0 for p in points) or
+                [p[0] for p in points]!=sorted({p[0] for p in points})):
+                return None
+        return doc
+    except (OSError, ValueError, TypeError, KeyError):
+        return None
+
+
+@st.cache_data(ttl=90, show_spinner=False)
 def performance_status():
     try:
         payload = fetch_published('status.json')
@@ -381,7 +406,32 @@ def backtest(research, nav):
     ) or "淨值總覽"
 
     if section == "淨值總覽":
-        st.subheader("A／B 歷史淨值")
+        conditional=conditional_nav_curve(market) if market=="TW" else None
+        if (conditional and live and conditional["anchor"]==live["through"] and
+                conditional["through"]>live["through"]):
+            st.subheader(f"A／B 固定持倉逐日估值 · {conditional['through']}")
+            st.caption(
+                f"從 {conditional['anchor']} 正式封存帳戶延伸；"
+                "保留當時持股與現金、逐日以已核對收盤價重新估值。"
+                "**沒有納入封存後買賣、成本或訊號，因此不是主策略正式續算。**"
+            )
+            estimate=pd.DataFrame({
+                plan:dict(conditional["curves"][f"{market}_{year}_{plan}"])
+                for plan in "AB"
+            }).rename_axis("日期").reset_index()
+            estimate["日期"]=pd.to_datetime(estimate["日期"])
+            trend_chart(estimate,"日期",["A","B"],ylabel="固定持倉估值倍數",height=255)
+            mark_cols=st.columns(4,gap="small")
+            for idx,plan in enumerate("AB"):
+                info=conditional["latest"][f"{market}_{year}_{plan}"]
+                mark_cols[idx].metric(f"{plan} 估值累積報酬",percent(info["cumulative"]))
+                mark_cols[idx+2].metric(f"{plan} 封存後估值變動",percent(info["changeSinceSeal"]))
+            st.warning(
+                f"正式主策略交易回測仍結算到 {live['through']}；"
+                f"{conditional['through']} 只代表固定持股估值。"
+                "缺少 11/5–11/13 的逐日有效策略決策證據，不能把此圖說成交易策略收益。"
+            )
+        st.subheader("A／B 正式主策略歷史淨值")
         curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
         curve["日期"] = pd.to_datetime(curve["日期"])
         if live:
@@ -425,8 +475,8 @@ def backtest(research, nav):
     estimate = conditional_marks(market)
     if estimate and str(year) in estimate["years"] and (not marks or estimate["through"] >= marks["date"]):
         marks = {"date": estimate["through"], "portfolios": estimate["years"][str(year)]}
-    if live:
-        marks = None
+    # A new verified strategy release does not invalidate the separately
+    # labeled fixed-position marks. Never replace the strategy P&L with marks.
     if marks:
         selected = next(row for row in rows if row["start_year"] == year)
         block = []
@@ -751,6 +801,7 @@ def clear_research_caches():
     performance_status.clear()
     primary_performance.clear()
     conditional_marks.clear()
+    conditional_nav_curve.clear()
     market_prices.clear()
     snapshot.clear()
     runner_attempts.clear()
