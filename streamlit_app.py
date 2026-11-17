@@ -428,65 +428,7 @@ def backtest(research, nav):
     ) or "淨值總覽"
 
     if section == "淨值總覽":
-        provisional=(reconstructed_tw_strategy() if market=="TW" and
-                     (not live or live["through"]=="2026-11-04") else None)
-        if provisional:
-            st.subheader("A／B 策略交易重建 · 2026/11/16（非正式績效）")
-            st.warning(
-                "這段曲線有依原 A／B 買賣規則重算 11/5–11/16 的交易。"
-                "財報電子書上傳時分秒及每日股價已核對，但部分財務數字是 11/17 才從 FinMind 重新取得，"
-                "尚未與各季當時公告的原始版本逐項核對。"
-                "**因此是事後重建試算，不可視為已驗證的歷史策略報酬。**"
-            )
-            original=next(r for r in rows if r["start_year"]==year)
-            rebuilt=pd.DataFrame({
-                plan:dict([("2026-11-04",1+original[f"{plan}_cumulative"]),
-                           *provisional["curves"][f"TW_{year}_{plan}"]])
-                for plan in "AB"
-            }).rename_axis("日期").reset_index()
-            rebuilt["日期"]=pd.to_datetime(rebuilt["日期"])
-            trend_chart(rebuilt,"日期",["A","B"],ylabel="交易重建淨值倍數",height=265)
-            outcomes={(r["year"],r["variant"]):r for r in provisional["summary"]}
-            m=st.columns(4,gap="small")
-            for i,plan in enumerate("AB"):
-                item=outcomes[(year,plan)]
-                m[i].metric(f"{plan} 重建累積報酬",percent(item["cumulative"]))
-                m[i+2].metric(f"{plan} 重建最大回撤",percent(item["max_drawdown"]))
-            with st.expander("交易重建持倉與新增訂單（僅供研究）"):
-                for plan in "AB":
-                    latest=provisional["latest"][f"TW_{year}_{plan}"]
-                    if latest["orders"]:
-                        table(latest["orders"],label=f"{plan} 重建成交明細")
-                    if latest["positions"]:
-                        table(latest["positions"],label=f"{plan} 重建最新持股")
-            st.caption("這是依保守次一交易日財報生效規則重跑的獨立研究結果；"
-                       "正式主策略歷史回測仍依 11/4 的原封存數字呈現。")
-        conditional=conditional_nav_curve(market) if market=="TW" else None
-        if (conditional and conditional["through"]>conditional["anchor"] and
-                (not live or conditional["anchor"]==live["through"])):
-            st.subheader(f"A／B 固定持倉逐日估值 · {conditional['through']}")
-            st.caption(
-                f"從 {conditional['anchor']} 正式封存帳戶延伸；"
-                "保留當時持股與現金、逐日以已核對收盤價重新估值。"
-                "**沒有納入封存後買賣、成本或訊號，因此不是主策略正式續算。**"
-            )
-            estimate=pd.DataFrame({
-                plan:dict(conditional["curves"][f"{market}_{year}_{plan}"])
-                for plan in "AB"
-            }).rename_axis("日期").reset_index()
-            estimate["日期"]=pd.to_datetime(estimate["日期"])
-            trend_chart(estimate,"日期",["A","B"],ylabel="固定持倉估值倍數",height=255)
-            mark_cols=st.columns(4,gap="small")
-            for idx,plan in enumerate("AB"):
-                info=conditional["latest"][f"{market}_{year}_{plan}"]
-                mark_cols[idx].metric(f"{plan} 估值累積報酬",percent(info["cumulative"]))
-                mark_cols[idx+2].metric(f"{plan} 封存後估值變動",percent(info["changeSinceSeal"]))
-            st.warning(
-                f"正式主策略交易回測仍結算到 {live['through'] if live else conditional['anchor']}；"
-                f"{conditional['through']} 只代表固定持股估值。"
-                "缺少 11/5–11/13 的逐日有效策略決策證據，不能把此圖說成交易策略收益。"
-            )
-        st.subheader("A／B 正式主策略歷史淨值")
+        st.subheader("A／B 歷史淨值")
         curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
         curve["日期"] = pd.to_datetime(curve["日期"])
         if live:
@@ -505,7 +447,7 @@ def backtest(research, nav):
         metrics[2].metric("A 最大回撤", percent(selected["A_max_drawdown"]))
         metrics[3].metric("B 最大回撤", percent(selected["B_max_drawdown"]))
         if live:
-            st.caption(f"已驗證主策略回測 · 結算 {live['through']} · GitHub 正式績效")
+            st.caption(f"主策略歷史回測 · 結算 {live['through']}")
             for plan in "AB":
                 info = live["latest"][f"{market}_{year}_{plan}"]
                 with st.expander(f"{plan} 版最新模擬持倉與交易"):
@@ -515,9 +457,7 @@ def backtest(research, nav):
                         table(info["orders"], label=f"{plan} 版模擬交易")
         else:
             st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
-        if market == "TW":
-            st.caption("台股 2016–2026 起跑組為研究版；早期財報可用性與成交時點仍有限制。")
-        else:
+        if market == "US":
             st.caption("早期美股信用利差代理及財報發布時點有限制；詳見「歷年績效」。")
         return
 
@@ -526,26 +466,14 @@ def backtest(research, nav):
         return
 
     st.subheader("歷年回測比較")
-    if market=="TW" and (not live or live["through"]=="2026-11-04"):
-        reconstruction=reconstructed_tw_strategy()
-        if reconstruction:
-            st.markdown("**A／B 事後交易重建（至 2026/11/16，非正式驗證）**")
-            st.caption("依官方財報電子書上傳時間及原 A／B 規則逐日重算交易；"
-                       "各季 FinMind 財務數值於 11/17 回補，尚未驗證為當時原始版本。"
-                       "不可與下方 11/4 正式封存回測混為一談。")
-            pairs={(r["year"],r["variant"]):r for r in reconstruction["summary"]}
-            table([{"起始年":y,
-                    "A 重建累積":percent(pairs[y,"A"]["cumulative"]),
-                    "B 重建累積":percent(pairs[y,"B"]["cumulative"]),
-                    "A 重建最大回撤":percent(pairs[y,"A"]["max_drawdown"]),
-                    "B 重建最大回撤":percent(pairs[y,"B"]["max_drawdown"])}
-                   for y in range(2016,2027)],label="台股 A/B 11/16 交易重建研究績效")
     marks = (data or {}).get("markets", {}).get(market, {}).get("marks", {}).get(str(year))
     estimate = conditional_marks(market)
     if estimate and str(year) in estimate["years"] and (not marks or estimate["through"] >= marks["date"]):
         marks = {"date": estimate["through"], "portfolios": estimate["years"][str(year)]}
-    # A new verified strategy release does not invalidate the separately
-    # labeled fixed-position marks. Never replace the strategy P&L with marks.
+    # Once strategy trading has caught up, do not show the old fixed-holdings
+    # mark as a second, conflicting performance figure.
+    if live and estimate and live["through"]>=estimate["through"]:
+        marks = None
     if marks:
         selected = next(row for row in rows if row["start_year"] == year)
         block = []
@@ -559,9 +487,7 @@ def backtest(research, nav):
     status = performance_status().get(market, {})
     if status.get("status") == "WAITING_FOR_CONTINUITY":
         st.warning(f"主策略交易績效待銜接 · 結算 {status['through']} · 研究 {status['requested']}")
-    if market == "TW":
-        st.warning("台股 2016–2026 起跑組為研究版。現有封存驗收沒有確認符合公告時點、財報版本及成交證據的可信起始年。")
-    else:
+    if market == "US":
         st.info("2006 起跑可同時參考發布時點延後情境。早期金融條件採信用利差代理，存在發布時點限制。")
         with st.expander("2006 發布時點敏感度"):
             table([{**r, "cumulative": percent(r["cumulative"]),
