@@ -6,8 +6,10 @@ on:
     paths:
       - engine/archive-tw-disclosures.mjs
       - engine/archive-tw-financial-statements.mjs
+      - engine/archive-tw-otc-evidence.mjs
       - tests/tw-official-disclosure-archive.test.mjs
       - tests/tw-official-financial-statements.test.mjs
+      - tests/tw-otc-filing-evidence.test.mjs
       - .github/workflows/tw-filing-evidence.yml
       - .github/workflows/tw-filing-evidence-check.yml
       - .github/workflows/research-update.yml
