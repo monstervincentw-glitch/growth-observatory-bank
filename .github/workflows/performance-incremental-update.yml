@@ -10,6 +10,7 @@ on:
     paths:
       - performance/conditional_curve.py
       - performance/primary_valuation.py
+      - performance/primary_live.py
       - .github/workflows/performance-incremental-update.yml
 permissions:
   contents: write
