@@ -6,6 +6,7 @@ on:
       - .github/workflows/tw-replay-schema-probe.yml
       - engine/tw-rebuild-research-inputs.mjs
       - tests/tw-rebuild-research-inputs.test.mjs
+      - performance/tw_provisional_replay.py
 permissions:
   contents: read
 jobs:
@@ -17,6 +18,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Validate 80-company fiscal and historical quote reconstruction isolation
         run: node --test tests/tw-rebuild-research-inputs.test.mjs
       - name: Load verified latest close research and vendor quarter observations
@@ -32,6 +36,16 @@ jobs:
         run: |
           git worktree add --detach /tmp/research-data FETCH_HEAD
           node engine/tw-rebuild-research-inputs.mjs /tmp/research-data /tmp/reconstructed-audit
+      - name: Run original A/B simulation in isolated reconstructed mode
+        shell: bash
+        env:
+          PYTHONPATH: performance:.
+        run: |
+          pip install -r performance/requirements.txt
+          mkdir -p /tmp/research-data/reconstructed-primary-inputs/TW /tmp/research-data/filing-evidence/TW/reconstructed-daily
+          cp /tmp/reconstructed-audit/2026-*.json /tmp/research-data/reconstructed-primary-inputs/TW/
+          cp /tmp/reconstructed-audit/status.json /tmp/research-data/filing-evidence/TW/reconstructed-daily/status.json
+          python performance/tw_provisional_replay.py /tmp/research-data /tmp/provisional-simulation
       - name: Show fiscal and price-history structure without source data dumps
         run: |
           node --input-type=module <<'NODE'
