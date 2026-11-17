@@ -1,0 +1,68 @@
+name: 主策略起訖年區間回測驗證
+
+on:
+  push:
+    branches: [feat/backtest-start-end-year-range-20261117]
+  pull_request:
+    branches: [main]
+    paths:
+      - streamlit_app.py
+      - performance/backtest_window.py
+      - tests/test_backtest_window.py
+      - .github/workflows/backtest-range-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install NAV math dependency
+        run: pip install pandas
+      - name: Verify source compiles and range-specific NAV calculations
+        run: |
+          python -m py_compile streamlit_app.py performance/backtest_window.py
+          python -m unittest discover -s tests -p 'test_backtest_window.py' -v
+      - name: Load actual published A/B official continuation
+        run: |
+          git fetch --depth=1 origin performance-data
+          git show FETCH_HEAD:primary/TW/release.json > /tmp/tw-primary-release.json
+          git show FETCH_HEAD:primary/US/release.json > /tmp/us-primary-release.json
+      - name: Verify each real cohort's default view matches official last NAV
+        run: |
+          python - <<'PY'
+          import gzip
+          import json
+          from pathlib import Path
+          from performance.backtest_window import available_end_year, cohort_window
+          with gzip.open('data/nav-monthly.json.gz', 'rt') as f:
+              nav=json.load(f)
+          for market,earliest,file in [
+              ('TW',2016,'/tmp/tw-primary-release.json'),
+              ('US',2006,'/tmp/us-primary-release.json'),
+          ]:
+              live=json.loads(Path(file).read_text())
+              end_year=available_end_year(nav,market,live)
+              assert end_year==2026,(market,end_year)
+              summary={(r['year'],r['variant']):r for r in live['summary']}
+              for start in range(earliest,2027):
+                  window,stats,through=cohort_window(nav,live,market,start,end_year)
+                  assert through==live['through'],(market,start,through,live['through'])
+                  assert window['日期'].is_unique
+                  assert int(window['日期'].dt.year.min())==start
+                  for plan in 'AB':
+                      actual=stats[plan]['cumulative']
+                      expected=summary[start,plan]['cumulative']
+                      assert abs(actual-expected)<1e-9,(market,start,plan,actual,expected)
+                  if start<2026:
+                      historical,_,earlier=cohort_window(nav,live,market,start,2024)
+                      assert earlier.startswith('2024-'),(market,start,earlier)
+                      assert historical['日期'].dt.year.max()==2024
+              print(f'{market}: {len(range(earliest,2027))} cohorts, 2024 and 2026 windows verified')
+          PY
