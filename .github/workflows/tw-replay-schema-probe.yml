@@ -1,0 +1,41 @@
+name: 台股日策略重建來源檢查
+on:
+  push:
+    branches: [fix/tw-historical-replay-reconstruct-20261117]
+    paths:
+      - .github/workflows/tw-replay-schema-probe.yml
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Load verified latest close research and vendor quarter observations
+        shell: bash
+        run: |
+          git fetch --depth=1 origin research-data
+          git show FETCH_HEAD:observed-primary-inputs/TW/2026-11-16.json > /tmp/replay-data.json
+          git show FETCH_HEAD:financial-source-rows/TW/2026-11-16--44012645235_1_TW.json > /tmp/fin-income.json
+      - name: Show fiscal and price-history structure without source data dumps
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          const p=JSON.parse(readFileSync('/tmp/replay-data.json','utf8'));
+          const f=JSON.parse(readFileSync('/tmp/fin-income.json','utf8'));
+          const sym='2330',s=p.stocks[sym],fi=f.stocks[sym];
+          const qs=fi.quarters||[];
+          console.log(JSON.stringify({status:p.status,market:p.market,cutoff:p.cutoff,
+            stocks:Object.keys(p.stocks).length,topKeys:Object.keys(p),
+            stockKeys:Object.keys(s||{}),financial:s?.financial,
+            barCount:s?.bars?.length,firstBar:s?.bars?.[0],lastBar:s?.bars?.at(-1),
+            features:s?.features,benchmarks:Object.keys(p.benchmarks||{}),
+            benchmark05:p.benchmarks?.['0052']?.slice(-4),
+            calendarSize:p.calendar?.length,macroKeys:Object.keys(p.macro||{}),
+            finStockCount:Object.keys(f.stocks||{}).length,finQuarterCount:qs.length,
+            finQuarters:qs.map(x=>({date:x.date,hasRevenue:x.revenue!==null,hasOperating:x.operatingIncome!==null}))}));
+          NODE
