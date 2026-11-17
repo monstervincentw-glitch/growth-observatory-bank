@@ -51,7 +51,7 @@ jobs:
       - name: Test release timestamps, no-lookahead and idempotent audit archives
         run: node --test tests/tw-official-disclosure-archive.test.mjs tests/tw-official-financial-statements.test.mjs tests/tw-otc-filing-evidence.test.mjs tests/tw-financial-reconciliation.test.mjs
       - name: Verify TypeScript source compiles in the existing Node 24 runtime
-        run: node --check engine/providers.ts && node --check engine/update.mjs && node --check engine/market-observations.mjs
+        run: node --experimental-strip-types --input-type=module -e "await import('./engine/providers.ts')" && node --check engine/update.mjs && node --check engine/market-observations.mjs
       - name: Verify no silent failure when archiving Taiwan research inputs
         shell: bash
         run: |
