@@ -122,7 +122,7 @@ export async function reconcileOfficialAndFinMind(researchRoot,outputRoot,now=ne
   const records=symbols.map(symbol=>{
     const comparison=compareWithOfficial(finmind.get(symbol),official.get(symbol));
     if(!OBSERVATION_STATES.includes(comparison.status))throw Error('Invalid reconciliation status');
-    return {symbol,...comparison};
+    return {symbol,...comparison,officialFilingTimeVerified:false,eligibleForHistoricalPointInTimeBacktest:false};
   });
   const counts=Object.fromEntries(OBSERVATION_STATES.map(s=>[s,records.filter(r=>r.status===s).length]));
   const out={
