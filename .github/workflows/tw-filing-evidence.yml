@@ -1,0 +1,52 @@
+name: 台股官方公告時間存檔
+
+on:
+  schedule:
+    # Monday-Friday 21:45 Asia/Taipei (13:45 UTC).
+    - cron: '45 13 * * 1-5'
+    # Monday-Saturday 08:45 Asia/Taipei (00:45 UTC).
+    # Next-morning recheck captures announcements after the evening collection.
+    - cron: '45 0 * * 1-6'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  # Serialise with the official research writer; never drop archive writes
+  # because market research is publishing concurrently.
+  group: research-publish
+  cancel-in-progress: false
+
+jobs:
+  archive-twse-disclosures:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Check timestamp parser and no-lookahead trust boundaries
+        run: node --test tests/tw-official-disclosure-archive.test.mjs
+      - name: Load last archived Taiwan evidence
+        shell: bash
+        run: |
+          git fetch --depth=1 origin research-data
+          git worktree add --detach /tmp/research-data FETCH_HEAD
+          test -s /tmp/research-data/financial-versions/TW.json
+      - name: Query official TWSE announcements and archive time down to seconds
+        # A material announcement does NOT certify a complete quarterly report.
+        run: node engine/archive-tw-disclosures.mjs /tmp/research-data/financial-versions/TW.json /tmp/research-data/filing-evidence/TW
+      - name: Publish official announcement archive and retrieval receipts
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/research-data add filing-evidence/TW/
+          if ! git -C /tmp/research-data diff --cached --quiet; then
+            git -C /tmp/research-data commit -m "Record official TWSE disclosure timestamps"
+            git -C /tmp/research-data push origin HEAD:refs/heads/research-data
+          fi

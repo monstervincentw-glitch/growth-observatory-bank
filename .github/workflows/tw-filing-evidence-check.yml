@@ -1,0 +1,49 @@
+name: 台股財報公告證據與回測隔離測試
+
+on:
+  push:
+    branches: [fix/tw-filing-release-evidence-20261117]
+    paths:
+      - engine/archive-tw-disclosures.mjs
+      - tests/tw-official-disclosure-archive.test.mjs
+      - .github/workflows/tw-filing-evidence.yml
+      - .github/workflows/tw-filing-evidence-check.yml
+      - .github/workflows/research-update.yml
+      - engine/update.mjs
+  pull_request:
+    branches: [main]
+    paths:
+      - engine/archive-tw-disclosures.mjs
+      - tests/tw-official-disclosure-archive.test.mjs
+      - .github/workflows/tw-filing-evidence.yml
+      - .github/workflows/tw-filing-evidence-check.yml
+      - .github/workflows/research-update.yml
+      - engine/update.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  verify-filing-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Test release timestamps, no-lookahead and idempotent audit archives
+        run: node --test tests/tw-official-disclosure-archive.test.mjs
+      - name: Verify no silent failure when archiving Taiwan research inputs
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs=require('fs');
+          const update=fs.readFileSync('engine/update.mjs','utf8');
+          const workflow=fs.readFileSync('.github/workflows/research-update.yml','utf8');
+          if (!update.includes("if(market==='TW')throw error;"))
+            throw Error('Taiwan market-observation archive failures must stop research publication');
+          const section=workflow.split('      - name: Save verified inputs for the performance engine')[1];
+          if (!section||section.split('      - name: Preserve existing research failure reporting')[0].includes('continue-on-error: true'))
+            throw Error('Taiwan performance archive publication cannot silently pass');
+          NODE
