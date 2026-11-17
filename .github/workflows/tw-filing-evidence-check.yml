@@ -2,14 +2,18 @@ name: 台股財報公告證據與回測隔離測試
 
 on:
   push:
-    branches: [fix/tw-filing-release-evidence-20261117, fix/tw-otc-complete-evidence-20261117]
+    branches: [fix/tw-filing-release-evidence-20261117, fix/tw-otc-complete-evidence-20261117, fix/tw-finmind-official-reconciliation-20261117]
     paths:
       - engine/archive-tw-disclosures.mjs
       - engine/archive-tw-financial-statements.mjs
       - engine/archive-tw-otc-evidence.mjs
+      - engine/tw-financial-reconciliation.mjs
+      - engine/providers.ts
+      - engine/market-observations.mjs
       - tests/tw-official-disclosure-archive.test.mjs
       - tests/tw-official-financial-statements.test.mjs
       - tests/tw-otc-filing-evidence.test.mjs
+      - tests/tw-financial-reconciliation.test.mjs
       - .github/workflows/tw-filing-evidence.yml
       - .github/workflows/tw-filing-evidence-check.yml
       - .github/workflows/research-update.yml
@@ -20,9 +24,13 @@ on:
       - engine/archive-tw-disclosures.mjs
       - engine/archive-tw-financial-statements.mjs
       - engine/archive-tw-otc-evidence.mjs
+      - engine/tw-financial-reconciliation.mjs
+      - engine/providers.ts
+      - engine/market-observations.mjs
       - tests/tw-official-disclosure-archive.test.mjs
       - tests/tw-official-financial-statements.test.mjs
       - tests/tw-otc-filing-evidence.test.mjs
+      - tests/tw-financial-reconciliation.test.mjs
       - .github/workflows/tw-filing-evidence.yml
       - .github/workflows/tw-filing-evidence-check.yml
       - .github/workflows/research-update.yml
