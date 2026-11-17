@@ -38,7 +38,7 @@ export function parseOfficialStatements(rows, tracked, fetchedAt){
     matches.set(symbol,{
       symbol,company:String(raw['公司名稱']??''),period,
       sourcePrintDate:asOf,firstObservedAt:fetchedAt,
-      revenue,operatingProfit,unit:'TWSE source amounts (NTD thousands per official dataset conventions)',
+      revenue,operatingProfit,unit:'as given by TWSE; reconcile units before comparing FinMind',
       originalRowSha256:hash(JSON.stringify(raw)),
       sourceUrl:OFFICIAL_STATEMENTS,
       proofKind:'OFFICIAL_TWSE_FIRST_OBSERVED_FINANCIAL_VALUES',
