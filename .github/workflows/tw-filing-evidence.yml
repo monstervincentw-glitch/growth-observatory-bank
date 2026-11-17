@@ -7,6 +7,7 @@ on:
       - engine/archive-tw-disclosures.mjs
       - engine/archive-tw-financial-statements.mjs
       - engine/archive-tw-otc-evidence.mjs
+      - engine/tw-financial-reconciliation.mjs
       - .github/workflows/tw-filing-evidence.yml
   schedule:
     # Monday-Friday 21:45 Asia/Taipei (13:45 UTC).
@@ -37,7 +38,7 @@ jobs:
         with:
           node-version: '24'
       - name: Check timestamp parser and no-lookahead trust boundaries
-        run: node --test tests/tw-official-disclosure-archive.test.mjs tests/tw-official-financial-statements.test.mjs tests/tw-otc-filing-evidence.test.mjs
+        run: node --test tests/tw-official-disclosure-archive.test.mjs tests/tw-official-financial-statements.test.mjs tests/tw-otc-filing-evidence.test.mjs tests/tw-financial-reconciliation.test.mjs
       - name: Load last archived Taiwan evidence
         shell: bash
         run: |
@@ -55,6 +56,10 @@ jobs:
         # Listed and OTC are different exchanges and APIs.
         # Missing OTC data is a visible failure, never treated as company non-filing.
         run: node engine/archive-tw-otc-evidence.mjs /tmp/research-data/financial-versions/TW.json /tmp/research-data/filing-evidence/TW
+      - name: Reconcile official cumulative NTD-thousands against observed FinMind quarterly NTD
+        # This is an AUDIT-ONLY comparison. Matching figures do not provide
+        # original filing time or authorize historical strategy trades.
+        run: node engine/tw-financial-reconciliation.mjs /tmp/research-data /tmp/research-data/filing-evidence/TW
       - name: Publish official announcement archive and retrieval receipts
         shell: bash
         run: |
