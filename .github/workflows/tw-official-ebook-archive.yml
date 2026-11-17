@@ -1,7 +1,7 @@
 name: 台股財報電子書原始上傳時間驗證
 on:
   push:
-    branches: [fix/tw-pit-daily-availability-matrix-20261117, main]
+    branches: [fix/tw-official-2026-one-year-20261117, main]
     paths:
       - engine/archive-tw-official-ebooks.mjs
       - engine/tw-official-ebook-merge.mjs
@@ -45,7 +45,7 @@ jobs:
           git fetch --depth=1 origin research-data
           git show FETCH_HEAD:financial-versions/TW.json > /tmp/tw-versions.json
           test -s /tmp/tw-versions.json
-      - name: Fetch 10 unique stock codes across 2025 and 2026 from official MOPS
+      - name: Fetch 10 unique 2026 fiscal-year stocks from official MOPS
         run: |
           node engine/archive-tw-official-ebooks.mjs /tmp/tw-versions.json /tmp/mops ${{ matrix.shard }} 8
       - uses: actions/upload-artifact@v4
