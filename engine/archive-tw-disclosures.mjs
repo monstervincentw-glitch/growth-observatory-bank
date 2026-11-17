@@ -43,7 +43,7 @@ export function announcedAt(rocDate, rocTime) {
 export function parseDisclosureFeed(rows, symbols, retrievedAt, endpoint = SOURCE) {
   if (!Array.isArray(rows) || !Array.isArray(symbols) || symbols.length < 1)
     throw Error('MOPS disclosure feed or target universe is invalid');
-  if (!Number.isFinite(Date.parse(retrievedAt)) || !endpoint.startsWith('https://openapi.twse.com.tw/'))
+  if (!Number.isFinite(Date.parse(retrievedAt)) || ![SOURCE, 'https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap04_O'].includes(endpoint))
     throw Error('MOPS retrieval provenance missing');
   const allowed = new Set(symbols);
   const result = [];
