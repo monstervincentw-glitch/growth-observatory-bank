@@ -16,7 +16,7 @@ function researchRow(stock, context, version) {
   return {...stock,financial,financialObservedAt:version.firstVerifiedAt};
 }
 
-export async function archiveObservations(folder,{market,context,stocks,previous,bars,registry,batch,attempt}) {
+export async function archiveObservations(folder,{market,context,stocks,previous,bars,financialAudit={},registry,batch,attempt}) {
   const at=attempt.finishedAt, day=context.cutoff;
   const close=day+(market==='TW'?'T13:30:00+08:00':'T16:00:00'+new Intl.DateTimeFormat('en-US',
     {timeZone:'America/New_York',timeZoneName:'longOffset'}).formatToParts(new Date(day+'T18:00:00Z'))
@@ -84,6 +84,24 @@ export async function archiveObservations(folder,{market,context,stocks,previous
   ]){
     await mkdir(path,{recursive:true});
     await writeFile(join(path,name),JSON.stringify(value)+'\n');
+  }
+  if(market==='TW'){
+    // These source rows are observed at acquisition, never backdated to a
+    // quarterly period end. Record every run separately so intraday rechecks
+    // cannot overwrite a previous version or its original observation time.
+    const sources=Object.fromEntries(Object.entries(financialAudit).sort(([a],[b])=>a.localeCompare(b)));
+    const safeRun=String(attempt.runId).replace(/[^A-Za-z0-9_-]/g,'_');
+    if(Object.keys(sources).length){
+      const dir=join(folder,'financial-source-rows',market);
+      await mkdir(dir,{recursive:true});
+      const path=join(dir,day+'--'+safeRun+'.json');
+      await writeFile(path,JSON.stringify({schema:1,market,cutoff:day,batch,
+        runId:attempt.runId,observedAt:at,
+        count:Object.keys(sources).length,
+        expected:previous.filter(s=>!s.marketEvent).length,
+        missing:previous.filter(s=>!s.marketEvent&&!sources[s.symbol]).map(s=>s.symbol).sort(),
+        stocks:sources})+'\n');
+    }
   }
   return {quoteDate:day,quoteCount:Object.keys(quote).length,pendingFinancial:pending.length,
     observationStatus:output.researchStatus};
