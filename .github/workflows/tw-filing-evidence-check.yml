@@ -59,6 +59,11 @@ jobs:
           const fs=require('fs');
           const update=fs.readFileSync('engine/update.mjs','utf8');
           const workflow=fs.readFileSync('.github/workflows/research-update.yml','utf8');
+          const officialWorkflow=fs.readFileSync('.github/workflows/tw-filing-evidence.yml','utf8');
+          const twseSave=officialWorkflow.indexOf('Commit verified TWSE observations before starting OTC network requests');
+          const tpex=officialWorkflow.indexOf('Archive official TPEx OTC quarterly statements');
+          if(twseSave<0||tpex<0||twseSave>tpex)
+            throw Error('TWSE observations must be committed before potentially slow OTC sources');
           if (!update.includes("if(market==='TW')throw error;"))
             throw Error('Taiwan market-observation archive failures must stop research publication');
           const section=workflow.split('      - name: Save verified inputs for the performance engine')[1];
