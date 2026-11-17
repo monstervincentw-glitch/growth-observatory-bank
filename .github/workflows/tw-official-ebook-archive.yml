@@ -1,0 +1,54 @@
+name: 台股財報電子書原始上傳時間驗證
+
+on:
+  push:
+    branches: [fix/tw-official-upload-pit-20261117, main]
+    paths:
+      - engine/archive-tw-official-ebooks.mjs
+      - tests/tw-official-ebooks.test.mjs
+      - .github/workflows/tw-official-ebook-archive.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: research-publish
+  cancel-in-progress: false
+
+jobs:
+  verify-and-capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate exact upload-time parser
+        run: node --test tests/tw-official-ebooks.test.mjs
+      - name: Load tracked 80-company research universe
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          git fetch --depth=1 origin research-data
+          git worktree add --detach /tmp/research-data FETCH_HEAD
+          test -s /tmp/research-data/financial-versions/TW.json
+      - name: Verify primary MOPS upload time for 2025 and 2026 filing years
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          node engine/archive-tw-official-ebooks.mjs /tmp/research-data/financial-versions/TW.json /tmp/research-data/filing-evidence/TW/
+      - name: Preserve official disclosure evidence even if some requests failed
+        if: always() && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          if [[ -d /tmp/research-data/filing-evidence/TW ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git -C /tmp/research-data add filing-evidence/TW/official-book-upload-review-2026-11-17.json
+            if ! git -C /tmp/research-data diff --cached --quiet; then
+              git -C /tmp/research-data commit -m "Archive official MOPS PDF upload timestamps for 80 Taiwan stocks"
+              git -C /tmp/research-data push origin HEAD:refs/heads/research-data
+            fi
+          fi
