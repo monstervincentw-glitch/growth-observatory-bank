@@ -22,7 +22,7 @@ test('MOPS ROC date, five-digit times, and timezone are handled exactly',()=>{
   assert.equal(rocDay('1151113'),'2026-11-13');
   assert.equal(announcedAt('1151113','94531'),'2026-11-13T09:45:31+08:00');
   assert.equal(announcedAt('1151113','0'),'2026-11-13T00:00:00+08:00');
-  for(const bad of ['1151132','1150219','1150001','1151232'])assert.throws(()=>rocDay(bad));
+  for(const bad of ['1151132','1150230','1150001','1151232'])assert.throws(()=>rocDay(bad));
   for(const bad of ['246001','999999','abcd'])assert.throws(()=>announcedAt('1151113',bad));
 });
 
