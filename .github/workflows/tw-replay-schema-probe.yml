@@ -4,6 +4,8 @@ on:
     branches: [fix/tw-historical-replay-reconstruct-20261117]
     paths:
       - .github/workflows/tw-replay-schema-probe.yml
+      - engine/tw-rebuild-research-inputs.mjs
+      - tests/tw-rebuild-research-inputs.test.mjs
 permissions:
   contents: read
 jobs:
@@ -15,6 +17,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Validate 80-company fiscal and historical quote reconstruction isolation
+        run: node --test tests/tw-rebuild-research-inputs.test.mjs
       - name: Load verified latest close research and vendor quarter observations
         shell: bash
         run: |
@@ -23,6 +27,11 @@ jobs:
           git show FETCH_HEAD:financial-source-rows/TW/2026-11-16--44012645235_1_TW.json > /tmp/fin-income.json
           git show FETCH_HEAD:unverified-primary-inputs/TW/2026-11-16.json > /tmp/unverified-1116.json
           git show FETCH_HEAD:filing-evidence/TW/replay-source/cashflow-reconstructed-2026-11-17.json > /tmp/fin-cash.json
+      - name: Reconstruct all 80 x 9 research dates without publishing trades
+        shell: bash
+        run: |
+          git worktree add --detach /tmp/research-data FETCH_HEAD
+          node engine/tw-rebuild-research-inputs.mjs /tmp/research-data /tmp/reconstructed-audit
       - name: Show fiscal and price-history structure without source data dumps
         run: |
           node --input-type=module <<'NODE'
