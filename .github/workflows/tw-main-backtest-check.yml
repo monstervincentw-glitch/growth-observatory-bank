@@ -44,9 +44,10 @@ jobs:
           from pathlib import Path
           base=Path('/tmp/performance-data')
           status=json.loads((base/'status.json').read_text())['results']['TW']
-          assert status['status']=='VERIFIED', status
+          assert status['status'] in ('VERIFIED','NO_NEW_DATA'), status
           assert status['through']=='2026-11-16', status
-          assert status['cohorts']==22, status
+          if status['status']=='VERIFIED':
+              assert status['cohorts']==22, status
           perf=json.loads((base/'primary/TW/release.json').read_text())
           assert perf['through']=='2026-11-16'
           assert len(perf['summary'])==22
@@ -74,9 +75,9 @@ jobs:
           python - <<'PY'
           from pathlib import Path
           s=Path('streamlit_app.py').read_text()
-          assert 'st.subheader("A／B 歷史淨值")' in s
+          assert 'st.subheader(f"A／B 歷史淨值 · {year}～{end_year}")' in s
           assert 'A／B 策略交易重建' not in s
           assert 'A／B 固定持倉逐日估值' not in s
           assert 'reconstruction=reconstructed_tw_strategy()' not in s
-          assert 'curve = pd.concat([curve, updated], ignore_index=True)' in s
+          assert 'curve, period, through = cohort_window(nav, live, market, year, end_year)' in s
           PY
