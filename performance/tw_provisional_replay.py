@@ -92,7 +92,11 @@ def rebuild_account_scenarios(research, destination):
                 'cohorts':len(candidate['summary']),
                 '2026':[{k:row[k] for k in ('year','variant','cumulative','max_drawdown','orders','positions')}
                  for row in candidate['summary'] if row['year']==2026],
-                'verifiedOfficialTradingPerformance':False}
+                'verifiedOfficialTradingPerformance':False,
+                '2026NewOrders':{key:len(log['orders']) for key,log in ledgers['accounts'].items()
+                                 if key in ('TW_2026_A','TW_2026_B')},
+                '2026NewDaily':{key:len(log['daily']) for key,log in ledgers['accounts'].items()
+                                 if key in ('TW_2026_A','TW_2026_B')}}
     finally:
         primary_live.load_archive=original_loader
 
