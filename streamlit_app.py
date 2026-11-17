@@ -526,6 +526,20 @@ def backtest(research, nav):
         return
 
     st.subheader("歷年回測比較")
+    if market=="TW" and (not live or live["through"]=="2026-11-04"):
+        reconstruction=reconstructed_tw_strategy()
+        if reconstruction:
+            st.markdown("**A／B 事後交易重建（至 2026/11/16，非正式驗證）**")
+            st.caption("依官方財報電子書上傳時間及原 A／B 規則逐日重算交易；"
+                       "各季 FinMind 財務數值於 11/17 回補，尚未驗證為當時原始版本。"
+                       "不可與下方 11/4 正式封存回測混為一談。")
+            pairs={(r["year"],r["variant"]):r for r in reconstruction["summary"]}
+            table([{"起始年":y,
+                    "A 重建累積":percent(pairs[y,"A"]["cumulative"]),
+                    "B 重建累積":percent(pairs[y,"B"]["cumulative"]),
+                    "A 重建最大回撤":percent(pairs[y,"A"]["max_drawdown"]),
+                    "B 重建最大回撤":percent(pairs[y,"B"]["max_drawdown"])}
+                   for y in range(2016,2027)],label="台股 A/B 11/16 交易重建研究績效")
     marks = (data or {}).get("markets", {}).get(market, {}).get("marks", {}).get(str(year))
     estimate = conditional_marks(market)
     if estimate and str(year) in estimate["years"] and (not marks or estimate["through"] >= marks["date"]):
