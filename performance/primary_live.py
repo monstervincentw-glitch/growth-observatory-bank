@@ -33,15 +33,46 @@ def sealed_engine(market):
 def load_archive(inputs, market, days):
     folder = inputs/'primary-inputs'/market
     by_day = {}
+    historical_tw = {
+        '2026-11-04','2026-11-05','2026-11-06','2026-11-09',
+        '2026-11-10','2026-11-11','2026-11-12','2026-11-13',
+        '2026-11-16',
+    }
     for date in days:
-        path = inputs/'observed-primary-inputs'/market/f'{date.date()}.json'
+        day = str(date.date())
+        path = inputs/'observed-primary-inputs'/market/f'{day}.json'
         if not path.exists():
-            path = folder/f'{date.date()}.json'
+            path = folder/f'{day}.json'
+        historical = False
+        if market=='TW' and day in historical_tw:
+            # A consistent historical fiscal vintage (from the original PDF
+            # upload day) is used across the whole initial 11/04–11/16 span.
+            # From the next close onward, use the regular daily input stream.
+            candidate = inputs/'reconstructed-primary-inputs'/'TW'/f'{day}.json'
+            if candidate.exists():
+                path = candidate
+                historical = True
         if path.exists():
             data = json.loads(path.read_text())
-            if (data['market']!=market or data['cutoff']!=str(date.date()) or
-                    data['status'] not in ('RESEARCH_VERIFIED','POINT_IN_TIME_INPUT_VERIFIED')):
-                raise ValueError(f'{market} {date.date()}: invalid archive identity')
+            if data.get('market')!=market or data.get('cutoff')!=day:
+                raise ValueError(f'{market} {day}: invalid archive identity')
+            if historical:
+                if (data.get('status')!='RETROSPECTIVE_RECONSTRUCTION_NOT_TRADE_VERIFIED' or
+                    data.get('reconstructedCount')!=80 or data.get('issues') or
+                    data.get('financialNumericalVintageVerified') is not False or
+                    len(data.get('stocks',{}))!=80):
+                    raise ValueError(f'{market} {day}: incomplete historical backtest source')
+                for stock in data['stocks'].values():
+                    document=stock.get('officialPDF') or {}
+                    version=stock.get('financialVersion') or {}
+                    if (not document.get('uploadedAt') or
+                        document['uploadedAt'][:10]>=day or
+                        document.get('period')!=version.get('period') or
+                        document['uploadedAt']!=version.get('officialPublishedAt') or
+                        version.get('officialSource')!=document.get('sourceUrl')):
+                        raise ValueError(f'{market} {day}: original report availability mismatch')
+            elif data.get('status') not in ('RESEARCH_VERIFIED','POINT_IN_TIME_INPUT_VERIFIED'):
+                raise ValueError(f'{market} {day}: invalid archived research input')
             by_day[date] = data
     return by_day
 

@@ -36,11 +36,13 @@ jobs:
           s=Path('streamlit_app.py').read_text()
           p=Path('performance/conditional_curve.py').read_text()
           w=Path('.github/workflows/performance-incremental-update.yml').read_text()
-          assert 'conditional_nav_curve(market)' in s
-          # TW has no primary/TW/release.json yet. The fixed-price mark
-          # must show while official live is None, without claiming verified trades.
-          assert '(not live or conditional["anchor"]==live["through"])' in s
-          assert "live['through'] if live else conditional['anchor']" in s
+          # The live strategy curve now includes the official-document-dated
+          # historical trading span. Keep fixed-position valuation out of the
+          # main chart so the user sees one A/B backtest, not duplicates.
+          assert 'st.subheader("A／B 歷史淨值")' in s
+          assert 'primary_performance(market)' in s
+          assert 'A／B 策略交易重建' not in s
+          assert 'A／B 固定持倉逐日估值' not in s
           assert 'noPostAnchorTrading' in s
           assert "tradingReplayVerified':False" in p
           assert 'primary-marks/' not in p or 'primary/' not in p

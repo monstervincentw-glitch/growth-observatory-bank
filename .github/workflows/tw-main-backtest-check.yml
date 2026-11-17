@@ -1,0 +1,82 @@
+name: 台股主策略歷史回測續算驗收
+
+on:
+  push:
+    branches: [fix/tw-main-backtest-1116-20261117]
+  pull_request:
+    branches: [main]
+    paths:
+      - performance/primary_live.py
+      - streamlit_app.py
+      - .github/workflows/performance-incremental-update.yml
+      - .github/workflows/tw-main-backtest-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-original-kernel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install exact bank backtest dependencies
+        run: pip install -r performance/requirements.txt
+      - name: Load independent actual research and performance branches
+        shell: bash
+        run: |
+          git fetch --depth=1 origin research-data
+          git worktree add --detach /tmp/research-data FETCH_HEAD
+          git fetch --depth=1 origin performance-data
+          git worktree add --detach /tmp/performance-data FETCH_HEAD
+      - name: Resume original A/B strategy against actual 80-stock daily backtest inputs
+        env:
+          PYTHONPATH: .
+        run: |
+          python performance/production.py /tmp/research-data /tmp/performance-data --run "test-${{ github.run_id }}"
+      - name: Assert TW is a single, continuous 11/16 backtest
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          base=Path('/tmp/performance-data')
+          status=json.loads((base/'status.json').read_text())['results']['TW']
+          assert status['status']=='VERIFIED', status
+          assert status['through']=='2026-11-16', status
+          assert status['cohorts']==22, status
+          perf=json.loads((base/'primary/TW/release.json').read_text())
+          assert perf['through']=='2026-11-16'
+          assert len(perf['summary'])==22
+          days=['2026-11-05','2026-11-06','2026-11-09','2026-11-10',
+                '2026-11-11','2026-11-12','2026-11-13','2026-11-16']
+          for key,curve in perf['curves'].items():
+              assert len(curve)==8,(key,len(curve))
+              assert [d for d,_ in curve]==days,(key,[d for d,_ in curve])
+          year2026=[x for x in perf['summary'] if x['year']==2026]
+          assert len(year2026)==2
+          ledgers=json.loads((base/'primary/TW/ledgers/2026-11-16.json').read_text())
+          for variant in 'AB':
+              account=ledgers['accounts'][f'TW_2026_{variant}']
+              assert len(account['daily'])==8,variant
+              assert all('date' in order for order in account['orders'])
+          print(json.dumps({'TW':'VERIFIED','through':perf['through'],
+                            'cohorts':len(perf['summary']),
+                            'year2026':[{'variant':v['variant'],'cumulative':v['cumulative'],
+                            'maxDrawdown':v['max_drawdown']} for v in year2026]},
+                           ensure_ascii=False))
+          PY
+      - name: Verify one consistent historical backtest appears in Streamlit
+        run: |
+          python -m py_compile streamlit_app.py performance/primary_live.py
+          python - <<'PY'
+          from pathlib import Path
+          s=Path('streamlit_app.py').read_text()
+          assert 'st.subheader("A／B 歷史淨值")' in s
+          assert 'A／B 策略交易重建' not in s
+          assert 'A／B 固定持倉逐日估值' not in s
+          assert 'reconstruction=reconstructed_tw_strategy()' not in s
+          assert 'curve = pd.concat([curve, updated], ignore_index=True)' in s
+          PY
