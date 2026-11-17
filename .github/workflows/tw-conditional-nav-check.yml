@@ -39,7 +39,7 @@ jobs:
           # The live strategy curve now includes the official-document-dated
           # historical trading span. Keep fixed-position valuation out of the
           # main chart so the user sees one A/B backtest, not duplicates.
-          assert 'st.subheader("A／B 歷史淨值")' in s
+          assert 'st.subheader(f"A／B 歷史淨值 · {year}～{end_year}")' in s
           assert 'primary_performance(market)' in s
           assert 'A／B 策略交易重建' not in s
           assert 'A／B 固定持倉逐日估值' not in s
