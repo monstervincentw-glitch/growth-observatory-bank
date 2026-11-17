@@ -20,6 +20,7 @@ from shared.candidates import DIVERGENCE, SCOPES, candidate_status, in_scope
 from taiwan_fund_research import render as render_taiwan_fund_research
 from performance_view import Reader as PerformanceReader, fetch as fetch_performance, overlay as overlay_performance
 from performance.publication import decode as decode_performance
+from performance.backtest_window import available_end_year, cohort_window
 
 # Streamlit can reload this entry point while Python still holds old helpers.
 if "fallback" not in (SnapshotReader.read.__kwdefaults__ or {}):
@@ -412,9 +413,17 @@ def backtest(research, nav):
     with st.container(horizontal=True, gap="small", vertical_alignment="bottom"):
         market = market_picker(st)
         rows = research[market.lower()]
-        year = st.selectbox("歷史淨值起始年", [r["start_year"] for r in reversed(rows)],
+        live = primary_performance(market)
+        latest_year = available_end_year(nav, market, live)
+        year = st.selectbox("歷史淨值起始年",
+                            [r["start_year"] for r in reversed(rows) if r["start_year"] <= latest_year],
                             key=f"curve-{market}", width=152)
-    live = primary_performance(market)
+        end_options = list(range(latest_year, year - 1, -1))
+        end_key = f"curve-end-{market}"
+        if end_key in st.session_state and st.session_state[end_key] not in end_options:
+            st.session_state[end_key] = end_options[0]
+        end_year = st.selectbox("歷史淨值結束年", end_options,
+                                key=end_key, width=152)
     if live:
         summary = {(r["year"], r["variant"]): r for r in live["summary"]}
         rows = [r | {f"{plan}_{field}": summary[r["start_year"], plan][field]
@@ -428,26 +437,23 @@ def backtest(research, nav):
     ) or "淨值總覽"
 
     if section == "淨值總覽":
-        st.subheader("A／B 歷史淨值")
-        curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
-        curve["日期"] = pd.to_datetime(curve["日期"])
-        if live:
-            updated = pd.DataFrame({
-                plan: dict(live["curves"][f"{market}_{year}_{plan}"])
-                for plan in "AB"
-            }).rename_axis("日期").reset_index()
-            updated["日期"] = pd.to_datetime(updated["日期"])
-            curve = pd.concat([curve, updated], ignore_index=True)
-        # The complete chart belongs to the first viewport, not below tables.
+        st.subheader(f"A／B 歷史淨值 · {year}～{end_year}")
+        curve, period, through = cohort_window(nav, live, market, year, end_year)
         trend_chart(curve, "日期", ["A", "B"], ylabel="淨值倍數", height=305)
         selected = next(r for r in rows if r["start_year"] == year)
+        full_period = end_year == latest_year
         metrics = st.columns(4, gap="small")
-        metrics[0].metric("A 累積報酬", percent(selected["A_cumulative"]))
-        metrics[1].metric("B 累積報酬", percent(selected["B_cumulative"]))
-        metrics[2].metric("A 最大回撤", percent(selected["A_max_drawdown"]))
-        metrics[3].metric("B 最大回撤", percent(selected["B_max_drawdown"]))
-        if live:
-            st.caption(f"主策略歷史回測 · 結算 {live['through']}")
+        metrics[0].metric("A 區間累積報酬", percent(period["A"]["cumulative"]))
+        metrics[1].metric("B 區間累積報酬", percent(period["B"]["cumulative"]))
+        for i, plan in enumerate("AB"):
+            mdd = (selected[f"{plan}_max_drawdown"] if full_period
+                   else period[plan]["sampled_drawdown"])
+            metrics[i + 2].metric(f"{plan} " + ("最大回撤" if full_period else "月末取樣最大回撤"),
+                                  percent(mdd))
+        st.caption(f"起跑 {year} 年 · 結束 {end_year} 年 · 實際淨值截至 {through}。"
+                   " 區間報酬以起跑本金 1 計算。"
+                   + ("" if full_period else " 過去年度回撤依月末淨值取樣，可能低於逐日最大回撤。"))
+        if live and full_period:
             for plan in "AB":
                 info = live["latest"][f"{market}_{year}_{plan}"]
                 with st.expander(f"{plan} 版最新模擬持倉與交易"):
@@ -455,8 +461,6 @@ def backtest(research, nav):
                         table(info["positions"], label=f"{plan} 版模擬持倉")
                     if info["orders"]:
                         table(info["orders"], label=f"{plan} 版模擬交易")
-        else:
-            st.caption("封存模擬淨值，起始本金標準化為 1。圖為每月最後交易日，截止 2026-11-04。")
         if market == "US":
             st.caption("早期美股信用利差代理及財報發布時點有限制；詳見「歷年績效」。")
         return
@@ -465,9 +469,12 @@ def backtest(research, nav):
         legacy_backtest(market)
         return
 
-    st.subheader("歷年回測比較")
-    marks = (data or {}).get("markets", {}).get(market, {}).get("marks", {}).get(str(year))
-    estimate = conditional_marks(market)
+    st.subheader(f"歷年回測比較 · 截至 {end_year} 年")
+    st.caption("各起始年獨立投入本金 1，統一比較至所選結束年。"
+               + ("" if end_year == latest_year else " 回撤依月末淨值取樣，可能低於逐日最大回撤。"))
+    marks = ((data or {}).get("markets", {}).get(market, {}).get("marks", {}).get(str(year))
+             if end_year == latest_year else None)
+    estimate = conditional_marks(market) if end_year == latest_year else None
     if estimate and str(year) in estimate["years"] and (not marks or estimate["through"] >= marks["date"]):
         marks = {"date": estimate["through"], "portfolios": estimate["years"][str(year)]}
     # Once strategy trading has caught up, do not show the old fixed-holdings
@@ -493,23 +500,29 @@ def backtest(research, nav):
             table([{**r, "cumulative": percent(r["cumulative"]),
                     "cagr": percent(r["cagr"]), "max_drawdown": percent(r["max_drawdown"])}
                    for r in research["usDelay"]], label="2006 發布時點敏感度")
-    table([{"起始年": r["start_year"], "A 累積": percent(r["A_cumulative"]),
-            "B 累積": percent(r["B_cumulative"]), "A CAGR": percent(r["A_cagr"]),
-            "B CAGR": percent(r["B_cagr"]), "A 最大回撤": percent(r["A_max_drawdown"]),
-            "B 最大回撤": percent(r["B_max_drawdown"]), "B 額外買入": r["B_extras"]}
-           for r in rows], label="年度回測比較")
+    comparison = []
+    for r in rows:
+        inception = r["start_year"]
+        if inception > end_year:
+            continue
+        _, period, actual = cohort_window(nav, live, market, inception, end_year)
+        item = {"起始年": inception, "資料截至": actual,
+                "A 區間報酬": percent(period["A"]["cumulative"]),
+                "B 區間報酬": percent(period["B"]["cumulative"])}
+        for plan in "AB":
+            dd = (r[f"{plan}_max_drawdown"] if end_year == latest_year
+                  else period[plan]["sampled_drawdown"])
+            label = f"{plan} 最大回撤" + ("" if end_year == latest_year else "（月末取樣）")
+            item[label] = percent(dd)
+        comparison.append(item)
+    table(comparison, label=f"各起始年截至 {end_year} 年的回測比較")
     with st.expander("匯出回測資料"):
-        curve = pd.DataFrame(nav[market][str(year)], columns=["日期", "A", "B"])
-        curve["日期"] = pd.to_datetime(curve["日期"])
-        if live:
-            updated = pd.DataFrame({
-                plan: dict(live["curves"][f"{market}_{year}_{plan}"])
-                for plan in "AB"
-            }).rename_axis("日期").reset_index()
-            updated["日期"] = pd.to_datetime(updated["日期"])
-            curve = pd.concat([curve, updated], ignore_index=True)
-        csv_button("匯出每月歷史淨值", curve, f"{market}-{year}-nav.csv", f"nav-{market}")
-        report_file("年度回測比較 CSV", "us-ab.csv" if market == "US" else "tw-ab-research.csv")
+        curve, _, _ = cohort_window(nav, live, market, year, end_year)
+        csv_button("匯出所選區間淨值", curve,
+                   f"{market}-{year}-to-{end_year}-nav.csv", f"nav-{market}")
+        csv_button("匯出所選結束年比較 CSV", comparison,
+                   f"{market}-through-{end_year}-comparison.csv", f"window-compare-{market}")
+        report_file("原始全期間回測比較 CSV", "us-ab.csv" if market == "US" else "tw-ab-research.csv")
         if market == "US":
             report_file("2006 發布時點敏感度 CSV", "us-2006-release-delay.csv")
 
