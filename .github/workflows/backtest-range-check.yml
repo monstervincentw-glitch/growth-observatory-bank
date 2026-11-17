@@ -60,7 +60,7 @@ jobs:
                       actual=stats[plan]['cumulative']
                       expected=summary[start,plan]['cumulative']
                       assert abs(actual-expected)<1e-9,(market,start,plan,actual,expected)
-                  if start<2026:
+                  if start<=2024:
                       historical,_,earlier=cohort_window(nav,live,market,start,2024)
                       assert earlier.startswith('2024-'),(market,start,earlier)
                       assert historical['日期'].dt.year.max()==2024
