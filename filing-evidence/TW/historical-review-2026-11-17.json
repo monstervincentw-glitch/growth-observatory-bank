@@ -1,0 +1,1540 @@
+{
+  "schema": 1,
+  "reviewDate": "2026-11-17",
+  "focusWindow": {
+    "from": "2026-11-05",
+    "to": "2026-11-13"
+  },
+  "status": "PENDING_OFFICIAL_FINANCIAL_REPORT_TIMESTAMPS_DO_NOT_REPLAY",
+  "versionRegistrySource": "research-data/financial-versions/TW.json",
+  "versionRegistryGitBlobSha": "91d0fec5806446090739d2cd3f31aeb2359b4c67",
+  "methodology": "Only verified official filing submission time and matching financial statement version can advance historical backtest. First observation and third-party date-only leads must not be moved backwards.",
+  "summary": {
+    "trackedSymbols": 80,
+    "registryVersions": 94,
+    "versionsWithVerifiedOfficialFinancialReportTimestamps": 0,
+    "firstObservedDates": {
+      "2026-11-12": 73,
+      "2026-11-16": 2,
+      "2026-11-13": 19
+    }
+  },
+  "sessionGapDates": [
+    "2026-11-05",
+    "2026-11-06",
+    "2026-11-09",
+    "2026-11-10",
+    "2026-11-11",
+    "2026-11-12",
+    "2026-11-13"
+  ],
+  "sourceDocumentation": {
+    "officialMopsPortal": "https://mops.twse.com.tw/",
+    "officialDailyDisclosures": "https://openapi.twse.com.tw/v1/opendata/t187ap04_L",
+    "officialMaterialDisclosureDoesNotProveCompleteFiling": true
+  },
+  "secondaryDateOnlyLeads": [
+    {
+      "symbol": "2383",
+      "period": "2026-09-30",
+      "uploadDate": "2026-10-28",
+      "precision": "calendar_day_only",
+      "sourceType": "SECONDARY_EBOOK_LISTING_NOT_OFFICIAL_TIMESTAMP",
+      "sourceUrl": "https://toalpha.tw/stock/2383/filings",
+      "officialReleaseTime": null,
+      "eligibleForPointInTimeBacktest": false,
+      "note": "僅核到第三方轉錄證交所財報電子書的上傳日期；尚未核對原始申報時分、全文版本與 FinMind 數值對應"
+    },
+    {
+      "symbol": "2330",
+      "period": "2026-09-30",
+      "uploadDate": "2026-11-13",
+      "precision": "calendar_day_only",
+      "sourceType": "SECONDARY_EBOOK_LISTING_NOT_OFFICIAL_TIMESTAMP",
+      "sourceUrl": "https://toalpha.tw/stock/2330/filings",
+      "officialReleaseTime": null,
+      "eligibleForPointInTimeBacktest": false,
+      "note": "僅核到第三方轉錄證交所財報電子書的上傳日期；尚未核對原始申報時分、全文版本與 FinMind 數值對應"
+    },
+    {
+      "symbol": "2454",
+      "period": "2026-09-30",
+      "uploadDate": "2026-11-13",
+      "precision": "calendar_day_only",
+      "sourceType": "SECONDARY_EBOOK_LISTING_NOT_OFFICIAL_TIMESTAMP",
+      "sourceUrl": "https://toalpha.tw/stock/2454/filings",
+      "officialReleaseTime": null,
+      "eligibleForPointInTimeBacktest": false,
+      "note": "僅核到第三方轉錄證交所財報電子書的上傳日期；尚未核對原始申報時分、全文版本與 FinMind 數值對應"
+    },
+    {
+      "symbol": "2379",
+      "period": "2026-09-30",
+      "uploadDate": "2026-11-12",
+      "precision": "calendar_day_only",
+      "sourceType": "SECONDARY_EBOOK_LISTING_NOT_OFFICIAL_TIMESTAMP",
+      "sourceUrl": "https://toalpha.tw/stock/2379/filings",
+      "officialReleaseTime": null,
+      "eligibleForPointInTimeBacktest": false,
+      "note": "僅核到第三方轉錄證交所財報電子書的上傳日期；尚未核對原始申報時分、全文版本與 FinMind 數值對應"
+    },
+    {
+      "symbol": "2458",
+      "period": "2026-09-30",
+      "uploadDate": "2026-11-12",
+      "precision": "calendar_day_only",
+      "sourceType": "SECONDARY_EBOOK_LISTING_NOT_OFFICIAL_TIMESTAMP",
+      "sourceUrl": "https://toalpha.tw/stock/2458/filings",
+      "officialReleaseTime": null,
+      "eligibleForPointInTimeBacktest": false,
+      "note": "僅核到第三方轉錄證交所財報電子書的上傳日期；尚未核對原始申報時分、全文版本與 FinMind 數值對應"
+    },
+    {
+      "symbol": "2357",
+      "period": "2026-09-30",
+      "uploadDate": "2026-11-12",
+      "precision": "calendar_day_only",
+      "sourceType": "SECONDARY_EBOOK_LISTING_NOT_OFFICIAL_TIMESTAMP",
+      "sourceUrl": "https://toalpha.tw/stock/2357/filings",
+      "officialReleaseTime": null,
+      "eligibleForPointInTimeBacktest": false,
+      "note": "僅核到第三方轉錄證交所財報電子書的上傳日期；尚未核對原始申報時分、全文版本與 FinMind 數值對應"
+    }
+  ],
+  "symbols": {
+    "2301": {
+      "activeVersionId": "e4b857ee92b93ab2e625663d8eb180f0323ba680bb10dfdf15576accd26c0a89",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "e4b857ee92b93ab2e625663d8eb180f0323ba680bb10dfdf15576accd26c0a89",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:58.807Z",
+          "eligibleFrom": "2026-11-12T14:28:58.807Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2303": {
+      "activeVersionId": "6900c23ffbe1597c5a5c17ba1ba950ee7e7d05277946fefc25c37411166f761b",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "6900c23ffbe1597c5a5c17ba1ba950ee7e7d05277946fefc25c37411166f761b",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:53.476Z",
+          "eligibleFrom": "2026-11-12T14:28:53.476Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2308": {
+      "activeVersionId": "cd66d543159e0cb647bf521a5ed5a6d464cd1c142a7f0d6ac1098197cb8722bf",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "cd66d543159e0cb647bf521a5ed5a6d464cd1c142a7f0d6ac1098197cb8722bf",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:58.802Z",
+          "eligibleFrom": "2026-11-12T14:28:58.802Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2313": {
+      "activeVersionId": "4bae1dcf5bfa37174d7051bff2c19714e4ea12eb38a767491b5c42c9e9fb92e2",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "4bae1dcf5bfa37174d7051bff2c19714e4ea12eb38a767491b5c42c9e9fb92e2",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:59.131Z",
+          "eligibleFrom": "2026-11-12T14:28:59.131Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2317": {
+      "activeVersionId": "b56796fc771a7bf8362891b627db49943ab8ce2c8a2ee48046d9024ad2e54ca3",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "81575f909c27118ffa38d8f8653bbef5e3743d0e09161f02574b5c47567b541d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:57.128Z",
+          "eligibleFrom": "2026-11-12T14:28:57.128Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "b56796fc771a7bf8362891b627db49943ab8ce2c8a2ee48046d9024ad2e54ca3",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-16T01:48:01.160Z",
+          "eligibleFrom": "2026-11-16T01:48:01.160Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2324": {
+      "activeVersionId": "170eeebe312efc6136772fe6da4fbda8688c2521e8ac18ca3ce17779072718e2",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "170eeebe312efc6136772fe6da4fbda8688c2521e8ac18ca3ce17779072718e2",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:58.035Z",
+          "eligibleFrom": "2026-11-12T14:28:58.035Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "c371872910cd497d7f85622493915ff22f132609a6d7fb4c288a6dbbb94b4d29",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-16T15:55:27.097Z",
+          "eligibleFrom": "2026-11-16T15:55:27.097Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2327": {
+      "activeVersionId": "12687b851802d58d9326ba5ade6b4f61c1d6e17bf179f892068aad4c34707657",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "12687b851802d58d9326ba5ade6b4f61c1d6e17bf179f892068aad4c34707657",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:00.348Z",
+          "eligibleFrom": "2026-11-12T14:29:00.348Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2330": {
+      "activeVersionId": "8646d6eabe5b8fd17626e4bf066541c20c307814cbf6bbcda7a21be794fa67f3",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "3bc3192b3d42e3f57f409be22fb000496d2bb22e635c35f16ad25d4006a36ae1",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:53.417Z",
+          "eligibleFrom": "2026-11-12T14:28:53.417Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "8646d6eabe5b8fd17626e4bf066541c20c307814cbf6bbcda7a21be794fa67f3",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:24.699Z",
+          "eligibleFrom": "2026-11-13T16:22:24.699Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2337": {
+      "activeVersionId": "05fbd6c646e98deb2f0c15c7ff7a2a11176e5f8135249c5f3f2cd8cdbac18b8b",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "05fbd6c646e98deb2f0c15c7ff7a2a11176e5f8135249c5f3f2cd8cdbac18b8b",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:55.579Z",
+          "eligibleFrom": "2026-11-12T14:28:55.579Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2344": {
+      "activeVersionId": "78bb4a03bb181c3db928856d96d77be031b1080f882af964fbf047bbb6b7e302",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "78bb4a03bb181c3db928856d96d77be031b1080f882af964fbf047bbb6b7e302",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:55.165Z",
+          "eligibleFrom": "2026-11-12T14:28:55.165Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2347": {
+      "activeVersionId": "ecbf27a4622309d8fc01cd0098a5cf08d957eee89380f85549fabea862ca9310",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "ecbf27a4622309d8fc01cd0098a5cf08d957eee89380f85549fabea862ca9310",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:09.671Z",
+          "eligibleFrom": "2026-11-12T14:29:09.671Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2353": {
+      "activeVersionId": "750139b9dc2bbb71e9a1a5453d7e5a61c366f1092a1a8f10fe292fa466d52db0",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "750139b9dc2bbb71e9a1a5453d7e5a61c366f1092a1a8f10fe292fa466d52db0",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:57.915Z",
+          "eligibleFrom": "2026-11-12T14:28:57.915Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2356": {
+      "activeVersionId": "f34377bb47bf804a16b6bb01916e1571bf4530062ffc4f1c7e2029a68569a163",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "f34377bb47bf804a16b6bb01916e1571bf4530062ffc4f1c7e2029a68569a163",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:57.487Z",
+          "eligibleFrom": "2026-11-12T14:28:57.487Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2357": {
+      "activeVersionId": "c3db4c558dde30511ad25c50eab7099282497ff6d46cdccce21e1d5461c18223",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "3831f22e0d2eebe05168d9c84925e2c6ca96bc06908f4bc9e653b6eed669363d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:57.111Z",
+          "eligibleFrom": "2026-11-12T14:28:57.111Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "c3db4c558dde30511ad25c50eab7099282497ff6d46cdccce21e1d5461c18223",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:29.819Z",
+          "eligibleFrom": "2026-11-13T16:22:29.819Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2368": {
+      "activeVersionId": "0aae7cd6471a00268c02a75561e6e3b3559bda315dabf5c052f5c3f55bb9fa7b",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "0aae7cd6471a00268c02a75561e6e3b3559bda315dabf5c052f5c3f55bb9fa7b",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:59.947Z",
+          "eligibleFrom": "2026-11-12T14:28:59.947Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2371": {
+      "activeVersionId": "afdcdd965f2b9cac156f6eba369598bd3a51ff0f12329d8f90403d29a03ecb1e",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "b747b5954d28c02d2aaeda63d3302c6e9bd55f11429e769624c0eb0ae607790d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:09.333Z",
+          "eligibleFrom": "2026-11-12T14:29:09.333Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "afdcdd965f2b9cac156f6eba369598bd3a51ff0f12329d8f90403d29a03ecb1e",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:36.082Z",
+          "eligibleFrom": "2026-11-13T16:22:36.082Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2376": {
+      "activeVersionId": "ebaeb862ad237535f2c9d10848c7eee0667299dae31d50477cce9d3381f6fb38",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "13b450fd2f43669a436551b454ef261a91bf57f7905e9b6dcc448983f30d5166",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:57.605Z",
+          "eligibleFrom": "2026-11-12T14:28:57.605Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "ebaeb862ad237535f2c9d10848c7eee0667299dae31d50477cce9d3381f6fb38",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:30.400Z",
+          "eligibleFrom": "2026-11-13T16:22:30.400Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2377": {
+      "activeVersionId": "622b2fec9a1d4ed2f0d952d586580757e8b9f6ba0d2cfc2a32dbf75bc5f20395",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "5cdbfdcec5777454ef0fadaf91ad205f1cff96d61da14b0dd5090d9cf8c0e05b",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:58.477Z",
+          "eligibleFrom": "2026-11-12T14:28:58.477Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "622b2fec9a1d4ed2f0d952d586580757e8b9f6ba0d2cfc2a32dbf75bc5f20395",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:31.445Z",
+          "eligibleFrom": "2026-11-13T16:22:31.445Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2379": {
+      "activeVersionId": "917e28c236914ff66c2664aa9c4db69ce79a6c131a814d41dd7de48bc76fd8f7",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "917e28c236914ff66c2664aa9c4db69ce79a6c131a814d41dd7de48bc76fd8f7",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:25.140Z",
+          "eligibleFrom": "2026-11-13T16:22:25.140Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2382": {
+      "activeVersionId": "749680c651b541929c8b131b423c59479f7e275e90ec6e87e5d35127febcf449",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "749680c651b541929c8b131b423c59479f7e275e90ec6e87e5d35127febcf449",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:57.100Z",
+          "eligibleFrom": "2026-11-12T14:28:57.100Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2383": {
+      "activeVersionId": "58780370cce1fc74071afdb8588906466ca4dedb9458e53b86adf54385a6115f",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "58780370cce1fc74071afdb8588906466ca4dedb9458e53b86adf54385a6115f",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:59.503Z",
+          "eligibleFrom": "2026-11-12T14:28:59.503Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2385": {
+      "activeVersionId": "31c95c21adbdf51d3cba1d674aebd9579fcc6fbc3e721fbd224111e2de002b57",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "31c95c21adbdf51d3cba1d674aebd9579fcc6fbc3e721fbd224111e2de002b57",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:11.836Z",
+          "eligibleFrom": "2026-11-12T14:29:11.836Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2402": {
+      "activeVersionId": "40902e39a3a9371883bae318d4d1415b964f8290687f9e083843aed113a7b489",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "1cd4189c05e816d175c7f411cac317e7cb9b306f71ab56176681595971da647b",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:12.338Z",
+          "eligibleFrom": "2026-11-12T14:29:12.338Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "40902e39a3a9371883bae318d4d1415b964f8290687f9e083843aed113a7b489",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:44.027Z",
+          "eligibleFrom": "2026-11-13T16:22:44.027Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2408": {
+      "activeVersionId": "ddf53a2a2d249a7be8fd4e9e9e526d7a3f4f1117df92c1835aaabc685c86ea72",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "ddf53a2a2d249a7be8fd4e9e9e526d7a3f4f1117df92c1835aaabc685c86ea72",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:55.299Z",
+          "eligibleFrom": "2026-11-12T14:28:55.299Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2409": {
+      "activeVersionId": "5c2454496213735116ab745c2e2bf0dc67759eadd66f5aa7669c749a765a3174",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "5c2454496213735116ab745c2e2bf0dc67759eadd66f5aa7669c749a765a3174",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:07.335Z",
+          "eligibleFrom": "2026-11-12T14:29:07.335Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2421": {
+      "activeVersionId": "bb6465be40f1ae43edc5b2f2b23fb885d2147379d69923d2fc2cbadf9b411ecf",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "bb6465be40f1ae43edc5b2f2b23fb885d2147379d69923d2fc2cbadf9b411ecf",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:10.068Z",
+          "eligibleFrom": "2026-11-12T14:29:10.068Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2449": {
+      "activeVersionId": "64c33e2d1a24e48c0642b577c3c7598cbb27b9c5ae7c798c50c6a3bd21eee81d",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "64c33e2d1a24e48c0642b577c3c7598cbb27b9c5ae7c798c50c6a3bd21eee81d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:56.010Z",
+          "eligibleFrom": "2026-11-12T14:28:56.010Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2454": {
+      "activeVersionId": "124f4fb2722fba538ad06d5e198f22ff38032adce6a8959eec81a30b7c36908d",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "88712eee2da9851ee0e6f9374d3be9b88e98b9eecc0a81b98050dffc1e1cffd3",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:53.090Z",
+          "eligibleFrom": "2026-11-12T14:28:53.090Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "124f4fb2722fba538ad06d5e198f22ff38032adce6a8959eec81a30b7c36908d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:24.616Z",
+          "eligibleFrom": "2026-11-13T16:22:24.616Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2458": {
+      "activeVersionId": "a8706952b759e55c771904bf2d0dfb3830b12da37fedf8a501d5b24127d9ce97",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "316cac11de0c895c00ea287eae786166cb4c768a516f76d103b09f84f623021d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:53.893Z",
+          "eligibleFrom": "2026-11-12T14:28:53.893Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "a8706952b759e55c771904bf2d0dfb3830b12da37fedf8a501d5b24127d9ce97",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:25.181Z",
+          "eligibleFrom": "2026-11-13T16:22:25.181Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2474": {
+      "activeVersionId": "db75a622a41bb283e6e19a1b2145b80b3e01936eb3556b3a4d1e3c7569ba65ff",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "db75a622a41bb283e6e19a1b2145b80b3e01936eb3556b3a4d1e3c7569ba65ff",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:09.365Z",
+          "eligibleFrom": "2026-11-12T14:29:09.365Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2481": {
+      "activeVersionId": "f6956fd216e8a94d92c5916073eb5d84b3716016b1b25301274649d8fff2394e",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "f6956fd216e8a94d92c5916073eb5d84b3716016b1b25301274649d8fff2394e",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:12.331Z",
+          "eligibleFrom": "2026-11-12T14:29:12.331Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2492": {
+      "activeVersionId": "28d3ff40c834f041816d243a6be8f8d3acfe8f9bdfc6ef3e7770edbc181a2592",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "28d3ff40c834f041816d243a6be8f8d3acfe8f9bdfc6ef3e7770edbc181a2592",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:33.764Z",
+          "eligibleFrom": "2026-11-13T16:22:33.764Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "2498": {
+      "activeVersionId": "ca869fb30ad8ecebcfa5fc5d893c52eee8fb82ebf5e68d46c23089986c736df5",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "ca869fb30ad8ecebcfa5fc5d893c52eee8fb82ebf5e68d46c23089986c736df5",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:09.323Z",
+          "eligibleFrom": "2026-11-12T14:29:09.323Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3008": {
+      "activeVersionId": "dcefb51f227aee11c6fb29934be167e998c8a027d16dd1e299394c444467e985",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "dcefb51f227aee11c6fb29934be167e998c8a027d16dd1e299394c444467e985",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:06.671Z",
+          "eligibleFrom": "2026-11-12T14:29:06.671Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3013": {
+      "activeVersionId": "44f2778137ae217f7559c7dd0cf7c809d27c6f08a38ed51fab43d586f9b883d8",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "44f2778137ae217f7559c7dd0cf7c809d27c6f08a38ed51fab43d586f9b883d8",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:10.443Z",
+          "eligibleFrom": "2026-11-12T14:29:10.443Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3017": {
+      "activeVersionId": "bfc82be013897bb8e3a0cdb984e2679f87c893cb0a3a82af4710a4462258bd99",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "bfc82be013897bb8e3a0cdb984e2679f87c893cb0a3a82af4710a4462258bd99",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:10.062Z",
+          "eligibleFrom": "2026-11-12T14:29:10.062Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3019": {
+      "activeVersionId": "1e0c41e918208168ce1f507ad23f0ac85b4f0647115349507888b938eea7acdd",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "1e0c41e918208168ce1f507ad23f0ac85b4f0647115349507888b938eea7acdd",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:00.281Z",
+          "eligibleFrom": "2026-11-12T14:29:00.281Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3023": {
+      "activeVersionId": "5b8c2b9afa99eeafd9693b7149cbbc230b0d45c000cd68ce52150937001acc39",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "5b8c2b9afa99eeafd9693b7149cbbc230b0d45c000cd68ce52150937001acc39",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:11.855Z",
+          "eligibleFrom": "2026-11-12T14:29:11.855Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3034": {
+      "activeVersionId": "e90acc8977424eddab6d7e2c841021c959b9ce036d1f4585692d684a27e51f53",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "e90acc8977424eddab6d7e2c841021c959b9ce036d1f4585692d684a27e51f53",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:53.800Z",
+          "eligibleFrom": "2026-11-12T14:28:53.800Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3035": {
+      "activeVersionId": "082884b19bc5e279a902342ba1728359710ba0517120cdb2cab2a72d106b5b6e",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "082884b19bc5e279a902342ba1728359710ba0517120cdb2cab2a72d106b5b6e",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:54.397Z",
+          "eligibleFrom": "2026-11-12T14:28:54.397Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3037": {
+      "activeVersionId": "19b2e93cd18cc8e0593529c1c2ef5df45c0c02040521d16e3b6d7dd4513ac940",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "19b2e93cd18cc8e0593529c1c2ef5df45c0c02040521d16e3b6d7dd4513ac940",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:59.157Z",
+          "eligibleFrom": "2026-11-12T14:28:59.157Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3044": {
+      "activeVersionId": "03609dfe1adf80ccb38666827c52747b317b912bad84fd88914cf3e89db554ea",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "03609dfe1adf80ccb38666827c52747b317b912bad84fd88914cf3e89db554ea",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:58.764Z",
+          "eligibleFrom": "2026-11-12T14:28:58.764Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3081": {
+      "activeVersionId": "1f9c75a4740d748dd02baee26ba08e9a7e313758650f83755232615d1ba9e455",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "1f9c75a4740d748dd02baee26ba08e9a7e313758650f83755232615d1ba9e455",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:11.552Z",
+          "eligibleFrom": "2026-11-12T14:29:11.552Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3105": {
+      "activeVersionId": "5bdd6085e719099ba918e887eee0e1fefc9e131879d8e2320d7545a448aca3b4",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "5bdd6085e719099ba918e887eee0e1fefc9e131879d8e2320d7545a448aca3b4",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:10.748Z",
+          "eligibleFrom": "2026-11-12T14:29:10.748Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3189": {
+      "activeVersionId": "5ffc427bf9cd61561c03943c9414abbad470d279b80ca2e89b84fd578754b7df",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "5ffc427bf9cd61561c03943c9414abbad470d279b80ca2e89b84fd578754b7df",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:59.492Z",
+          "eligibleFrom": "2026-11-12T14:28:59.492Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3231": {
+      "activeVersionId": "cbd89f3f616a3ae6c380a7be7f9e2110679428c4a7c1ceb67c9957b9db006b79",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "cbd89f3f616a3ae6c380a7be7f9e2110679428c4a7c1ceb67c9957b9db006b79",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:57.427Z",
+          "eligibleFrom": "2026-11-12T14:28:57.427Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3260": {
+      "activeVersionId": "fb3b85e29929f074b4cfaa4d15b77c7c42d091fcefd42c91933f092c196e0165",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "fb3b85e29929f074b4cfaa4d15b77c7c42d091fcefd42c91933f092c196e0165",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:55.621Z",
+          "eligibleFrom": "2026-11-12T14:28:55.621Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3324": {
+      "activeVersionId": "609117965fde8ad8dfe503143f8fb0bccb2d607635cf9b809d126ae2a3f57ce7",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "609117965fde8ad8dfe503143f8fb0bccb2d607635cf9b809d126ae2a3f57ce7",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:09.986Z",
+          "eligibleFrom": "2026-11-12T14:29:09.986Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3363": {
+      "activeVersionId": "9366a52a8057900650b1afc2503caf721ed5ae86f9633bb4dfc21a58f74a6f97",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "9366a52a8057900650b1afc2503caf721ed5ae86f9633bb4dfc21a58f74a6f97",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:10.782Z",
+          "eligibleFrom": "2026-11-12T14:29:10.782Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3374": {
+      "activeVersionId": "ed0d53ec3852ed089454cab45a49d515944236627c40270b0ad3734e2fcf8d48",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "ed0d53ec3852ed089454cab45a49d515944236627c40270b0ad3734e2fcf8d48",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:56.436Z",
+          "eligibleFrom": "2026-11-12T14:28:56.436Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3406": {
+      "activeVersionId": "9b03b383ef7054e9191ca48609c549d1345b9feaffd59f97aeb156bf2d1a824a",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "9b03b383ef7054e9191ca48609c549d1345b9feaffd59f97aeb156bf2d1a824a",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:35.143Z",
+          "eligibleFrom": "2026-11-13T16:22:35.143Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3443": {
+      "activeVersionId": "6d44a60435fb3375f4c8167d33326324478d3532b5a4cddef76fa515e93317d9",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "6d44a60435fb3375f4c8167d33326324478d3532b5a4cddef76fa515e93317d9",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:54.277Z",
+          "eligibleFrom": "2026-11-12T14:28:54.277Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3481": {
+      "activeVersionId": "340980ac7776bf1fd1389d15619c6e1de1e194a878ca25ff8b72ea9240effbd7",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "e3b01a1662f6f6b992b081dab625b97227333cde802e241687bdb7c6c26fb956",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:09.041Z",
+          "eligibleFrom": "2026-11-12T14:29:09.041Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "340980ac7776bf1fd1389d15619c6e1de1e194a878ca25ff8b72ea9240effbd7",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:34.981Z",
+          "eligibleFrom": "2026-11-13T16:22:34.981Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3529": {
+      "activeVersionId": "ae8839277affc5726d967388d8490282f589f8f716c02943f194e8f5c510446b",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "ae8839277affc5726d967388d8490282f589f8f716c02943f194e8f5c510446b",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:54.738Z",
+          "eligibleFrom": "2026-11-12T14:28:54.738Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3532": {
+      "activeVersionId": "7c42499144258a292ba0a07a905e419082120060387178812c83aad8e21eaf42",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "7c42499144258a292ba0a07a905e419082120060387178812c83aad8e21eaf42",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:29.344Z",
+          "eligibleFrom": "2026-11-13T16:22:29.344Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3533": {
+      "activeVersionId": "678f27fb5d7c8a7c0fec653fb3de31887f873a8d94a66ed64c92c1adafa5c080",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "678f27fb5d7c8a7c0fec653fb3de31887f873a8d94a66ed64c92c1adafa5c080",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:10.438Z",
+          "eligibleFrom": "2026-11-12T14:29:10.438Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3661": {
+      "activeVersionId": "bfa18aec09da582ecb22d9058b6bf4339f9a2e810a818873884aa06ddf97f782",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "bfa18aec09da582ecb22d9058b6bf4339f9a2e810a818873884aa06ddf97f782",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:54.744Z",
+          "eligibleFrom": "2026-11-12T14:28:54.744Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3702": {
+      "activeVersionId": "9bfe6b167addbe5580c54b9f8c26071ea6735e51db5a689a1d880fc2241a93e7",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "9bfe6b167addbe5580c54b9f8c26071ea6735e51db5a689a1d880fc2241a93e7",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:36.656Z",
+          "eligibleFrom": "2026-11-13T16:22:36.656Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3706": {
+      "activeVersionId": "012c375102d19cab8d9400f68722196fd220b4a90c4cb37e93416ff2bd2972a9",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "b1d3717ca63d60b73632bcdb76afe32b4cd7cd828e8ed84ac345ac79ab60ecbe",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:58.342Z",
+          "eligibleFrom": "2026-11-12T14:28:58.342Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "012c375102d19cab8d9400f68722196fd220b4a90c4cb37e93416ff2bd2972a9",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:31.479Z",
+          "eligibleFrom": "2026-11-13T16:22:31.479Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "3711": {
+      "activeVersionId": "0d9064d5d678716a847cda50cecf6086eef4715168fee62abb38bec86acdd925",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "0d9064d5d678716a847cda50cecf6086eef4715168fee62abb38bec86acdd925",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:56.102Z",
+          "eligibleFrom": "2026-11-12T14:28:56.102Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "4938": {
+      "activeVersionId": "670b8fc8a87837194f1507cf5b0d6c47f72cf6e993716c05d81702567a4b1a40",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "8774d9e17fa00f98ed18a2c654aec4895d2078d2fb7cac7b65ad5bcad7343133",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:57.951Z",
+          "eligibleFrom": "2026-11-12T14:28:57.951Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "670b8fc8a87837194f1507cf5b0d6c47f72cf6e993716c05d81702567a4b1a40",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:30.960Z",
+          "eligibleFrom": "2026-11-13T16:22:30.960Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "4958": {
+      "activeVersionId": "17cf9f7479611004b32418a4e246f4d1cf0977e408cba9d5b8a637f4b16621d8",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "17cf9f7479611004b32418a4e246f4d1cf0977e408cba9d5b8a637f4b16621d8",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:59.498Z",
+          "eligibleFrom": "2026-11-12T14:28:59.498Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "4967": {
+      "activeVersionId": "ba0a3877155851d7144c1a10aeaabc48146aa37303a3a2f0cb0e47047c5ee5b5",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "ba0a3877155851d7144c1a10aeaabc48146aa37303a3a2f0cb0e47047c5ee5b5",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:56.141Z",
+          "eligibleFrom": "2026-11-12T14:28:56.141Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "5269": {
+      "activeVersionId": "fec4f66e2287f2f8035558cb30a953cec4ceaa6eddf505b9673405693ca9757f",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "fec4f66e2287f2f8035558cb30a953cec4ceaa6eddf505b9673405693ca9757f",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:54.325Z",
+          "eligibleFrom": "2026-11-12T14:28:54.325Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "5274": {
+      "activeVersionId": "82e4f987f9959891390fcb99c37f777add8171b153d2901a6e3502be8650d2c7",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "82e4f987f9959891390fcb99c37f777add8171b153d2901a6e3502be8650d2c7",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:55.176Z",
+          "eligibleFrom": "2026-11-12T14:28:55.176Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "5425": {
+      "activeVersionId": "9a9badbfc50a8352fc44467392cb02e931809480e0eb077095c6a55da32fc60d",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "9a9badbfc50a8352fc44467392cb02e931809480e0eb077095c6a55da32fc60d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:12.658Z",
+          "eligibleFrom": "2026-11-12T14:29:12.658Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "5434": {
+      "activeVersionId": "4ec867d8443f63db3f025e19a8238c7cb5df47505b8eb91dedb60b26bfe0166d",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "4ec867d8443f63db3f025e19a8238c7cb5df47505b8eb91dedb60b26bfe0166d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:09.694Z",
+          "eligibleFrom": "2026-11-12T14:29:09.694Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6116": {
+      "activeVersionId": "8c15fd6930120da57c32870cf9249ca3f4c55946158e5c15e5ad258b77f0e023",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "8c15fd6930120da57c32870cf9249ca3f4c55946158e5c15e5ad258b77f0e023",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:12.300Z",
+          "eligibleFrom": "2026-11-12T14:29:12.300Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6117": {
+      "activeVersionId": "24434a167e13100d6dc71b44dc5fcc8a884ecc13ab4b1461ba42b61ee40a380d",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "24434a167e13100d6dc71b44dc5fcc8a884ecc13ab4b1461ba42b61ee40a380d",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:43.031Z",
+          "eligibleFrom": "2026-11-13T16:22:43.031Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6121": {
+      "activeVersionId": "06fdcf2359b328dd32de6545844b1f358386d2ecc66ae3b6ba4649695930ef2a",
+      "versions": [
+        {
+          "period": "2026-06-30",
+          "versionId": "ee1a2ce7054ef7a9b2bb537bd0d663f9aba6f9cc0f66b91db3b65732a8715952",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:10.481Z",
+          "eligibleFrom": "2026-11-12T14:29:10.481Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        },
+        {
+          "period": "2026-09-30",
+          "versionId": "06fdcf2359b328dd32de6545844b1f358386d2ecc66ae3b6ba4649695930ef2a",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:39.326Z",
+          "eligibleFrom": "2026-11-13T16:22:39.326Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6223": {
+      "activeVersionId": "6ee97549ecf1890234696ebe92b88d2a3da0055a82390a32f974976debf9d4ca",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "6ee97549ecf1890234696ebe92b88d2a3da0055a82390a32f974976debf9d4ca",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:56.427Z",
+          "eligibleFrom": "2026-11-12T14:28:56.427Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6239": {
+      "activeVersionId": "61c8bcdd5803cfd508190810a8ca812069f0717c12f4366288198924e0f94338",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "61c8bcdd5803cfd508190810a8ca812069f0717c12f4366288198924e0f94338",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:56.471Z",
+          "eligibleFrom": "2026-11-12T14:28:56.471Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6274": {
+      "activeVersionId": "722b3696ddbac98687c8e89f11ab0fecf4aafb3be6cd3fba72e1f79dfa8a525f",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "722b3696ddbac98687c8e89f11ab0fecf4aafb3be6cd3fba72e1f79dfa8a525f",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:59.816Z",
+          "eligibleFrom": "2026-11-12T14:28:59.816Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6415": {
+      "activeVersionId": "cbe5c87f26abebb3c1c2b8998aa97b7de7e9b8093294e70d9af89754aef294be",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "cbe5c87f26abebb3c1c2b8998aa97b7de7e9b8093294e70d9af89754aef294be",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-13T16:22:26.546Z",
+          "eligibleFrom": "2026-11-13T16:22:26.546Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6488": {
+      "activeVersionId": "3dacf4fa3c32d64dabb7438c01068ff9ee8b45cd65f3d3460abedc827cfe0652",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "3dacf4fa3c32d64dabb7438c01068ff9ee8b45cd65f3d3460abedc827cfe0652",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:56.809Z",
+          "eligibleFrom": "2026-11-12T14:28:56.809Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6510": {
+      "activeVersionId": "95784a89b70177f9b04a9cb7214e1b8fe20a2fd966ed816bfc0e0d73f3f7703b",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "95784a89b70177f9b04a9cb7214e1b8fe20a2fd966ed816bfc0e0d73f3f7703b",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:56.792Z",
+          "eligibleFrom": "2026-11-12T14:28:56.792Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "6669": {
+      "activeVersionId": "62d2b387815c9446b4ae0447ee0d1d7d8b9268c9366aba9a5a69af66644a50c2",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "62d2b387815c9446b4ae0447ee0d1d7d8b9268c9366aba9a5a69af66644a50c2",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:58.413Z",
+          "eligibleFrom": "2026-11-12T14:28:58.413Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "8046": {
+      "activeVersionId": "6c2abec4932fb51b2e429a7f335184ea61deb98d1c29fb64f50a6588a18ad23a",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "6c2abec4932fb51b2e429a7f335184ea61deb98d1c29fb64f50a6588a18ad23a",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:59.120Z",
+          "eligibleFrom": "2026-11-12T14:28:59.120Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "8086": {
+      "activeVersionId": "d9bf1b71fc2176c737db43b5705c5b0f9c421a49ce23954d7df7172ebe3504e9",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "d9bf1b71fc2176c737db43b5705c5b0f9c421a49ce23954d7df7172ebe3504e9",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:29:12.650Z",
+          "eligibleFrom": "2026-11-12T14:29:12.650Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    },
+    "8299": {
+      "activeVersionId": "dd55fe03b24f9ff709e0f615e940100afbfc3e4bf2e4fc432920c556a18debb4",
+      "versions": [
+        {
+          "period": "2026-09-30",
+          "versionId": "dd55fe03b24f9ff709e0f615e940100afbfc3e4bf2e4fc432920c556a18debb4",
+          "financialSource": "FinMind",
+          "firstVerifiedAt": "2026-11-12T14:28:55.673Z",
+          "eligibleFrom": "2026-11-12T14:28:55.673Z",
+          "officialPublishedAt": null,
+          "officialSource": null,
+          "verification": "VERIFIED_OBSERVATION",
+          "timestampVerifiedForExactQuarter": false
+        }
+      ]
+    }
+  }
+}
