@@ -335,6 +335,28 @@ def conditional_marks(market):
 
 
 @st.cache_data(ttl=90, show_spinner=False)
+def reconstructed_tw_strategy():
+    """Not official verified performance: retrospective fiscal numeric vintages."""
+    try:
+        release=fetch_bank_json("research-data","reconstructed-primary/TW/release.json")
+        expected={f"TW_{year}_{plan}" for year in range(2016,2027) for plan in "AB"}
+        if (release.get("schema")!=1 or release.get("market")!="TW" or
+                release.get("status")!="RECONSTRUCTED_TRADES_NUMERIC_VINTAGE_PENDING" or
+                release.get("verifiedOfficialTradingPerformance") is not False or
+                release.get("historicalVendorValuesAtOriginalCloseVerified") is not False or
+                release.get("officialReportUploadTimesVerified") is not True or
+                release.get("anchor")!="2026-11-04" or release.get("through")!="2026-11-16" or
+                set(release.get("curves",{}))!=expected or
+                set(release.get("latest",{}))!=expected or
+                {(r["year"],r["variant"]) for r in release["summary"]}!=
+                {(year,plan) for year in range(2016,2027) for plan in "AB"}):
+            return None
+        return release
+    except (OSError,ValueError,KeyError,TypeError):
+        return None
+
+
+@st.cache_data(ttl=90, show_spinner=False)
 def conditional_nav_curve(market):
     """Post-seal fixed-position values: never treated as verified trade P&L."""
     try:
@@ -406,6 +428,38 @@ def backtest(research, nav):
     ) or "淨值總覽"
 
     if section == "淨值總覽":
+        provisional=reconstructed_tw_strategy() if market=="TW" else None
+        if provisional:
+            st.subheader("A／B 策略交易重建 · 2026/11/16（非正式績效）")
+            st.warning(
+                "這段曲線有依原 A／B 買賣規則重算 11/5–11/16 的交易。"
+                "財報電子書上傳時分秒及每日股價已核對，但部分財務數字是 11/17 才從 FinMind 重新取得，"
+                "尚未與各季當時公告的原始版本逐項核對。"
+                "**因此是事後重建試算，不可視為已驗證的歷史策略報酬。**"
+            )
+            original=next(r for r in rows if r["start_year"]==year)
+            rebuilt=pd.DataFrame({
+                plan:dict([("2026-11-04",1+original[f"{plan}_cumulative"]),
+                           *provisional["curves"][f"TW_{year}_{plan}"]])
+                for plan in "AB"
+            }).rename_axis("日期").reset_index()
+            rebuilt["日期"]=pd.to_datetime(rebuilt["日期"])
+            trend_chart(rebuilt,"日期",["A","B"],ylabel="交易重建淨值倍數",height=265)
+            outcomes={(r["year"],r["variant"]):r for r in provisional["summary"]}
+            m=st.columns(4,gap="small")
+            for i,plan in enumerate("AB"):
+                item=outcomes[(year,plan)]
+                m[i].metric(f"{plan} 重建累積報酬",percent(item["cumulative"]))
+                m[i+2].metric(f"{plan} 重建最大回撤",percent(item["max_drawdown"]))
+            with st.expander("交易重建持倉與新增訂單（僅供研究）"):
+                for plan in "AB":
+                    latest=provisional["latest"][f"TW_{year}_{plan}"]
+                    if latest["orders"]:
+                        table(latest["orders"],label=f"{plan} 重建成交明細")
+                    if latest["positions"]:
+                        table(latest["positions"],label=f"{plan} 重建最新持股")
+            st.caption("這是依保守次一交易日財報生效規則重跑的獨立研究結果；"
+                       "正式主策略歷史回測仍依 11/4 的原封存數字呈現。")
         conditional=conditional_nav_curve(market) if market=="TW" else None
         if (conditional and conditional["through"]>conditional["anchor"] and
                 (not live or conditional["anchor"]==live["through"])):
@@ -802,6 +856,7 @@ def clear_research_caches():
     primary_performance.clear()
     conditional_marks.clear()
     conditional_nav_curve.clear()
+    reconstructed_tw_strategy.clear()
     market_prices.clear()
     snapshot.clear()
     runner_attempts.clear()
