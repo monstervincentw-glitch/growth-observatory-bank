@@ -1,0 +1,50 @@
+name: 美股收盤監控
+on:
+  schedule:
+    # After the 06:17 run and the 07:00/07:20 Taipei backups.
+    - cron: '45 23 * * 1-5'
+    # 14:30 Taipei, after the multi-hour schedule delay seen on 2026-11-17.
+    - cron: '30 6 * * 2-6'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read published research
+        run: |
+          git fetch --depth=1 origin research-data
+          git show FETCH_HEAD:release.json > /tmp/research-release.json
+      - name: Check US close freshness
+        id: freshness
+        run: node engine/us-close-watch.mjs /tmp/research-release.json /tmp/us-watch.json
+      - name: Open or update the US close alert
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="美股收盤監控：資料過期、失敗或未觸發"
+          body="$(cat /tmp/us-watch.json 2>/dev/null || echo '{"ok":false,"code":"UPDATE_FAILED","detail":"監控沒有產出結果"}')"
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number')"
+          if [ -n "$number" ]; then
+            gh issue comment "$number" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"
+          fi
+      - name: Close recovered US close alerts
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="美股收盤監控：資料過期、失敗或未觸發"
+          number="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "$title in:title" --json number --jq '.[0].number')"
+          if [ -n "$number" ]; then
+            gh issue close "$number" --repo "$GITHUB_REPOSITORY" --comment "後續檢查已看到符合日曆的美股收盤，關閉這次監控警示。"
+          fi
