@@ -102,3 +102,12 @@ MOPS 原 PDF 下載僅試一份（2330 2026Q3），回應是 HTTP 200 的安全�
 [官方原 PDF 與完整核對明細下載](https://chatgpt.com/library?file_id=libfile_80c0575efc0481918f9d506ed12c5fd0&account_id=personal)
 
 [去重原始數值 CSV](https://github.com/monstervincentw-glitch/growth-observatory-bank/blob/research-data/filing-evidence/TW/numeric-audit/raw-facts.csv) · [策略欄位 CSV](https://github.com/monstervincentw-glitch/growth-observatory-bank/blob/research-data/filing-evidence/TW/numeric-audit/derived-fields.csv) · [進度狀態 JSON](https://github.com/monstervincentw-glitch/growth-observatory-bank/blob/research-data/filing-evidence/TW/numeric-audit/latest.json)
+
+## 正式保存與驗收證據
+
+- 程式與核對文件：[16dbc8c](https://github.com/monstervincentw-glitch/growth-observatory-bank/commit/16dbc8cf79b099f0a816bd88e07ae5e400755625)。
+- 研究資料層：[b2c4f9a](https://github.com/monstervincentw-glitch/growth-observatory-bank/commit/b2c4f9abf3083e593a7e9c0fcf7677bb3744cc86)，只新增八份核對資料／矩陣，沒有覆寫歷史研究輸入。
+- 原績效分支仍為 `368be54908650364b364ef2812677778de913917`，整個分支未變。
+- 正式離線核對保護：[Actions 44554685515](https://github.com/monstervincentw-glitch/growth-observatory-bank/actions/runs/44554685515)，五項測試成功。
+- 從正式研究資料分支重新讀回，驗證全部原始來源 SHA-256 保持一致、壓縮矩陣可解碼，去重原始值 1,697 筆、策略欄位 973 筆，新增官方吻合筆數恰為 22／14。
+- 後續收盤工作沿用資料分支並只增修其自身資料檔，因此本次核對證據會保留；未修改原收盤排程或來源請求頻率。

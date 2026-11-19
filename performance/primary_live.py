@@ -33,6 +33,8 @@ def sealed_engine(market):
 def load_archive(inputs, market, days):
     folder = inputs/'primary-inputs'/market
     by_day = {}
+    proof_path=inputs/'financial-numerical-evidence'/f'{market}.json'
+    numeric= json.loads(proof_path.read_text())['stocks'] if proof_path.exists() else {}
     historical_tw = {
         '2026-11-04','2026-11-05','2026-11-06','2026-11-09',
         '2026-11-10','2026-11-11','2026-11-12','2026-11-13',
@@ -75,6 +77,15 @@ def load_archive(inputs, market, days):
                         raise ValueError(f'{market} {day}: original report availability mismatch')
             elif data.get('status') not in ('RESEARCH_VERIFIED','POINT_IN_TIME_INPUT_VERIFIED'):
                 raise ValueError(f'{market} {day}: invalid archived research input')
+            for symbol,stock in data.get('stocks',{}).items():
+                evidence=numeric.get(symbol,{}).get((stock.get('financialVersion') or {}).get('period'))
+                if evidence:
+                    # Attach already-completed official checks to the actual
+                    # research row. Never replace financial values or clocks.
+                    stock['financial']['numericalEvidence']=evidence
+                    stock['officialFinancialNumbersVerified']=(evidence['strategyFieldsVerified'] and
+                        all(stock['financial'].get(field)==proof['value']
+                            for field,proof in evidence['strategyFields'].items()))
             by_day[date] = data
     return by_day
 

@@ -450,6 +450,11 @@ def backtest(research, nav):
         st.warning("台股歷史證據附條件：2016～11/4 基準採估計財報可得日；"
                    "11/4～11/16 含事後重建，公告時間已核對，但原始財報數值版本仍待完整驗證。"
                    "績效計算通過不等於當時可得資料全部驗證；既有報酬與交易紀錄保留。")
+        filled=performance_status().get('TW',{}).get('numericEvidenceProgress',{})
+        if filled:
+            st.caption(f"已補入官方數值證據：沿用 {filled['reusedOfficialYtdFields']} 項累計損益核對；"
+                       f"新增 {filled['newRawFacts']} 項原始數值、{filled['newStrategyFields']} 項策略欄位，"
+                       f"涵蓋 {filled['completeNumericVersions']} 組財報；其餘 {filled['pendingNumericVersions']} 組待補。")
     section = st.segmented_control(
         "回測內容區塊", ["淨值總覽", "歷年績效", "歷史研究"],
         default="淨值總覽", key="bank-backtest-section",
