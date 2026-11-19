@@ -1,0 +1,867 @@
+{
+  "schema": 1,
+  "status": "REPLAY_AND_LEDGER_MATCHED",
+  "through": "2026-11-04",
+  "cohortCount": 11,
+  "cohorts": [
+    {
+      "year": 2016,
+      "sessions": 2634,
+      "buys": 122,
+      "sells": 114,
+      "extras": 0,
+      "gateCalls": 922,
+      "gateReasons": {
+        "CORE_NOT_FULL": 890,
+        "CORE_SCORE_MISSING": 32
+      },
+      "coreFullCashGateCalls": [
+        {
+          "date": "2019-04-11",
+          "signalDate": "2019-04-10",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3401811.192728588,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-12",
+          "signalDate": "2019-04-11",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3367687.4527517185,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-15",
+          "signalDate": "2019-04-12",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3363223.9935170743,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-16",
+          "signalDate": "2019-04-15",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3398775.669907537,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-17",
+          "signalDate": "2019-04-16",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3412750.4914983395,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-18",
+          "signalDate": "2019-04-17",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3433093.6988654425,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-19",
+          "signalDate": "2019-04-18",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3427816.845495126,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-22",
+          "signalDate": "2019-04-19",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3408951.2692006645,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-23",
+          "signalDate": "2019-04-22",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3384286.672598757,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-24",
+          "signalDate": "2019-04-23",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3358986.38678441,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-25",
+          "signalDate": "2019-04-24",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3352265.9931844277,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-26",
+          "signalDate": "2019-04-25",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3339015.8839701437,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-29",
+          "signalDate": "2019-04-26",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3307508.771126847,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-04-30",
+          "signalDate": "2019-04-29",
+          "core": 10,
+          "missingCoreScores": 1,
+          "cash": 769519.4525920823,
+          "navOpen": 3244203.3885900937,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-02",
+          "signalDate": "2019-04-30",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3283995.2019978007,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-03",
+          "signalDate": "2019-05-02",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3305696.006754747,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-06",
+          "signalDate": "2019-05-03",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3254758.837077339,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-07",
+          "signalDate": "2019-05-06",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3251525.6759293587,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-08",
+          "signalDate": "2019-05-07",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3266739.521057265,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-09",
+          "signalDate": "2019-05-08",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3290193.7732801996,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-10",
+          "signalDate": "2019-05-09",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3243884.72972534,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-13",
+          "signalDate": "2019-05-10",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3165890.298430313,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-14",
+          "signalDate": "2019-05-13",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3065847.2178211953,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-15",
+          "signalDate": "2019-05-14",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3131590.1651528855,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-16",
+          "signalDate": "2019-05-15",
+          "core": 10,
+          "missingCoreScores": 3,
+          "cash": 769519.4525920823,
+          "navOpen": 3155097.781917364,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-17",
+          "signalDate": "2019-05-16",
+          "core": 10,
+          "missingCoreScores": 3,
+          "cash": 769519.4525920823,
+          "navOpen": 3134972.555707246,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-20",
+          "signalDate": "2019-05-17",
+          "core": 10,
+          "missingCoreScores": 3,
+          "cash": 769519.4525920823,
+          "navOpen": 3042630.1745146387,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-21",
+          "signalDate": "2019-05-20",
+          "core": 10,
+          "missingCoreScores": 3,
+          "cash": 769519.4525920823,
+          "navOpen": 2986581.5949797006,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-22",
+          "signalDate": "2019-05-21",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3057313.522493817,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-23",
+          "signalDate": "2019-05-22",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 2999790.5250702254,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-24",
+          "signalDate": "2019-05-23",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3016551.449225374,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        },
+        {
+          "date": "2019-05-27",
+          "signalDate": "2019-05-24",
+          "core": 10,
+          "missingCoreScores": 2,
+          "cash": 769519.4525920823,
+          "navOpen": 3014250.4192912793,
+          "threshold": null,
+          "eligibleExtraCount": 0,
+          "reason": "CORE_SCORE_MISSING"
+        }
+      ],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "d8c3c266310f25bb131b6dbeb35dc5b2680fdbb9af1c766ffa0061762273d6bc",
+          "B_sha256": "d8c3c266310f25bb131b6dbeb35dc5b2680fdbb9af1c766ffa0061762273d6bc",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "afd1542021c5537db298631115658d65505e6250efe7f564549626552fcdfd42",
+          "B_sha256": "afd1542021c5537db298631115658d65505e6250efe7f564549626552fcdfd42",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "9108c8319c1722af468ae017d9d4ee42c32b2302a0423534d41c5f322b3b4053",
+          "B_sha256": "9108c8319c1722af468ae017d9d4ee42c32b2302a0423534d41c5f322b3b4053",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "f35e1190ced7f2d33f099a0aeb723ba63a687f10aea76472e2b648700aa472ed",
+          "B_sha256": "f35e1190ced7f2d33f099a0aeb723ba63a687f10aea76472e2b648700aa472ed",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "B_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2017,
+      "sessions": 2392,
+      "buys": 120,
+      "sells": 112,
+      "extras": 0,
+      "gateCalls": 668,
+      "gateReasons": {
+        "CORE_NOT_FULL": 668
+      },
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "d4ec52994c2ac7dc0c8e84956bb1809a7487c949f1ea0923d58689dc396453ad",
+          "B_sha256": "d4ec52994c2ac7dc0c8e84956bb1809a7487c949f1ea0923d58689dc396453ad",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "1fcd511dfa9fa482aee359b0c71560daca28f3614dcd86528d5b45d58f8dd1fc",
+          "B_sha256": "1fcd511dfa9fa482aee359b0c71560daca28f3614dcd86528d5b45d58f8dd1fc",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "ba1359d782d93bf43b0165973a222734abbb5edef8d9db77124d4faa040f0441",
+          "B_sha256": "ba1359d782d93bf43b0165973a222734abbb5edef8d9db77124d4faa040f0441",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "866ebcb9f420159d4639232a58348a2a6645ff728aa273c0a42335847f9bd840",
+          "B_sha256": "866ebcb9f420159d4639232a58348a2a6645ff728aa273c0a42335847f9bd840",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "cb141e98fb2fe774fd5bc0a31fd24efe0892bfb386276c6b22a2b28d63210443",
+          "B_sha256": "cb141e98fb2fe774fd5bc0a31fd24efe0892bfb386276c6b22a2b28d63210443",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2018,
+      "sessions": 2149,
+      "buys": 114,
+      "sells": 106,
+      "extras": 0,
+      "gateCalls": 419,
+      "gateReasons": {
+        "CORE_NOT_FULL": 419
+      },
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "b7b0972f1ddb4d37528817354b7ca4a4714dc40fa8b013104fd863ffebb0c771",
+          "B_sha256": "b7b0972f1ddb4d37528817354b7ca4a4714dc40fa8b013104fd863ffebb0c771",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "d744179a8750c9345a406a87fc81637cf4ebe78733b83d5ca27c0aa04e882ed2",
+          "B_sha256": "d744179a8750c9345a406a87fc81637cf4ebe78733b83d5ca27c0aa04e882ed2",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "8fd9896148695a888ee231dc75c0ea30dca2a7f5c70ccc14c7aa827b1ed51d1d",
+          "B_sha256": "8fd9896148695a888ee231dc75c0ea30dca2a7f5c70ccc14c7aa827b1ed51d1d",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "fffc1d224d461272bb3b1d3e5d6fe4e84e78fe7115303e4b50157c7dd8919be0",
+          "B_sha256": "fffc1d224d461272bb3b1d3e5d6fe4e84e78fe7115303e4b50157c7dd8919be0",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "B_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2019,
+      "sessions": 1902,
+      "buys": 107,
+      "sells": 99,
+      "extras": 0,
+      "gateCalls": 357,
+      "gateReasons": {
+        "CORE_NOT_FULL": 357
+      },
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "d70e95f25028ad1d4aeefcd213c4f33d3a341337e7b53c118dd15f8a55a2be13",
+          "B_sha256": "d70e95f25028ad1d4aeefcd213c4f33d3a341337e7b53c118dd15f8a55a2be13",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "58ce11345fbf363e9cc920c94fbc3dad3fcbd1e9c4ca34fad2e8a33488c53779",
+          "B_sha256": "58ce11345fbf363e9cc920c94fbc3dad3fcbd1e9c4ca34fad2e8a33488c53779",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "6273cca20135bde7aa2bcbe8ec372a8caec63d0cf99421e6d0dd4caaeb335627",
+          "B_sha256": "6273cca20135bde7aa2bcbe8ec372a8caec63d0cf99421e6d0dd4caaeb335627",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "a22aa1d979c9267a8e7c4bf1ba3e9df1a7fdb3cea7e49de842c161b39922803e",
+          "B_sha256": "a22aa1d979c9267a8e7c4bf1ba3e9df1a7fdb3cea7e49de842c161b39922803e",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "B_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2020,
+      "sessions": 1660,
+      "buys": 93,
+      "sells": 85,
+      "extras": 0,
+      "gateCalls": 326,
+      "gateReasons": {
+        "CORE_NOT_FULL": 326
+      },
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "ed9bf2cfaff4b2895f7ec6ad8a52e4d6f84d0d8ead1570c7363da88a61fcf638",
+          "B_sha256": "ed9bf2cfaff4b2895f7ec6ad8a52e4d6f84d0d8ead1570c7363da88a61fcf638",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "8e7dff9f85fab313a0e10249b3c671b41bd8fca960a1b957191e85d9965c6ccb",
+          "B_sha256": "8e7dff9f85fab313a0e10249b3c671b41bd8fca960a1b957191e85d9965c6ccb",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "d69798195a3898528040cd5145eb52e4007512ca4874237f28b3f1124187d541",
+          "B_sha256": "d69798195a3898528040cd5145eb52e4007512ca4874237f28b3f1124187d541",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "9d4862e1feda79704f381cb287d8592cbb1d54e7e948c1a904873a9bc3e3699a",
+          "B_sha256": "9d4862e1feda79704f381cb287d8592cbb1d54e7e948c1a904873a9bc3e3699a",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "B_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2021,
+      "sessions": 1415,
+      "buys": 82,
+      "sells": 74,
+      "extras": 0,
+      "gateCalls": 317,
+      "gateReasons": {
+        "CORE_NOT_FULL": 317
+      },
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "2346e4dd81e89c4deae46e13ffb1d518e80a0d008697ad95fdc28de9620edd0c",
+          "B_sha256": "2346e4dd81e89c4deae46e13ffb1d518e80a0d008697ad95fdc28de9620edd0c",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "674f2c2d6f9ccbf80bfb81d83cc46fadf4dd493230f88170ab7e08d8983dc6b3",
+          "B_sha256": "674f2c2d6f9ccbf80bfb81d83cc46fadf4dd493230f88170ab7e08d8983dc6b3",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "4381e98877a864874949de9a91a7c5053097ec5bf1920f51c8b65f3c9ea84312",
+          "B_sha256": "4381e98877a864874949de9a91a7c5053097ec5bf1920f51c8b65f3c9ea84312",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "554381b4312f28ac0242172a41abee8665bfbe711fcdd9b47d480ae801eca164",
+          "B_sha256": "554381b4312f28ac0242172a41abee8665bfbe711fcdd9b47d480ae801eca164",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "B_sha256": "fd9db431b0eed53f8b95a758cf8c25f1ff7f5393412aa3d0ce9d753affabd2cc",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2022,
+      "sessions": 1171,
+      "buys": 74,
+      "sells": 66,
+      "extras": 0,
+      "gateCalls": 317,
+      "gateReasons": {
+        "CORE_NOT_FULL": 317
+      },
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "349bf42defce543bc7d6dbeb9dcc3f67fc1b4d7c74f4336a06a9163fd34bc312",
+          "B_sha256": "349bf42defce543bc7d6dbeb9dcc3f67fc1b4d7c74f4336a06a9163fd34bc312",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "fe4a5b221749dd5e3137e31bc13139d73d9881c04a1ffa48070e9cf6bc1cabe7",
+          "B_sha256": "fe4a5b221749dd5e3137e31bc13139d73d9881c04a1ffa48070e9cf6bc1cabe7",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "ffcf7a7887f1c3df2758e45ccf70c165a96560100340c89d56fdd50381076d35",
+          "B_sha256": "ffcf7a7887f1c3df2758e45ccf70c165a96560100340c89d56fdd50381076d35",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "22ca66b216eb1099cf8d039e3753f8ae6b11c48ebb65e0e27a1eb590a467fb82",
+          "B_sha256": "22ca66b216eb1099cf8d039e3753f8ae6b11c48ebb65e0e27a1eb590a467fb82",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "42dd9bfea4ae105df5729562ba058eba7ec771493119d72e7b91de227c322374",
+          "B_sha256": "42dd9bfea4ae105df5729562ba058eba7ec771493119d72e7b91de227c322374",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2023,
+      "sessions": 925,
+      "buys": 43,
+      "sells": 35,
+      "extras": 0,
+      "gateCalls": 182,
+      "gateReasons": {
+        "CORE_NOT_FULL": 182
+      },
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "73a544a701e3ada82cfcce8a6ba1d1d77746cce378696e3ede75a42ffdf6e4b1",
+          "B_sha256": "73a544a701e3ada82cfcce8a6ba1d1d77746cce378696e3ede75a42ffdf6e4b1",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "8e927f996b0027634aaae0a6d633c1d84289a69e770da6a4942af2f575ca5bf0",
+          "B_sha256": "8e927f996b0027634aaae0a6d633c1d84289a69e770da6a4942af2f575ca5bf0",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "e119ce191d1aa140112855e7842cbee0a65b0462bd37f21af263d5625347743f",
+          "B_sha256": "e119ce191d1aa140112855e7842cbee0a65b0462bd37f21af263d5625347743f",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "db073bf766d9286d27018716d2040882ec1b544d9ee5aa414d8f153ecb549d0b",
+          "B_sha256": "db073bf766d9286d27018716d2040882ec1b544d9ee5aa414d8f153ecb549d0b",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "42dd9bfea4ae105df5729562ba058eba7ec771493119d72e7b91de227c322374",
+          "B_sha256": "42dd9bfea4ae105df5729562ba058eba7ec771493119d72e7b91de227c322374",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2024,
+      "sessions": 686,
+      "buys": 27,
+      "sells": 19,
+      "extras": 0,
+      "gateCalls": 94,
+      "gateReasons": {
+        "CORE_NOT_FULL": 94
+      },
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "716c93314b336ce3a693f2f43a9c0853d92a883b6511ffd0179018d612759350",
+          "B_sha256": "716c93314b336ce3a693f2f43a9c0853d92a883b6511ffd0179018d612759350",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "5254d911a453d5af55507964b7c04cc81f29ada63590c1f419fef9e1ec8f9d27",
+          "B_sha256": "5254d911a453d5af55507964b7c04cc81f29ada63590c1f419fef9e1ec8f9d27",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "07d588b2ab0f43218bc7cbb6b6b28858cbcb0dc98c0d4ec9fb5df0159b4eb5d5",
+          "B_sha256": "07d588b2ab0f43218bc7cbb6b6b28858cbcb0dc98c0d4ec9fb5df0159b4eb5d5",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "796a329734413360b0eeb3a2d35c03b8226ed2057450461734e1005296caa839",
+          "B_sha256": "796a329734413360b0eeb3a2d35c03b8226ed2057450461734e1005296caa839",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "42dd9bfea4ae105df5729562ba058eba7ec771493119d72e7b91de227c322374",
+          "B_sha256": "42dd9bfea4ae105df5729562ba058eba7ec771493119d72e7b91de227c322374",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2025,
+      "sessions": 444,
+      "buys": 24,
+      "sells": 15,
+      "extras": 0,
+      "gateCalls": 0,
+      "gateReasons": {},
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "735f4e39a1303224642aff0c133d230adc4c2ad6de5124f91308f1b5c6fbf7df",
+          "B_sha256": "735f4e39a1303224642aff0c133d230adc4c2ad6de5124f91308f1b5c6fbf7df",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "864756fcca1b46e06a169c01fa0ce9b1b1a83b0a9c896937810910af3b52e0cd",
+          "B_sha256": "864756fcca1b46e06a169c01fa0ce9b1b1a83b0a9c896937810910af3b52e0cd",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "d1ebe15e523e619348ba9005d103b35932a94182f34fb047af1da0879007304a",
+          "B_sha256": "d1ebe15e523e619348ba9005d103b35932a94182f34fb047af1da0879007304a",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "2bec5c461d3551212c9e3410a63d35e674494c725d8febba358f0224bedfcdb5",
+          "B_sha256": "2bec5c461d3551212c9e3410a63d35e674494c725d8febba358f0224bedfcdb5",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "874f3eeb737d0ad45d609d5a289c2e88943d08dd9b25e44dddbf0fc02c4a47c4",
+          "B_sha256": "874f3eeb737d0ad45d609d5a289c2e88943d08dd9b25e44dddbf0fc02c4a47c4",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    },
+    {
+      "year": 2026,
+      "sessions": 201,
+      "buys": 13,
+      "sells": 4,
+      "extras": 0,
+      "gateCalls": 0,
+      "gateReasons": {},
+      "coreFullCashGateCalls": [],
+      "ledgers": {
+        "daily": {
+          "A_sha256": "77c095ef8cd42e8842236f96f7de08873fc4d1df014272ed2a3907eecdf0484a",
+          "B_sha256": "77c095ef8cd42e8842236f96f7de08873fc4d1df014272ed2a3907eecdf0484a",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "orders": {
+          "A_sha256": "106b5bc4069547ac502390fb0aa5ebeb83c5f6739dbdfa86b68a23f7eb19ce88",
+          "B_sha256": "106b5bc4069547ac502390fb0aa5ebeb83c5f6739dbdfa86b68a23f7eb19ce88",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "closed": {
+          "A_sha256": "6b47202aae75a6df44762c28220c87983745aff48477d6191d2182e3ddea63bc",
+          "B_sha256": "6b47202aae75a6df44762c28220c87983745aff48477d6191d2182e3ddea63bc",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "positions": {
+          "A_sha256": "2f4da221b12da12096f3c3c83f322d4d9f2d27f089b93adb459ca201eb3d9cf6",
+          "B_sha256": "2f4da221b12da12096f3c3c83f322d4d9f2d27f089b93adb459ca201eb3d9cf6",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        },
+        "rejects": {
+          "A_sha256": "1dc5faaa33dd9615146e2b145b5cdc956af833ab9845dceec55f40cf5d4af676",
+          "B_sha256": "1dc5faaa33dd9615146e2b145b5cdc956af833ab9845dceec55f40cf5d4af676",
+          "byteIdentical": true,
+          "originalEngineReplayMatched": true
+        }
+      }
+    }
+  ],
+  "rulesChanged": false,
+  "engineSha256": {
+    "backtest.py": "841224c8e144750479115bf8923a384b84847649c34d8388ec550fe65832e2b5",
+    "prepare.py": "b4739842cf5a831618f076adde8ee1149981506a9e27078073854877a1aadd92",
+    "config.json": "0cf4842bfee42ec1488d1d90b035ee05606b342f8d3e80dd52d570fee801361e",
+    "equity_ab.py": "58a8cca93db65f0abef08f32e530b6e73ef0492e4b3d9520f3d2ff86e021b05d"
+  },
+  "continuationThrough": "2026-11-19",
+  "continuationLedgerComparisons": [
+    {
+      "batchThrough": "2026-11-16",
+      "accounts": 22,
+      "allPairedAccountsExactlyEqual": true
+    },
+    {
+      "batchThrough": "2026-11-17",
+      "accounts": 22,
+      "allPairedAccountsExactlyEqual": true
+    },
+    {
+      "batchThrough": "2026-11-19",
+      "accounts": 22,
+      "allPairedAccountsExactlyEqual": true
+    }
+  ]
+}

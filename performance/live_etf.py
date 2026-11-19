@@ -92,7 +92,7 @@ def signals_for(data_root, cutoff):
     return signals, evidence
 
 
-def normalized_prices(feed, state, anchor, sessions, overlap):
+def normalized_prices(feed, state, anchor, sessions, overlap, *, sealed=None, ledger=None, revisions=None, resolve_sealed=None):
     if feed['status'] != 'VERIFIED':
         raise PartialData(str(feed['errors']))
     if feed['source'] != 'Yahoo Finance chart' or feed['priceBasis'] != PRICE_BASIS:
@@ -119,11 +119,22 @@ def normalized_prices(feed, state, anchor, sessions, overlap):
         np.testing.assert_allclose(frame.adjOpen/frame.adjClose, frame.open/frame.close, rtol=1e-9)
         scale = marks[symbol]['tr_close']/frame.loc[anchor,'adjClose']
         adjusted = frame[['adjOpen','adjClose']].rename(columns={'adjOpen':'tr_open','adjClose':'tr_close'})*scale
-        np.testing.assert_allclose(adjusted.loc[anchor,'tr_open'], marks[symbol]['tr_open'], rtol=0, atol=1e-8)
+        if not np.isclose(adjusted.loc[anchor,'tr_open'],marks[symbol]['tr_open'],rtol=0,atol=1e-8):
+            if sealed is None and resolve_sealed is not None:
+                sealed,ledger=resolve_sealed()
+            if sealed is None or ledger is None:
+                raise ValueError(f'{symbol} {anchor.date()}: opening quote vintage changed; sealed-source reconciliation required')
+            from etf_vintages import reconcile_anchor
+            selected, audit = reconcile_anchor(symbol,frame,adjusted,marks[symbol],anchor,
+                                               overlap[symbol],sealed,ledger)
+            if revisions is not None:revisions.append(audit)
+        else:
+            selected = adjusted
+        np.testing.assert_allclose(selected.loc[anchor,'tr_open'], marks[symbol]['tr_open'], rtol=0, atol=1e-8)
         reference = pd.Series(overlap[symbol],dtype=float)
         reference.index = pd.DatetimeIndex(reference.index)
         np.testing.assert_allclose(adjusted.loc[reference.index,'tr_close'], reference, rtol=1e-6, atol=1e-8)
-        result[symbol] = adjusted.loc[needed]
+        result[symbol] = selected.loc[needed]
         next_overlap[symbol] = {str(d.date()):float(v) for d,v in adjusted.tr_close.tail(4).items()}
     return result, next_overlap
 
@@ -176,7 +187,17 @@ def advance(data_root, feed, prior, destination):
     raw = (prior/'overlap.json').read_bytes()
     if sha256(raw).hexdigest()!=manifest['overlap_sha256']:
         raise ValueError('ETF quote overlap checksum mismatch')
-    prices, overlap = normalized_prices(feed,state,anchor,sessions,json.loads(raw))
+    # A later vendor vintage may revise an already sealed opening bar. Resolve
+    # its provenance before calculation; never change either source or old P&L.
+    from etf_vintages import sealed_vintage
+    source=dict(checkpointBatch=manifest['batch'],checkpointStateSha256=manifest['state_sha256'])
+    def resolve_sealed():
+        sealed,ledger,provenance=sealed_vintage(data_root,prior,manifest['through'],manifest)
+        source.update(provenance)
+        return sealed,ledger
+    revisions=[]
+    prices, overlap = normalized_prices(feed,state,anchor,sessions,json.loads(raw),
+                                       resolve_sealed=resolve_sealed,revisions=revisions)
     signals, evidence = signals_for(data_root,cutoff)
     if signals.loc[sessions,'score'].isna().any():
         raise PartialData('ETF funding signal is unknown')
@@ -201,5 +222,7 @@ def advance(data_root, feed, prior, destination):
     release.update(batch=batch,calculated_at=datetime.now(timezone.utc).isoformat())
     archive_state(destination,release,state,overlap)
     (destination/'ledger.json').write_text(json.dumps(dict(batch=batch,source_batch=feed['batch'],
-        price_date=feed['cutoff'],macro_evidence=evidence,daily=daily,trades=trades),allow_nan=False)+'\n')
+        price_date=feed['cutoff'],macro_evidence=evidence,daily=daily,trades=trades,
+        price_vintage=dict(sealedSource=source,newSourceBatch=feed['batch'],newSourceObservedAt=feed['observedAt'],
+                          revisions=revisions,historyRewritten=False)),allow_nan=False)+'\n')
     return release

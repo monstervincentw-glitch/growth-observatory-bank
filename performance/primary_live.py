@@ -80,6 +80,11 @@ def load_archive(inputs, market, days):
 
 
 def point_in_time(archive, market):
+    """Check replay input eligibility; retrospective numerics remain qualified.
+
+    Original report publication times alone do not attest the later-observed
+    vendor's numerical vintage. performance/quality.py reports that separately.
+    """
     day = archive['cutoff']
     missing = []
     stocks = archive['stocks']

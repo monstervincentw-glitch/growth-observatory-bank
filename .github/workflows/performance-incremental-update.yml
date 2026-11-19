@@ -12,7 +12,13 @@ on:
       - performance/primary_valuation.py
       - performance/primary_live.py
       - performance/tw_daily_inputs.py
+      - performance/production.py
+      - performance/live_etf.py
+      - performance/etf_vintages.py
+      - performance/quality.py
+      - performance/engine/equity_ab.py
       - tests/test_tw_daily_inputs.py
+      - tests/test_performance_quality.py
       - .github/workflows/performance-incremental-update.yml
 permissions:
   contents: write
@@ -36,6 +42,10 @@ jobs:
         env:
           PYTHONPATH: performance:.
         run: python -m unittest discover -s tests -p 'test_tw_daily_inputs.py' -v
+      - name: Verify source-vintage and subsystem health safeguards
+        env:
+          PYTHONPATH: performance:.
+        run: python -m unittest discover -s tests -p 'test_performance_quality.py' -v
       - name: Load published research and last performance checkpoint
         run: |
           git fetch --depth=1 origin research-data
@@ -66,3 +76,27 @@ jobs:
             cat /tmp/performance-data/status.json
             echo '~~~'
           } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: performance-subsystem-status
+          path: /tmp/performance-data/status.json
+          retention-days: 30
+  subsystem-health:
+    name: 績效驗收 / ${{ matrix.scope }}
+    needs: publish
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        scope: [ETF, US, TW]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: performance-subsystem-status
+          path: /tmp/performance-status
+      - name: Report this subsystem independently after valid data publication
+        run: python performance/quality.py /tmp/performance-status/status.json "${{ matrix.scope }}"

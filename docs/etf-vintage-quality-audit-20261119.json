@@ -1,0 +1,77 @@
+{
+  "independentReplayFrom": "2026-11-12",
+  "independentReplayThrough": "2026-11-13",
+  "cohorts": 976,
+  "allEconomicCheckpointFieldsExactlyEqual": true,
+  "oneBatchVersusSequentialMaxCumulativeDifference": 0.0,
+  "positionsAndCashExactlyEqual": true,
+  "originalLedgersByteIdentical": true,
+  "through": "2026-11-18",
+  "priceVintage": {
+    "sealedSource": {
+      "checkpointBatch": "etf-8bcc62d746d1b424",
+      "checkpointStateSha256": "c9003acfef1ef79046a64c79cb583ed8dc6070900beebb0079e4a22efc7edd2a",
+      "path": "etf-inputs/2026-11-13.json",
+      "sha256": "ff4f59b7b348ff30745aedb3c0efe1a44112a27a391a8b9c2c6a2062f41347d7",
+      "batch": "v29-00779a6b76431862",
+      "observedAt": "2026-11-14T00:30:42.356Z"
+    },
+    "newSourceBatch": "v29-56de650e8f5a1db2",
+    "newSourceObservedAt": "2026-11-19T13:44:29.491Z",
+    "revisions": [
+      {
+        "symbol": "IEF",
+        "date": "2026-11-13",
+        "classification": "PROVIDER_UNUSED_HISTORICAL_OPEN_REVISION",
+        "sealedOpen": 90.01399993896484,
+        "laterOpen": 90.02999877929688,
+        "sealedClose": 90.04000091552734,
+        "laterClose": 90.04000091552734,
+        "sealedAdjustmentFactor": 1.0,
+        "laterAdjustmentFactor": 1.0,
+        "anchorTrades": 0,
+        "policy": "Sealed source through anchor; new source strictly after anchor; no historical recalculation"
+      },
+      {
+        "symbol": "QQQ",
+        "date": "2026-11-13",
+        "classification": "PROVIDER_UNUSED_HISTORICAL_OPEN_REVISION",
+        "sealedOpen": 688.510009765625,
+        "laterOpen": 688.5399780273438,
+        "sealedClose": 679.8900146484375,
+        "laterClose": 679.8900146484375,
+        "sealedAdjustmentFactor": 1.0,
+        "laterAdjustmentFactor": 1.0,
+        "anchorTrades": 0,
+        "policy": "Sealed source through anchor; new source strictly after anchor; no historical recalculation"
+      },
+      {
+        "symbol": "SOXX",
+        "date": "2026-11-13",
+        "classification": "PROVIDER_UNUSED_HISTORICAL_OPEN_REVISION",
+        "sealedOpen": 153.25999450683594,
+        "laterOpen": 153.32000732421875,
+        "sealedClose": 149.3000030517578,
+        "laterClose": 149.3000030517578,
+        "sealedAdjustmentFactor": 1.0,
+        "laterAdjustmentFactor": 1.0,
+        "anchorTrades": 0,
+        "policy": "Sealed source through anchor; new source strictly after anchor; no historical recalculation"
+      },
+      {
+        "symbol": "TLT",
+        "date": "2026-11-13",
+        "classification": "PROVIDER_UNUSED_HISTORICAL_OPEN_REVISION",
+        "sealedOpen": 79.30500030517578,
+        "laterOpen": 79.30000305175781,
+        "sealedClose": 79.37999725341797,
+        "laterClose": 79.37999725341797,
+        "sealedAdjustmentFactor": 1.0,
+        "laterAdjustmentFactor": 1.0,
+        "anchorTrades": 0,
+        "policy": "Sealed source through anchor; new source strictly after anchor; no historical recalculation"
+      }
+    ],
+    "historyRewritten": false
+  }
+}

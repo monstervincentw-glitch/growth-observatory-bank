@@ -119,6 +119,8 @@ def build_tw(eng):
         ("'reason':'fundamental_funding'+('_divergence' if policy=='buy_hold' else '')","'reason':'excess_cash_high_score' if sequence else 'fundamental_funding','position_type':'extra' if sequence else 'core','score':row['selection_score'],'core_max_score':threshold if sequence else np.nan"),
         ("'positions':len(positions),'exposure'","'positions':len(positions),'core_positions':sum(p['position_type']=='core' for p in positions.values()),'exposure'"),
         ("slots=cfg['maximum_positions']-(len(positions)-len(pending_exits))","slots=cfg['maximum_positions']-sum(p['position_type']=='core' and s not in pending_exits for s,p in positions.items())"),
+        ("assert cash>=-1e-5 and len(positions)<=cfg['maximum_positions']",
+         "assert cash>=-1e-5 and sum(p['position_type']=='core' for p in positions.values())<=cfg['maximum_positions'] and (extras or len(positions)<=cfg['maximum_positions'])"),
     ]:
         code=replace_once(code,old,new)
     start=code.index('            if not sequence')

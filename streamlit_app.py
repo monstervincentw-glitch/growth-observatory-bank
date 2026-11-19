@@ -485,6 +485,10 @@ def backtest(research, nav):
         legacy_backtest(market)
         return
 
+    if market == "TW":
+        st.warning("台股歷史證據附條件：2016～11/4 基準採估計財報可得日；"
+                   "11/4～11/16 含事後重建，公告時間已核對，但原始財報數值版本仍待完整驗證。"
+                   "績效計算通過不等於當時可得資料全部驗證；既有報酬與交易紀錄保留。")
     st.subheader(f"歷年回測比較 · 截至 {end_year} 年")
     st.caption("各起始年獨立投入本金 1，統一比較至所選結束年。"
                + ("" if end_year == latest_year else " 回撤依月末淨值取樣，可能低於逐日最大回撤。"))
@@ -861,6 +865,12 @@ def records(data, source, batch):
     st.write(f"**來源** {source}　**批次** {batch or '封存備援'}")
     st.write(f"**同步驗收標記** {data['qa']}")
     update_status(current_update_state())
+    subsystems=performance_status()
+    table([{"子系統":scope,"計算狀態":row.get("calculationStatus",row.get("status")),
+            "資料品質":row.get("evidenceStatus",row.get("status")),
+            "績效日期":row.get("through"),"要求日期":row.get("requested"),
+            "錯誤":row.get("detail") or row.get("valuationError") or row.get("evidenceError") or ""}
+           for scope,row in subsystems.items()],label="績效子系統獨立驗收")
     attempts, _ = runner_attempts()
     for attempt in attempts.values():
         result = {"same_close":"同一收盤，保留快照","failed":"來源更新失敗","published":"研究批次已發布","quotes_only":"行情已發布，策略批次待驗證"}[attempt["status"]]

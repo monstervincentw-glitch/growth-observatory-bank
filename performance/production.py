@@ -99,6 +99,21 @@ def main():
             result[market]['valuationThrough']=mark_valuation(args.inputs,release,args.output,market)
         except (OSError, ValueError, TypeError, KeyError) as exc:
             result[market]['valuationError']=str(exc)[:400]
+    # Preserve valid accounts while making evidence qualifications explicit.
+    from quality import audit_tw, qualify_tw
+    try:
+        evidence=audit_tw(args.inputs,args.output)
+        save(args.output/'quality/TW-evidence.json',evidence)
+        qualify_tw(result['TW'],evidence)
+        path=args.output/'primary/TW/release.json'
+        published=json.loads(path.read_text())
+        published['evidence']=dict(status=evidence['status'],pointInTimeFullyVerified=False,
+            calculation=evidence['calculation'],path='quality/TW-evidence.json')
+        save(path,published)
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        result['TW']['evidenceError']=str(exc)[:400]
+        if result['TW']['status'] in ('VERIFIED','NO_NEW_DATA'):
+            result['TW']['status']='EVIDENCE_AUDIT_FAILED'
     report = dict(schema=1, run=args.run, at=datetime.now(timezone.utc).isoformat(), results=result)
     save(args.output/'status.json',report)
     save(args.output/'runs'/f'{args.run}.json',report)
