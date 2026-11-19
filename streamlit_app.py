@@ -53,7 +53,7 @@ def snapshot():
         account = st.secrets.get("google_service_account")
     except FileNotFoundError:
         account = None
-    entry, state = verified_research_reader().read(lambda: fetch_bank_json("research-data", "release.json")["rows"],
+    entry, state = verified_research_reader().read(lambda: fetch_bank_json(research_revision(), "release.json")["rows"],
         source="github", fallback=lambda: fetch_rows(csv_url, account))
     return entry["snapshot"] if entry else None, state
 
@@ -297,6 +297,16 @@ def fetch_bank_json(branch, path, limit=2_000_000):
     if len(raw)>limit:
         raise ValueError("銀行版資料超過大小限制")
     return json.loads(raw)
+
+
+@st.cache_data(ttl=180, show_spinner=False)
+def research_revision():
+    url = "https://api.github.com/repos/monstervincentw-glitch/growth-observatory-bank/git/ref/heads/research-data"
+    with urlopen(Request(url, headers={"Accept":"application/vnd.github+json"}), timeout=15) as response:
+        revision = json.load(response)["object"]["sha"]
+    if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):
+        raise ValueError("GitHub 研究發布版本無效")
+    return revision
 
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -732,11 +742,11 @@ def advisor(research, research_close=None):
 def runner_attempts():
     try:
         try:
-            attempts=fetch_bank_json("research-data","attempts.json",262_144)
+            attempts=fetch_bank_json(research_revision(),"attempts.json",262_144)
         except HTTPError as error:
             if error.code != 404:
                 raise
-            attempt=fetch_bank_json("research-data","attempt.json",262_144)
+            attempt=fetch_bank_json(research_revision(),"attempt.json",262_144)
             attempts={attempt["market"]:attempt}
         for market, record in attempts.items():
             if market not in ("US", "TW") or record["market"] != market or record["status"] not in ("published", "same_close", "failed", "quotes_only"):
@@ -844,6 +854,7 @@ def clear_research_caches():
     snapshot.clear()
     runner_attempts.clear()
     sheets_pipeline_status.clear()
+    research_revision.clear()
 
 
 def records(data, source, batch):

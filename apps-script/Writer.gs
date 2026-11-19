@@ -20,7 +20,11 @@ function syncBankResearch() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) return;
   try {
-    const response = UrlFetchApp.fetch(SOURCE+'?v='+Math.floor(Date.now()/60000), {muteHttpExceptions:true});
+    const refResponse = UrlFetchApp.fetch('https://api.github.com/repos/monstervincentw-glitch/growth-observatory-bank/git/ref/heads/research-data', {muteHttpExceptions:true,headers:{Accept:'application/vnd.github+json'}});
+    if(refResponse.getResponseCode()!==200) throw new Error('GitHub 發布版本查核 HTTP '+refResponse.getResponseCode());
+    const revision=JSON.parse(refResponse.getContentText()).object.sha;
+    if(!/^[a-f0-9]{40}$/.test(revision)) throw new Error('GitHub 發布版本無效');
+    const response = UrlFetchApp.fetch(SOURCE.replace('/research-data/','/'+revision+'/'), {muteHttpExceptions:true});
     if (response.getResponseCode() !== 200) throw new Error('研究排程發布來源 HTTP '+response.getResponseCode());
     const release = JSON.parse(response.getContentText());
     const attempt = release.attempt;
