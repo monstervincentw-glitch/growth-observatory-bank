@@ -53,7 +53,7 @@ def snapshot():
         account = st.secrets.get("google_service_account")
     except FileNotFoundError:
         account = None
-    entry, state = verified_research_reader().read(lambda: fetch_bank_json(research_revision(), "release.json")["rows"],
+    entry, state = verified_research_reader().read(lambda: research_publication()["rows"],
         source="github", fallback=lambda: fetch_rows(csv_url, account))
     return entry["snapshot"] if entry else None, state
 
@@ -288,10 +288,10 @@ def market_picker(column, *, label_visibility="visible"):
                                             label_visibility=label_visibility) or "美股"]
 
 
-def fetch_bank_json(branch, path, limit=2_000_000):
+def fetch_bank_json(branch, path, limit=2_000_000, cache_key=None):
     base = "https://raw.githubusercontent.com/monstervincentw-glitch/growth-observatory-bank/"
     # Match the app cache window so a GitHub CDN entry from a prior run cannot linger.
-    request = Request(f"{base}{branch}/{path}?v={int(datetime.now().timestamp())//90}")
+    request = Request(f"{base}{branch}/{path}?v={cache_key or int(datetime.now().timestamp())//90}")
     with urlopen(request, timeout=15) as response:
         raw = response.read(limit+1)
     if len(raw)>limit:
@@ -299,14 +299,14 @@ def fetch_bank_json(branch, path, limit=2_000_000):
     return json.loads(raw)
 
 
-@st.cache_data(ttl=180, show_spinner=False)
-def research_revision():
-    url = "https://api.github.com/repos/monstervincentw-glitch/growth-observatory-bank/git/ref/heads/research-data"
-    with urlopen(Request(url, headers={"Accept":"application/vnd.github+json"}), timeout=15) as response:
-        revision = json.load(response)["object"]["sha"]
-    if len(revision) != 40 or any(c not in "0123456789abcdef" for c in revision):
-        raise ValueError("GitHub 研究發布版本無效")
-    return revision
+@st.cache_data(ttl=90, show_spinner=False)
+def research_publication():
+    metadata = fetch_bank_json("research-data", "attempt.json", 262_144)
+    batch_id = metadata["batch"]
+    release = fetch_bank_json("research-data", "release.json", cache_key=batch_id)
+    if release["rows"][1][0] != batch_id:
+        raise ValueError("GitHub 靜態狀態與研究批次尚未一致")
+    return release
 
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -742,11 +742,11 @@ def advisor(research, research_close=None):
 def runner_attempts():
     try:
         try:
-            attempts=fetch_bank_json(research_revision(),"attempts.json",262_144)
+            attempts=fetch_bank_json("research-data","attempts.json",262_144)
         except HTTPError as error:
             if error.code != 404:
                 raise
-            attempt=fetch_bank_json(research_revision(),"attempt.json",262_144)
+            attempt=fetch_bank_json("research-data","attempt.json",262_144)
             attempts={attempt["market"]:attempt}
         for market, record in attempts.items():
             if market not in ("US", "TW") or record["market"] != market or record["status"] not in ("published", "same_close", "failed", "quotes_only"):
@@ -854,7 +854,7 @@ def clear_research_caches():
     snapshot.clear()
     runner_attempts.clear()
     sheets_pipeline_status.clear()
-    research_revision.clear()
+    research_publication.clear()
 
 
 def records(data, source, batch):

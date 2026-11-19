@@ -35,15 +35,15 @@ function gas(state,release){
  let http=0,reads=0,writes=0;
  const context={console,Date,LockService:{getScriptLock:()=>({tryLock:()=>true,releaseLock(){}})},
  PropertiesService:{getScriptProperties:()=>({getProperty:k=>state[k]??null,setProperty:(k,v)=>state[k]=v,setProperties:o=>Object.assign(state,o)})},
- UrlFetchApp:{fetch:()=>{http++;return {getResponseCode:()=>200,getContentText:()=>JSON.stringify(http===1?{object:{sha:'a'.repeat(40)}}:release)}}},
+ UrlFetchApp:{fetch:()=>{http++;return {getResponseCode:()=>200,getHeaders:()=>({}),getContentText:()=>JSON.stringify(http===1?{batch:'v29-aaaaaaaaaaaaaaaa'}:release)}}},
  Sheets:{Spreadsheets:{Values:{batchGet:()=>{reads++;throw Error('unexpected Sheets read')}},batchUpdate:()=>{writes++;throw Error('unexpected Sheets write')}}}};
  vm.createContext(context);vm.runInContext(writer,context);context.syncBankResearch();return {http,reads,writes};
 }
-test('five-minute unchanged revision does one GitHub metadata GET and zero Sheets operations',()=>{
- assert.deepEqual(gas({LAST_RESEARCH_REVISION:'a'.repeat(40)}),{http:1,reads:0,writes:0});
+test('five-minute unchanged revision does one static metadata GET and zero Sheets operations',()=>{
+ assert.deepEqual(gas({LAST_RESEARCH_BATCH:'v29-aaaaaaaaaaaaaaaa'}),{http:1,reads:0,writes:0});
 });
-test('changed GitHub archive revision with same successful batch never writes Sheets',()=>{
- assert.deepEqual(gas({LAST_RESEARCH_BATCH:'v29-same'},{attempt:{},rows:[[],['v29-same']]}),{http:2,reads:0,writes:0});
+test('same successful batch across repeated checks never writes Sheets',()=>{
+ assert.deepEqual(gas({LAST_RESEARCH_BATCH:'v29-aaaaaaaaaaaaaaaa'},{attempt:{},rows:[[],['v29-aaaaaaaaaaaaaaaa']]}),{http:1,reads:0,writes:0});
 });
 test('same published close skips every market API and research replay before context loading',async()=>{
  const base=await mkdtemp(join(tmpdir(),'research-no-fetch-'));

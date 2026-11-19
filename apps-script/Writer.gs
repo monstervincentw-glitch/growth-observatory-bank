@@ -21,26 +21,30 @@ function syncBankResearch() {
   if (!lock.tryLock(20000)) return;
   try {
     const state=PropertiesService.getScriptProperties();
-    if(Number(state.getProperty('GITHUB_COOLDOWN_UNTIL')||0)>Date.now()) return;
-    const refResponse = UrlFetchApp.fetch('https://api.github.com/repos/monstervincentw-glitch/growth-observatory-bank/git/ref/heads/research-data', {muteHttpExceptions:true,headers:{Accept:'application/vnd.github+json'}});
-    if([429,403].includes(refResponse.getResponseCode())){
-      state.setProperty('GITHUB_COOLDOWN_UNTIL',String(Date.now()+3600000));
-      throw new Error('GitHub 限流：停止檢查一小時');
+    if(Number(state.getProperty('STATIC_GITHUB_COOLDOWN_UNTIL')||0)>Date.now()) return;
+    // Public static status only: no GitHub REST quota and no market API calls.
+    const metaOptions={muteHttpExceptions:true,headers:{}};
+    const etag=state.getProperty('RESEARCH_ETAG');
+    if(etag)metaOptions.headers['If-None-Match']=etag;
+    const metaResponse=UrlFetchApp.fetch(SOURCE.replace('/release.json','/attempt.json')+'?slot='+Math.floor(Date.now()/300000),metaOptions);
+    if(metaResponse.getResponseCode()===304) return;
+    if([429,403].includes(metaResponse.getResponseCode())){
+      state.setProperty('STATIC_GITHUB_COOLDOWN_UNTIL',String(Date.now()+3600000));
+      throw new Error('GitHub 靜態來源限流，停止檢查一小時');
     }
-    if(refResponse.getResponseCode()!==200) throw new Error('GitHub 發布版本查核 HTTP '+refResponse.getResponseCode());
-    const revision=JSON.parse(refResponse.getContentText()).object.sha;
-    if(!/^[a-f0-9]{40}$/.test(revision)) throw new Error('GitHub 發布版本無效');
-    if(state.getProperty('LAST_RESEARCH_REVISION')===revision) return;
-    const response = UrlFetchApp.fetch(SOURCE.replace('/research-data/','/'+revision+'/'), {muteHttpExceptions:true});
+    if(metaResponse.getResponseCode()!==200)throw new Error('GitHub 靜態狀態 HTTP '+metaResponse.getResponseCode());
+    const latest=JSON.parse(metaResponse.getContentText());
+    if(!/^v29-[a-f0-9]{16}$/.test(latest.batch))throw new Error('GitHub 研究批次無效');
+    if(state.getProperty('LAST_RESEARCH_BATCH')===latest.batch) return;
+    const revision=latest.batch;
+    const response = UrlFetchApp.fetch(SOURCE+'?batch='+latest.batch, {muteHttpExceptions:true});
     if (response.getResponseCode() !== 200) throw new Error('研究排程發布來源 HTTP '+response.getResponseCode());
     const release = JSON.parse(response.getContentText());
     const attempt = release.attempt;
     if (!attempt) return;
     const rows = release.rows;
     const batch=rows?.[1]?.[0];
-    if(state.getProperty('LAST_RESEARCH_BATCH')===batch){
-      state.setProperty('LAST_RESEARCH_REVISION',revision);return;
-    }
+    if(batch!==latest.batch)throw new Error('GitHub 靜態快取尚未一致，等待下次檢查；不寫入 Sheets');
     const verified = verifyEnvelope_(rows);
     const ranges = Sheets.Spreadsheets.Values.batchGet(BOOK,{ranges:['bank_snapshot!A2:E300','bank_runs!A2:A',
       'system_status!A1:C25','macro_latest!A1:J7','us_candidates!A1:U100','tw_candidates!A1:U100',
@@ -48,7 +52,8 @@ function syncBankResearch() {
     const existing = ranges[0].values || [];
     const recorded = ranges[1].values || [];
     if(existing[0]?.[0]===batch){
-      state.setProperties({LAST_RESEARCH_REVISION:revision,LAST_RESEARCH_BATCH:batch});return;
+      state.setProperties({LAST_RESEARCH_REVISION:revision,LAST_RESEARCH_BATCH:batch});
+      if(metaResponse.getHeaders().ETag)state.setProperty('RESEARCH_ETAG',metaResponse.getHeaders().ETag);return;
     }
     const pending = Object.values(release.attempts || {[attempt.market]:attempt}).filter(a=>a.status==='published' && a.batch===batch && !recorded.some(row=>row[0]===a.at));
     const requests = [];
@@ -67,6 +72,7 @@ function syncBankResearch() {
     if (!requests.length) return;
     Sheets.Spreadsheets.batchUpdate({requests},BOOK);
     state.setProperties({LAST_RESEARCH_REVISION:revision,LAST_RESEARCH_BATCH:batch});
+    if(metaResponse.getHeaders().ETag)state.setProperty('RESEARCH_ETAG',metaResponse.getHeaders().ETag);
     console.log(JSON.stringify({at:attempt.at,market:attempt.market,status:attempt.status,batch:attempt.batch}));
   } catch (error) {
     console.error(String(error.message||error));
