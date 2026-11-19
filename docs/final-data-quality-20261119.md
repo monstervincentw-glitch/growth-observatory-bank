@@ -73,3 +73,14 @@ IEF 的 11/13 原封存（11/14 00:30:42Z 取得）開盤為 `90.01399993896484`
 排程、同收盤日跳過、退避、防重疊及 Sheets 新批次才同步均未修改。待 11/20 自然交易日確認：美股 06:17（有限次補跑 07:17、08:17），台股 16:30、17:30、18:30、21:27；確認新增來源批次、ETF 及主策略增量、分系統健康工作與網站快取更新。以上皆為台北時間。
 
 仍未完成的是歷史財報「數值版本」與原始財報逐項核實，不能靠等下個交易日自動消除，也不會冒稱正式歷史資料全部驗證。
+
+## 正式發布與網站實際驗收
+
+- 主修復部署：[33af8e4](https://github.com/monstervincentw-glitch/growth-observatory-bank/commit/33af8e477e4a173ecbc7799d81a13614cce5ab0f)。台股證據提示擴及所有回測分頁：[2be89b5](https://github.com/monstervincentw-glitch/growth-observatory-bank/commit/2be89b5e15b9d5431d1170c03cddb0cf0ac2db53)。
+- 真實績效執行：[44548777379](https://github.com/monstervincentw-glitch/growth-observatory-bank/actions/runs/44548777379)，發布及 ETF、US、TW 三個獨立健康工作均完成。TW 工作明確留下歷史數值版本待驗證 warning。
+- `performance-data` 發布：[368be54](https://github.com/monstervincentw-glitch/growth-observatory-bank/commit/368be54908650364b364ef2812677778de913917)，ETF=`VERIFIED` through 11/18；US=`NO_NEW_DATA` through 11/18；TW=`CALCULATED_EVIDENCE_QUALIFIED` through 11/19。
+- 下載正式發布分支後重新比對：原 US/TW 檢查點與交易帳本逐位元組完全相同，TW release 除新增 evidence metadata 外所有數值相同；既有 ETF 交易帳本亦逐位元組相同。
+- 正式銀行版 `/advisor` 已實際顯示「ETF 績效截止 2026-11-18 · GitHub 正式績效 · etf-014e8194ab476341 · 更新 2026-11-19 22:54」，未再顯示原 VALIDATION_FAILED。
+- 正式 `/backtest` 切台股，實際顯示證據附條件提示、淨值截止 11/19、2026 組 A/B 均 +49.62%，與原數字相同。
+- 正式 `/updates` 已實際顯示三列「績效子系統獨立驗收」，ETF 11/18 VERIFIED、US 11/18 NO_NEW_DATA、TW 11/19 QUALIFIED_RECONSTRUCTED_HISTORY；沒有把總排程成功當成所有資料品質全部驗證。
+- 同次觸發的介面檢查與隔離台股重建工作亦成功；隔離報告仍維持非正式歷史證據狀態。
