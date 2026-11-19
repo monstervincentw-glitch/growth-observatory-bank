@@ -156,7 +156,7 @@ export async function readMacroVintage(series:typeof SERIES[number],vintage:stri
  if(!response.ok)throw new Error(series+' 總經來源 HTTP '+response.status);
  return response.text();
 }
-export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,market:Market='US',allowUnavailable=false,diagnostic?:Diagnostic):Promise<Macro>{
+export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,market:Market='US',allowUnavailable=false,diagnostic?:Diagnostic,liveResearch=false):Promise<Macro>{
  const asof=macroCutoff(cutoff),cpiVintage=latestCpiVintage(asof,cutoff,market==='US');
  try{
   // An older transport payload cannot override a fresh request for this close.
@@ -173,18 +173,18 @@ export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,mark
    }
    raw=Object.fromEntries(results.flatMap(r=>r.status==='fulfilled'?[r.value]:[]));
   }
-  if(transportError)return unavailableMacro(cutoff,asof,raw,transportError,new Date(),cpiVintage);
-  try{return scoreMacro(cutoff,asof,raw,new Date(),cpiVintage);}
-  catch(error){return unavailableMacro(cutoff,asof,raw,error,new Date(),cpiVintage);}
+  if(transportError)return unavailableMacro(cutoff,asof,raw,transportError,new Date(),cpiVintage,liveResearch);
+  try{return scoreMacro(cutoff,asof,raw,new Date(),cpiVintage,liveResearch);}
+  catch(error){return unavailableMacro(cutoff,asof,raw,error,new Date(),cpiVintage,liveResearch);}
  }catch(error){throw Object.assign(error instanceof Error?error:new Error(String(error)),{requiredMacroVintageDate:asof,requiredCpiVintageDate:cpiVintage,marketCloseDate:cutoff});}
 }
 export interface RefreshContext{market:Market;cutoff:string;benchmarks:Record<string,Bar[]>;marketDates?:string[];macro:Macro;createdAt:string;}
-export async function makeContext(market:Market,supplied?:MacroSeriesInput,allowMacroUnavailable=false,diagnostic?:(type:string,symbol:string|null)=>Diagnostic):Promise<RefreshContext>{
+export async function makeContext(market:Market,supplied?:MacroSeriesInput,allowMacroUnavailable=false,diagnostic?:(type:string,symbol:string|null)=>Diagnostic,liveResearch=false):Promise<RefreshContext>{
  const closed=latestClosedDate(market);const benchmarks:Record<string,Bar[]>={};let cutoff=closed,marketDates:string[]|undefined;
  if(market==='US'){for(const name of ['QQQ','SOXX','IGV'])benchmarks[name]=await yahoo(name,'US',closed,diagnostic?.('benchmark',name));cutoff=benchmarks.QQQ.at(-1)!.date;}
  else{const b=await taiwanBenchmark(closed,diagnostic?.('benchmark','0052'));benchmarks['0052']=b.bars;marketDates=b.dates;cutoff=b.dates.at(-1)!;}
  if(!cutoff||days(closed,cutoff)>5)throw new Error('市場交易日曆或基準行情過期');
- const macro=await refreshMacro(cutoff,supplied,market,allowMacroUnavailable,diagnostic?.('macro',null));return{market,cutoff,benchmarks,marketDates,macro,createdAt:new Date().toISOString()};
+ const macro=await refreshMacro(cutoff,supplied,market,allowMacroUnavailable,diagnostic?.('macro',null),liveResearch);return{market,cutoff,benchmarks,marketDates,macro,createdAt:new Date().toISOString()};
 }
 export function priceFeatures(bars:Bar[],benchmark:Bar[]){
  const bmap=new Map(benchmark.map(b=>[b.date,b.adjClose]));const ref=(date:string)=>benchmark.filter(b=>b.date<=date).at(-1)?.adjClose??NaN;

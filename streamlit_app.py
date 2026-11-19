@@ -101,6 +101,12 @@ def funding_details(macro):
             rows.append({"細項":label,"數值":macro.get(value),"變動或年化":macro.get(change),
                          "觀測日期":info.get("observationDate"),"版本日期":info.get("vintageDate"),"來源":series})
         table(rows, label="資金溫度資料版本")
+        estimates = macro.get("researchEstimates") or []
+        if estimates:
+            st.caption("通膨使用研究估算 ESTIMATED_INTERPOLATED；官方原始缺值保留，未套用至正式歷史回測。")
+            table([{"序列": e["series"], "月份": e["date"][:7], "估算指數": e["value"],
+                    "方法": e["method"], "季調": e["seasonalAdjustment"],
+                    "取得時間": stamp(e["firstObservedAt"])} for e in estimates], label="通膨研究補值")
         st.caption("利率、金融條件、通膨各至多一分。最低分已達 2 則觸發，最高分低於 2 則未達門檻，其他為未知。")
 
 def markets(market, block, signal_available, latest_quotes=None):
@@ -742,8 +748,25 @@ def runner_attempts():
         return {}, "更新紀錄無法驗證"
 
 
+@st.cache_data(ttl=90, show_spinner=False)
+def sheets_pipeline_status():
+    config_path = BASE / "data/sheets-url.txt"
+    url = environ.get("RESEARCH_SHEETS_URL") or config_path.read_text().strip()
+    try:
+        rows = fetch_rows(url)
+        from sheets_data import parse_envelope
+        entry = parse_envelope(rows)
+        return entry["batch"], entry["checksum"], None
+    except Exception as error:
+        return None, None, str(error)[:200]
+
+
 def update_status(state, quote=None):
     """Keep public market health concise; put diagnostics behind an expander."""
+    for market, info in state["markets"].items():
+        label = "美股" if market == "US" else "台股"
+        status = "更新異常" if info.get("reason") else "成功"
+        st.caption(f"{label}最後成功收盤 {info.get('date') or '待核對'} · 更新 {stamp(info.get('lastSuccessAt'))} · {status}")
     summaries = []
     for market, info in state["markets"].items():
         label = "美股" if market == "US" else "台股"
@@ -759,7 +782,13 @@ def update_status(state, quote=None):
                 summaries.append(f"{label}資料待驗證；沿用 {last_date}")
     if summaries:
         st.caption("⚠️ " + "｜".join(summaries))
+    sheet_batch, sheet_checksum, sync_error = sheets_pipeline_status()
+    if sync_error:
+        st.caption("⚠️ Sheets 同步查核失敗：" + sync_error)
+    elif sheet_batch != state.get("batch") or sheet_checksum != state.get("checksum"):
+        st.caption("⚠️ GitHub → Sheets 尚未同步最新批次；網站使用 GitHub 已驗證資料。")
     with st.expander("資料更新狀態與錯誤明細", expanded=False):
+        st.caption(f"GitHub → Sheets：{'吻合' if sheet_batch == state.get('batch') and sheet_checksum == state.get('checksum') else '待同步'} · Sheets 批次 {sheet_batch or '讀取失敗'}")
         for market, info in state["markets"].items():
             label = "美股" if market == "US" else "台股"
             count = lambda value: "—" if value is None else value
@@ -814,6 +843,7 @@ def clear_research_caches():
     market_prices.clear()
     snapshot.clear()
     runner_attempts.clear()
+    sheets_pipeline_status.clear()
 
 
 def records(data, source, batch):
@@ -856,6 +886,8 @@ def market_page():
         state=current_update_state(attempts.result())
         quote=prices.result()
     update_status(state,quote)
+    if block_estimates := (data or {}).get("markets", {}).get(market, {}).get("macro", {}).get("researchEstimates"):
+        st.caption("通膨含幾何插值研究估算（ESTIMATED_INTERPOLATED）；詳見資金數據。")
     if data is None:
         return
     block = data["markets"][market]

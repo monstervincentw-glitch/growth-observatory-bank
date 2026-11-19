@@ -9,9 +9,10 @@ const LEGACY = {
 const HEADER = ['batch_id','part','parts','sha256','payload_json'];
 
 function installBankSync() {
-  if (!ScriptApp.getProjectTriggers().some(trigger => trigger.getHandlerFunction() === 'syncBankResearch')) {
-    ScriptApp.newTrigger('syncBankResearch').timeBased().everyHours(1).create();
+  for (const trigger of ScriptApp.getProjectTriggers()) {
+    if (trigger.getHandlerFunction() === 'syncBankResearch') ScriptApp.deleteTrigger(trigger);
   }
+  ScriptApp.newTrigger('syncBankResearch').timeBased().everyMinutes(5).create();
   syncBankResearch();
 }
 
@@ -19,7 +20,7 @@ function syncBankResearch() {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) return;
   try {
-    const response = UrlFetchApp.fetch(SOURCE, {muteHttpExceptions:true});
+    const response = UrlFetchApp.fetch(SOURCE+'?v='+Math.floor(Date.now()/60000), {muteHttpExceptions:true});
     if (response.getResponseCode() !== 200) throw new Error('研究排程發布來源 HTTP '+response.getResponseCode());
     const release = JSON.parse(response.getContentText());
     const attempt = release.attempt;
@@ -27,13 +28,13 @@ function syncBankResearch() {
     const rows = release.rows;
     const verified = verifyEnvelope_(rows);
     const ranges = Sheets.Spreadsheets.Values.batchGet(BOOK,{ranges:['bank_snapshot!A2:E300','bank_runs!A2:A',
-      'system_status!A1:C19','macro_latest!A1:J7','us_candidates!A1:U100','tw_candidates!A1:U100',
+      'system_status!A1:C25','macro_latest!A1:J7','us_candidates!A1:U100','tw_candidates!A1:U100',
       'backtest_summary!A1:J100','risk_dashboard!A1:M100'],valueRenderOption:'UNFORMATTED_VALUE'}).valueRanges;
     const existing = ranges[0].values || [];
     const recorded = ranges[1].values || [];
-    if (recorded.some(row => row[0] === attempt.at)) return;
+    const pending = Object.values(release.attempts || {[attempt.market]:attempt}).filter(a=>!recorded.some(row=>row[0]===a.at));
     const requests = [];
-    if (attempt.status === 'published' && existing[0]?.[0] !== rows[1][0]) {
+    if (existing[0]?.[0] !== rows[1][0]) {
       const previous = verifyEnvelope_([HEADER,...existing]);
       for (const market of ['US','TW']) {
         if (verified.markets[market].macro.marketAsOf < previous.markets[market].macro.marketAsOf)
@@ -43,8 +44,9 @@ function syncBankResearch() {
         rows:rows.map(cells_),fields:'userEnteredValue'}});
       requests.push(...legacyRequests_(verified,rows[1][0],ranges.slice(2).map(x=>x.values||[])));
     }
-    requests.push({appendCells:{sheetId:RUNS_ID,rows:[cells_([attempt.at,attempt.market,attempt.status,attempt.batch,
-      attempt.us_close,attempt.tw_close,attempt.updated,attempt.failed,attempt.detail])],fields:'userEnteredValue'}});
+    for (const a of pending) requests.push({appendCells:{sheetId:RUNS_ID,rows:[cells_([a.at,a.market,a.status,a.batch,
+      a.us_close,a.tw_close,a.updated,a.failed,a.detail])],fields:'userEnteredValue'}});
+    if (!requests.length) return;
     Sheets.Spreadsheets.batchUpdate({requests},BOOK);
     console.log(JSON.stringify({at:attempt.at,market:attempt.market,status:attempt.status,batch:attempt.batch}));
   } catch (error) {
@@ -89,6 +91,12 @@ function legacyRequests_(snapshot, batch, existing) {
     throw new Error('既有六個研究分頁欄位不符');
   const compatible='v25-'+batch.split('-')[1].slice(0,12);
   const lookup={batch_id:compatible,site_version:String(snapshot.sourceVersion)};
+  // Refresh old compatibility failure fields with this publication.
+  lookup.last_attempt_at=snapshot.generatedAt;
+  lookup.last_attempt_market='US/TW';
+  lookup.last_attempt_state='VERIFIED_SYNC';
+  lookup.last_attempt_note='GitHub 研究封套已通過 SHA-256，同步至 Sheets';
+  lookup.last_successful_batch=compatible;
   const labels={rates:'利率',conditions:'金融條件',inflation:'通膨'};
   const keys=['growth','acceleration','operating','cashflow','value'];
   const lights=[macro[0]];
@@ -119,7 +127,7 @@ function legacyRequests_(snapshot, batch, existing) {
     range:{sheetId:LEGACY[name],startRowIndex:start,endRowIndex:max,startColumnIndex:0,endColumnIndex:width},
     rows:rows.map(cells_),fields:'userEnteredValue'}});
   return [
-    replace('system_status',rows.slice(2),19,3,2),
+    replace('system_status',rows.slice(2),rows.length,3,2),
     replace('macro_latest',lights,7,10),
     replace('us_candidates',candidates.US,100,21),
     replace('tw_candidates',candidates.TW,100,21),

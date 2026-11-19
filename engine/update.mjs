@@ -2,7 +2,7 @@ import {randomUUID} from 'node:crypto';
 import {readFile,writeFile} from 'node:fs/promises';
 import {makeContext,refreshInstrument} from './providers.ts';
 import {evaluate,rankInstruments} from './rules.ts';
-import {project,envelope,validate,markets} from './project.mjs';
+import {project,envelope,validate,markets,macroView} from './project.mjs';
 import {createDiagnostics} from './update-diagnostics.mjs';
 import {requirePublishable,verifyMarketInputs} from './publication.mjs';
 import {archiveResearch} from './replay-export.mjs';
@@ -28,7 +28,7 @@ let replayContext;
 let observations;
 
 try{
-  const context=await makeContext(market,undefined,false,report);
+  const context=await makeContext(market,undefined,false,report,true);
   replayContext=context;
   const before=old.markets[market];
   if(context.cutoff<before.macro.marketAsOf)throw Error('基準行情日期倒退，保留前批');
@@ -36,8 +36,23 @@ try{
      !context.macro.categoryStates||Object.values(context.macro.categoryStates).every(x=>x===null))
     throw Error('總經來源或版本驗證失敗');
   if(context.cutoff===before.macro.marketAsOf){
-    attempt.status='same_close';
-    attempt.detail='最近完整收盤已發布；休市或同日重跑。';
+    // Re-evaluate repaired macro inputs even when quotes are already published.
+    const fields=['categoryStates','cpi_yoy','cpi_3m_annualized','real_yield','fed_funds','financial_conditions','dataBasis'];
+    const changed=fields.some(k=>JSON.stringify(context.macro[k]??null)!==JSON.stringify(before.macro[k]??null));
+    if(changed){
+      const now=clock();
+      snapshot=structuredClone(old);
+      const block=snapshot.markets[market];
+      block.macro=macroView({...context.macro,marketComplete:true,lastMarketPublishedAt:now});
+      block.stocks=block.stocks.map(stock=>({...stock,evaluation:evaluate(stock,block.macro)}));
+      block.signalAt=now;snapshot.generatedAt=now;
+      validate(snapshot);
+      attempt.status='published';attempt.updated=markets[market];
+      attempt.detail='同一收盤日重新核對總經與通膨研究補值；行情與排名保留已驗證資料。';
+    }else{
+      attempt.status='same_close';
+      attempt.detail='最近完整收盤已發布；休市或同日重跑。';
+    }
   }else{
     const stocks=[];
     const bars={};

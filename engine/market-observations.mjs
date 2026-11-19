@@ -42,7 +42,7 @@ export async function archiveObservations(folder,{market,context,stocks,previous
       officialFilingVerified:official,financeError:stock._financialError??null};
   }
   const complete=Object.keys(quote).length===previous.filter(s=>!current.get(s.symbol)?.marketEvent).length;
-  const rankReady=complete&&active.length===Object.keys(quote).length&&context.macro.decision!=='unknown'&&
+  const rankReady=!context.macro.researchEstimates?.length&&complete&&active.length===Object.keys(quote).length&&context.macro.decision!=='unknown'&&
     active.every(s=>s.financial.financial_age_days<=180)&&
     !Object.values(quote).some(q=>q.financeError);
   const decisionStatus=rankReady?'POINT_IN_TIME_INPUT_VERIFIED':'DECISION_INPUT_PENDING';

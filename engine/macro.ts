@@ -1,3 +1,4 @@
+import {interpolateCpi} from './cpi-research.mjs';
 import type {Macro,MacroDecision,RiskFlag} from './types.ts';
 
 
@@ -68,13 +69,16 @@ export function decideFunding(categories:NonNullable<Macro['categoryStates']>){
  return {decision,scoreRange:[min,max] as [number,number]};
 }
 
-function calculateMacro(cutoff:string,asof:string,raw:Record<string,string>,clock:Date,cpiVintage:string,transportError?:unknown):Macro{
+function calculateMacro(cutoff:string,asof:string,raw:Record<string,string>,clock:Date,cpiVintage:string,transportError?:unknown,liveResearch=false):Macro{
  if(asof!==macroCutoff(cutoff))throw new Error('總經快照截止日無效');
  const snapshots:Partial<Record<Series,Snapshot>>={},issues:string[]=[];
  for(const s of SERIES){
   try{snapshots[s]=parseFredCsv(s,s==='CPIAUCSL'?cpiVintage:asof,raw[s]);}
   catch(error){issues.push(error instanceof Error?error.message:String(error));}
  }
+ const officialCpi=snapshots.CPIAUCSL;
+ const overlay=interpolateCpi('CPIAUCSL',officialCpi?.rows??[],{vintage:officialCpi?.vintage,acquiredAt:clock.toISOString(),enabled:liveResearch});
+ if(officialCpi)snapshots.CPIAUCSL={...officialCpi,rows:overlay.rows};
  const last=(s:Series)=>snapshots[s]?.rows.at(-1);
  function delta(s:Series){
   const current=last(s);
@@ -119,17 +123,18 @@ function calculateMacro(cutoff:string,asof:string,raw:Record<string,string>,cloc
   macro_stress:full?scoreRange[0]:null,categoryStates,decision,scoreRange,
   legacyStress:[real,policy,conditions,inflation].some(x=>x===null)?undefined:real!+policy!+conditions!+inflation!,
   categories:full?{rates:rates===1,conditions:conditions===1,inflation:inflation===1}:undefined,
+  researchEstimates:overlay.estimates,dataBasis:overlay.estimates.length?'RESEARCH_ESTIMATED':'OFFICIAL_VINTAGE',
   sourceError:problems.length?problems.join('；'):undefined,cpi_yoy:yoy,cpi_3m_annualized:annual,
   real_yield:last('DFII10')?.value??null,real_yield_90d_change:realDelta,fed_funds:last('FEDFUNDS')?.value??null,fed_funds_90d_change:policyDelta,
   financial_conditions:fc??null,financial_conditions_90d_change:fcDelta,...evidence(snapshots,asof,timestamp)
  };
 }
 
-export function unavailableMacro(cutoff:string,asof:string,raw:Record<string,string>,error:unknown,clock=new Date(),cpiVintage=asof):Macro{
- return calculateMacro(cutoff,asof,raw,clock,cpiVintage,error);
+export function unavailableMacro(cutoff:string,asof:string,raw:Record<string,string>,error:unknown,clock=new Date(),cpiVintage=asof,liveResearch=false):Macro{
+ return calculateMacro(cutoff,asof,raw,clock,cpiVintage,error,liveResearch);
 }
-export function scoreMacro(cutoff:string,asof:string,raw:Record<string,string>,clock=new Date(),cpiVintage=asof):Macro{
- const result=calculateMacro(cutoff,asof,raw,clock,cpiVintage);
+export function scoreMacro(cutoff:string,asof:string,raw:Record<string,string>,clock=new Date(),cpiVintage=asof,liveResearch=false):Macro{
+ const result=calculateMacro(cutoff,asof,raw,clock,cpiVintage,undefined,liveResearch);
  if(result.sourceError)throw new Error(result.sourceError);
  return result;
 }

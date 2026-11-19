@@ -3,6 +3,8 @@ on:
   schedule:
     # GitHub Actions uses UTC; US: 06:17 Asia/Taipei (Tue-Sat).
     - cron: '17 22 * * 1-5'
+    - cron: '17 23 * * 1-5'
+    - cron: '17 0,3 * * 2-6'
     # TW: first check at 16:30, then automatic retries at 17:30/18:30.
     # Retain 21:27 as a final fallback if Taiwan market data is delayed.
     # The engine handles same_close without replaying an already published close.
@@ -12,7 +14,7 @@ on:
     - cron: '27 13 * * 1-5'
   push:
     branches: [main]
-    paths: ['engine/market-observations.mjs', 'engine/providers.ts', 'engine/publication.mjs', 'engine/replay-export.mjs']
+    paths: ['engine/**', '.github/workflows/research-update.yml']
   workflow_dispatch:
     inputs:
       market:
@@ -30,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      MARKET: ${{ inputs.market || ((github.event.schedule == '17 22 * * 1-5' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[research-us]'))) && 'US' || 'TW') }}
+      MARKET: ${{ inputs.market || (((github.event.schedule == '17 22 * * 1-5' || github.event.schedule == '17 23 * * 1-5' || github.event.schedule == '17 0,3 * * 2-6') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[research-us]'))) && 'US' || 'TW') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -54,13 +56,13 @@ jobs:
             git show "FETCH_HEAD:financial-versions/$MARKET.json" > /tmp/financial-versions.json
           fi
       - name: Check live research cannot bypass historical replay guards
-        run: node --test tests/live-research-separation.test.mjs tests/tw-financial-reconciliation.test.mjs
+        run: node --test tests/cpi-research.test.mjs tests/live-research-separation.test.mjs tests/tw-financial-reconciliation.test.mjs
       - name: Calculate and validate research
         env:
           PERFORMANCE_INPUT_DIR: /tmp/performance-market-inputs
           FINANCIAL_VERSION_INDEX: /tmp/financial-versions.json
           PERFORMANCE_ETF_CONTEXT: /tmp/performance-etf-context.json
-        run: node engine/update.mjs "$MARKET" /tmp/research-prior.json /tmp/research-release.json
+        run: node engine/update-retry.mjs "$MARKET" /tmp/research-prior.json /tmp/research-release.json
       - name: Publish result without changing the app branch
         run: |
           git config user.name "github-actions[bot]"
@@ -111,5 +113,8 @@ jobs:
               git -C /tmp/research-publish push origin HEAD:refs/heads/research-data
             fi
           fi
+      - name: Verify Google Sheets received the published envelope
+        if: always()
+        run: node engine/check-sheets.mjs /tmp/research-release.json
       - name: Preserve existing research failure reporting
-        run: node -e 'if (require("/tmp/research-release.json").attempt.status === "failed") process.exitCode = 1'
+        run: node -e 'if (["failed","quotes_only"].includes(require("/tmp/research-release.json").attempt.status)) process.exitCode = 1'
