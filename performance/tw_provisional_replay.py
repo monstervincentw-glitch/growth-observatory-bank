@@ -52,7 +52,7 @@ def rebuild_account_scenarios(research, destination):
             temp=Path(work)
             # The official account checkpoint is loaded from the versioned
             # original seed, never copied from conditional fixed-price marks.
-            result=primary_live.evaluate_market(research,release,temp,'TW')
+            result=primary_live.evaluate_market(research,release,temp,'TW',through=marker['through'])
             if result['status']!='VERIFIED':
                 raise primary_live.ResearchGap(
                     'Original Taiwan A/B engine could not reconstruct complete daily trades: '+json.dumps(result))

@@ -11,6 +11,8 @@ on:
       - performance/conditional_curve.py
       - performance/primary_valuation.py
       - performance/primary_live.py
+      - performance/tw_daily_inputs.py
+      - tests/test_tw_daily_inputs.py
       - .github/workflows/performance-incremental-update.yml
 permissions:
   contents: write
@@ -30,6 +32,10 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r performance/requirements.txt
+      - name: Verify Taiwan close-time input recovery safeguards
+        env:
+          PYTHONPATH: performance:.
+        run: python -m unittest discover -s tests -p 'test_tw_daily_inputs.py' -v
       - name: Load published research and last performance checkpoint
         run: |
           git fetch --depth=1 origin research-data

@@ -43,6 +43,8 @@ def load_archive(inputs, market, days):
         path = inputs/'observed-primary-inputs'/market/f'{day}.json'
         if not path.exists():
             path = folder/f'{day}.json'
+        if not path.exists() and market=='TW':
+            path=inputs/'recovered-primary-inputs'/market/f'{day}.json'
         historical = False
         if market=='TW' and day in historical_tw:
             # A consistent historical fiscal vintage (from the original PDF
@@ -175,12 +177,14 @@ def replay_funding(macro, cfg):
     return dict(score=int(lower), date=macro.name, score_range=(int(lower),int(upper)))
 
 
-def evaluate_market(inputs, release, output, market):
+def evaluate_market(inputs, release, output, market, *, through=None):
     cutoff = release['snapshot']['markets'][market]['macro']['marketAsOf']
+    if through is not None:
+        cutoff=min(cutoff,through)
     recent=inputs/'market-observations'/market/'latest.json'
     if recent.exists():
         observation=json.loads(recent.read_text())
-        if observation['market']==market and observation['status']=='PRICES_VERIFIED':
+        if through is None and observation['market']==market and observation['status']=='PRICES_VERIFIED':
             cutoff=max(cutoff,observation['day'])
     directory=output/'primary'/market
     target=directory/'checkpoint.json.gz'
@@ -195,6 +199,10 @@ def evaluate_market(inputs, release, output, market):
         return dict(status='NO_NEW_DATA',through=anchor,requested=cutoff,detail=last.get('detail',''))
     calendar=calendars.get_calendar('XNYS' if market=='US' else 'XTAI')
     sessions=calendar.sessions_in_range(pd.Timestamp(anchor)+pd.Timedelta(days=1),pd.Timestamp(cutoff))
+    recovery=None
+    if market=='TW' and through is None:
+        from tw_daily_inputs import recover_sessions
+        recovery=recover_sessions(inputs,output,release,sessions,pd.Timestamp(anchor),cfg=json.loads((ROOT/'primary_engine/tw/config.json').read_text()))
     archives=load_archive(inputs,market,sessions.insert(0,pd.Timestamp(anchor)))
     missing=[str(day.date()) for day in sessions if day not in archives]
     filing={str(day.date()):codes for day,arc in archives.items() if day>pd.Timestamp(anchor)
@@ -202,6 +210,8 @@ def evaluate_market(inputs, release, output, market):
     result=dict(status='WAITING_FOR_CONTINUITY',through=anchor,requested=cutoff,
         archived_sessions=[str(day.date()) for day in archives if day>pd.Timestamp(anchor)],
         missing_sessions=missing,filing_or_quote_gaps=filing)
+    if recovery is not None:
+        result['input_recovery']=recovery
     if recent.exists() and observation.get('day') in missing:
         absent=sorted(set(observation.get('quotes',{}))-set(observation.get('observations',{})))
         result['latest_observation']=dict(date=observation['day'],
@@ -276,7 +286,9 @@ def evaluate_market(inputs, release, output, market):
         def run(start,end,variant,state):
             return kernel(exchange,start,end,'primary',extras=variant=='B',checkpoint=state)
     try:
-        return publish_primary(run,accounts,cutoff,market,directory,charts,panel)
+        result=publish_primary(run,accounts,cutoff,market,directory,charts,panel)
+        if recovery is not None:result['input_recovery']=recovery
+        return result
     except (AssertionError, KeyError, ValueError) as exc:
         raise ResearchGap(f'{market} {cutoff}: checkpoint validation failed: {exc}') from exc
 
