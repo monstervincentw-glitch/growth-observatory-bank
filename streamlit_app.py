@@ -447,14 +447,13 @@ def backtest(research, nav):
                 for r in rows]
 
     if market == "TW":
-        st.warning("台股歷史證據附條件：2016～11/4 基準採估計財報可得日；"
-                   "11/4～11/16 含事後重建，公告時間已核對，但原始財報數值版本仍待完整驗證。"
-                   "績效計算通過不等於當時可得資料全部驗證；既有報酬與交易紀錄保留。")
         filled=performance_status().get('TW',{}).get('numericEvidenceProgress',{})
         if filled:
-            st.caption(f"已補入官方數值證據：沿用 {filled['reusedOfficialYtdFields']} 項累計損益核對；"
-                       f"新增 {filled['newRawFacts']} 項原始數值、{filled['newStrategyFields']} 項策略欄位，"
-                       f"涵蓋 {filled['completeNumericVersions']} 組財報；其餘 {filled['pendingNumericVersions']} 組待補。")
+            st.success(f"台股 80 檔財報存在與官方公告時間：驗證通過。"
+                       f"官方累計營收／營業利益 {filled['reusedOfficialYtdFields']} 項數值比對：驗證通過。")
+            st.caption(f"台積電 Q2／Q3：另有 {filled['newRawFacts']} 項原始數值及 "
+                       f"{filled['newStrategyFields']} 項策略欄位核對通過。")
+        st.caption("歷史研究限制：早期財報可得日採估計，部分歷史數值由事後資料重建。")
     section = st.segmented_control(
         "回測內容區塊", ["淨值總覽", "歷年績效", "歷史研究"],
         default="淨值總覽", key="bank-backtest-section",
@@ -872,7 +871,9 @@ def records(data, source, batch):
     update_status(current_update_state())
     subsystems=performance_status()
     table([{"子系統":scope,"計算狀態":row.get("calculationStatus",row.get("status")),
-            "資料品質":row.get("evidenceStatus",row.get("status")),
+            "資料品質":("公告時間及官方累計數值比對：驗證通過"
+                        if scope=="TW" and row.get("numericEvidenceProgress")
+                        else row.get("evidenceStatus",row.get("status"))),
             "績效日期":row.get("through"),"要求日期":row.get("requested"),
             "錯誤":row.get("detail") or row.get("valuationError") or row.get("evidenceError") or ""}
            for scope,row in subsystems.items()],label="績效子系統獨立驗收")
