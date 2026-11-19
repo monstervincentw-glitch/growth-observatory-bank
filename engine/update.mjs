@@ -1,6 +1,6 @@
 import {randomUUID} from 'node:crypto';
 import {readFile,writeFile} from 'node:fs/promises';
-import {makeContext,refreshInstrument} from './providers.ts';
+import {makeContext,refreshInstrument,latestClosedDate} from './providers.ts';
 import {evaluate,rankInstruments} from './rules.ts';
 import {project,envelope,validate,markets,macroView} from './project.mjs';
 import {createDiagnostics} from './update-diagnostics.mjs';
@@ -28,9 +28,20 @@ let replayContext;
 let observations;
 
 try{
+  const before=old.markets[market];
+  const previous=prior.attempts?.[market] ?? (prior.attempt?.market===market?prior.attempt:null);
+  if(previous?.rateLimitedUntil && previous.rateLimitedUntil>clock()){
+    attempt.rateLimitedUntil=previous.rateLimitedUntil;
+    throw Error('來源限流冷卻至 '+previous.rateLimitedUntil+'；本次不呼叫行情 API');
+  }
+  const alreadyPublished=latestClosedDate(market)===before.macro.marketAsOf &&
+    before.macro.dataBasis && before.macro.cpi_yoy!==null && before.macro.status==='vintage_verified';
+  if(alreadyPublished && process.env.RESEARCH_FORCE_MACRO_REFRESH!=='1'){
+    attempt.status='same_close';
+    attempt.detail='同一收盤日已完整發布；未呼叫股價、財報、FRED/ALFRED，也未重算研究池。';
+  }else{
   const context=await makeContext(market,undefined,false,report,true);
   replayContext=context;
-  const before=old.markets[market];
   if(context.cutoff<before.macro.marketAsOf)throw Error('基準行情日期倒退，保留前批');
   if(!['vintage_verified','macro_incomplete'].includes(context.macro.status)||
      !context.macro.categoryStates||Object.values(context.macro.categoryStates).every(x=>x===null))
@@ -81,6 +92,7 @@ try{
           errors.push(symbol+': '+String(result.reason?.message||result.reason).slice(0,200));
         }
       }
+      if(diagnostics.errors.some(e=>[429,403].includes(e.code)))throw Error('來源限流或拒絕存取；停止本批後續請求，保留前批');
     }
     if(errors.length)throw Error('部分標的未通過驗證，保留全批：'+errors.join('｜'));
     const now=clock();
@@ -114,6 +126,7 @@ try{
       ?'已發布即時研究與收盤行情；新財報自首次取得後可供研究，尚未證明收盤前可得，不得直接延伸歷史回測。'
       :'收盤已驗證並發布排名。')+'財報及總經狀態：'+JSON.stringify(attempt.health);
   }
+  }
 }catch(error){
   attempt.status='failed';
   marketWide=affected.size===0;
@@ -129,6 +142,8 @@ attempt.notAttempted=attempt.expected-attempt.succeeded-attempt.failed;
 attempt.updated=attempt.succeeded;
 attempt.marketWide=marketWide;
 attempt.affected=[...affected].sort();
+const cooldowns=diagnostics.errors.filter(e=>String(e.code).startsWith('RATE_LIMIT_UNTIL:')).map(e=>String(e.code).slice(17));
+if(cooldowns.length)attempt.rateLimitedUntil=cooldowns.sort().at(-1);
 attempt.errors=diagnostics.errors.map(error=>({...error,batch:id}));
 const previousAttempt=prior.attempts?.[market]??(prior.attempt?.market===market?prior.attempt:null);
 if(attempt.status==='same_close'){
@@ -165,7 +180,7 @@ if(archiveDir&&replayResearch){
 }
 
 const etfContext=process.env.PERFORMANCE_ETF_CONTEXT;
-if(etfContext&&market==='US'&&replayContext&&attempt.status!=='failed'){
+if(etfContext&&market==='US'&&replayContext&&replayResearch&&attempt.status==='published'){
   try {await writeFile(etfContext,JSON.stringify({context:replayContext,batch:id})+'\n');}
   catch(error){console.warn('ETF context: '+String(error.message||error));}
 }

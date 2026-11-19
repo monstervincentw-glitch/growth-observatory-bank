@@ -4,7 +4,7 @@ on:
     # GitHub Actions uses UTC; US: 06:17 Asia/Taipei (Tue-Sat).
     - cron: '17 22 * * 1-5'
     - cron: '17 23 * * 1-5'
-    - cron: '17 0,3 * * 2-6'
+    - cron: '17 0 * * 2-6'
     # TW: first check at 16:30, then automatic retries at 17:30/18:30.
     # Retain 21:27 as a final fallback if Taiwan market data is delayed.
     # The engine handles same_close without replaying an already published close.
@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     env:
-      MARKET: ${{ inputs.market || (((github.event.schedule == '17 22 * * 1-5' || github.event.schedule == '17 23 * * 1-5' || github.event.schedule == '17 0,3 * * 2-6') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[research-us]'))) && 'US' || 'TW') }}
+      MARKET: ${{ inputs.market || (((github.event.schedule == '17 22 * * 1-5' || github.event.schedule == '17 23 * * 1-5' || github.event.schedule == '17 0 * * 2-6') || (github.event_name == 'push' && contains(github.event.head_commit.message, '[research-us]'))) && 'US' || 'TW') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,7 +56,7 @@ jobs:
             git show "FETCH_HEAD:financial-versions/$MARKET.json" > /tmp/financial-versions.json
           fi
       - name: Check live research cannot bypass historical replay guards
-        run: node --test tests/cpi-research.test.mjs tests/live-research-separation.test.mjs tests/tw-financial-reconciliation.test.mjs
+        run: node --test tests/update-safety.test.mjs tests/cpi-research.test.mjs tests/live-research-separation.test.mjs tests/tw-financial-reconciliation.test.mjs
       - name: Calculate and validate research
         env:
           PERFORMANCE_INPUT_DIR: /tmp/performance-market-inputs

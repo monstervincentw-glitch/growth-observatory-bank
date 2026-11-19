@@ -52,10 +52,16 @@ jobs:
           git fetch --depth=1 origin research-data
           git worktree add --detach /tmp/research-data FETCH_HEAD
           test -s /tmp/research-data/financial-versions/TW.json
+      - name: Avoid repeating official APIs after same-close or US retries
+        id: capture
+        run: |
+          node -e 'const fs=require("fs"); const a=require("/tmp/research-data/release.json").attempt; fs.appendFileSync(process.env.GITHUB_OUTPUT,"required="+(a.market==="TW" && a.status==="published" && a.quoteCount===80)+"\n")'
       - name: Query official TWSE announcements and archive time down to seconds
+        if: github.event_name != 'workflow_run' || steps.capture.outputs.required == 'true'
         # A material announcement does NOT certify a complete quarterly report.
         run: node engine/archive-tw-disclosures.mjs /tmp/research-data/financial-versions/TW.json /tmp/research-data/filing-evidence/TW
       - name: Archive official TWSE quarterly income values separately
+        if: github.event_name != 'workflow_run' || steps.capture.outputs.required == 'true'
         # This records first-seen official figures, not each issuer's exact
         # original filing timestamp. Never auto-approve strategy replay.
         run: node engine/archive-tw-financial-statements.mjs /tmp/research-data/financial-versions/TW.json /tmp/research-data/filing-evidence/TW
@@ -72,6 +78,7 @@ jobs:
             git -C /tmp/research-data push origin HEAD:refs/heads/research-data
           fi
       - name: Archive official TPEx OTC quarterly statements and disclosure timestamps
+        if: github.event_name != 'workflow_run' || steps.capture.outputs.required == 'true'
         # Listed and OTC are different exchanges and APIs.
         # Missing OTC data is a visible failure, never treated as company non-filing.
         run: node engine/archive-tw-otc-evidence.mjs /tmp/research-data/financial-versions/TW.json /tmp/research-data/filing-evidence/TW
