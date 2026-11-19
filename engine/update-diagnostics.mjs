@@ -34,3 +34,11 @@ export async function monitoredFetch(url, options, diagnostic) {
     throw error;
   }
 }
+
+export function reportedRateLimit(provider,diagnostic,status=429){
+  const until=Date.now()+(status===403?21600000:3600000);
+  blockedHosts.set(provider,until);
+  diagnostic?.(status,provider);
+  diagnostic?.('RATE_LIMIT_UNTIL:'+new Date(until).toISOString(),provider);
+  return new Error('來源回報配額或存取限制，停止請求：'+provider);
+}

@@ -6,7 +6,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {monitoredFetch} from '../engine/update-diagnostics.mjs';
-import {latestClosedDate} from '../engine/providers.ts';
+import {latestClosedDate,finmind} from '../engine/providers.ts';
 import {evaluate} from '../engine/rules.ts';
 import {envelope} from '../engine/project.mjs';
 const writer=await readFile(new URL('../apps-script/Writer.gs',import.meta.url),'utf8');
@@ -72,4 +72,14 @@ test('same published close skips every market API and research replay before con
   assert.equal(output.attempt.rateLimitedUntil,'2026-11-12T04:00:00Z');
   assert.ok(!output.attempt.detail.includes('NETWORK_FORBIDDEN'));
  }finally{await rm(base,{recursive:true,force:true});}
+});
+
+test('FinMind JSON quota status stops subsequent calls even when HTTP status is 200',async()=>{
+ const old=globalThis.fetch;let calls=0;const errors=[];
+ globalThis.fetch=async()=>{calls++;return new Response(JSON.stringify({status:402,msg:'Requests reach the upper limit'}),{status:200});};
+ try{
+  await assert.rejects(finmind('TaiwanStockPrice','2330','2026-11-01','2026-11-19',(c)=>errors.push(c)),/配額/);
+  await assert.rejects(finmind('TaiwanStockPrice','2454','2026-11-01','2026-11-19',(c)=>errors.push(c)),/冷卻/);
+  assert.equal(calls,1);assert.ok(errors.includes(429));
+ }finally{globalThis.fetch=old;}
 });

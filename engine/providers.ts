@@ -1,4 +1,4 @@
-import {monitoredFetch} from './update-diagnostics.mjs';
+import {monitoredFetch,reportedRateLimit} from './update-diagnostics.mjs';
 import {captureFinMindIncome} from './tw-financial-reconciliation.mjs';
 type Diagnostic = (code:number|string,provider?:string)=>void;
 import {macroCutoff,latestCpiVintage,scoreMacro,unavailableMacro,SERIES,type MacroSeriesInput} from './macro.ts';
@@ -78,6 +78,7 @@ export async function yahoo(ticker:string,market:Market,cutoff:string,diagnostic
 export async function finmind(dataset:string,symbol?:string,start='2018-01-01',end=iso(Date.now()),diagnostic?:Diagnostic){
  const q=new URLSearchParams({dataset,start_date:start,end_date:end});if(symbol)q.set('data_id',symbol);
  const obj=await readJSON('https://api.finmindtrade.com/api/v4/data?'+q,{},diagnostic);
+ if(obj.status!==200 && ([402,429].includes(Number(obj.status)) || /quota|rate.?limit|too many|upper limit|限流|頻率|上限/i.test(String(obj.msg??''))))throw reportedRateLimit('api.finmindtrade.com',diagnostic);
  if(obj.status!==200||!Array.isArray(obj.data))throw new Error(`FinMind ${dataset}: ${obj.msg||'來源格式異常'}`);
  return obj.data as any[];
 }
