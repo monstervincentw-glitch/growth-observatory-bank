@@ -446,6 +446,10 @@ def backtest(research, nav):
                      for plan in "AB" for field in ("cumulative", "cagr", "max_drawdown")}
                 for r in rows]
 
+    if market == "TW":
+        st.warning("台股歷史證據附條件：2016～11/4 基準採估計財報可得日；"
+                   "11/4～11/16 含事後重建，公告時間已核對，但原始財報數值版本仍待完整驗證。"
+                   "績效計算通過不等於當時可得資料全部驗證；既有報酬與交易紀錄保留。")
     section = st.segmented_control(
         "回測內容區塊", ["淨值總覽", "歷年績效", "歷史研究"],
         default="淨值總覽", key="bank-backtest-section",
@@ -485,10 +489,6 @@ def backtest(research, nav):
         legacy_backtest(market)
         return
 
-    if market == "TW":
-        st.warning("台股歷史證據附條件：2016～11/4 基準採估計財報可得日；"
-                   "11/4～11/16 含事後重建，公告時間已核對，但原始財報數值版本仍待完整驗證。"
-                   "績效計算通過不等於當時可得資料全部驗證；既有報酬與交易紀錄保留。")
     st.subheader(f"歷年回測比較 · 截至 {end_year} 年")
     st.caption("各起始年獨立投入本金 1，統一比較至所選結束年。"
                + ("" if end_year == latest_year else " 回撤依月末淨值取樣，可能低於逐日最大回撤。"))
