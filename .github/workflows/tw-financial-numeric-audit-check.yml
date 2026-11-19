@@ -1,0 +1,24 @@
+name: 台股原始財報數值核對保護
+on:
+  push:
+    branches: [main]
+    paths:
+      - performance/tw_numeric_audit.py
+      - tests/test_tw_numeric_audit.py
+      - docs/financial-numeric-audit/2330-official-transcription.json
+      - .github/workflows/tw-financial-numeric-audit-check.yml
+permissions:
+  contents: read
+jobs:
+  offline-evidence-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify YTD, units, comparison quarters and conflicting evidence
+        run: python -m unittest discover -s tests -p 'test_tw_numeric_audit.py' -v
+      - name: Verify audit syntax
+        run: python -m py_compile performance/tw_numeric_audit.py

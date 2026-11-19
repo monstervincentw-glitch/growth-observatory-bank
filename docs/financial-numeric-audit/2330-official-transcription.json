@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "symbol": "2330",
+  "unit": "NTD_THOUSANDS",
+  "method": "Original issuer Chinese consolidated PDF pages rendered and visually checked; OCR used only to locate rows. Values below are official observations, not copied from FinMind.",
+  "originalMopsPdfByteIdentityVerified": false,
+  "records": [
+    {"document":"2330-2025Q2.pdf","incomePage":5,"cashflowPage":8,"quarters":{"2025-06-30":{"revenue":933791869,"operatingIncome":463423638},"2024-06-30":{"revenue":673510177,"operatingIncome":286555542}},"ytd":{"2025-06-30":{"revenue":1773045533,"operatingIncome":870504446,"operatingCashflow":1122637757},"2024-06-30":{"revenue":1266154378,"operatingIncome":535573848,"operatingCashflow":813979318}}},
+    {"document":"2330-2025Q3.pdf","incomePage":5,"cashflowPage":8,"quarters":{"2025-09-30":{"revenue":989918318,"operatingIncome":500684818},"2024-09-30":{"revenue":759692143,"operatingIncome":360766289}},"ytd":{"2025-09-30":{"revenue":2762963851,"operatingIncome":1371189264,"operatingCashflow":1549466838},"2024-09-30":{"revenue":2025846521,"operatingIncome":896340137,"operatingCashflow":1205971785}}},
+    {"document":"2330-2025Q4.pdf","incomePage":9,"cashflowPage":12,"quarters":{},"ytd":{"2025-12-31":{"revenue":3809054272,"operatingIncome":1936091677,"operatingCashflow":2274975625},"2024-12-31":{"revenue":2894307699,"operatingIncome":1322053050,"operatingCashflow":1826177068}}},
+    {"document":"2330-2026Q1.pdf","incomePage":5,"cashflowPage":8,"quarters":{"2026-03-31":{"revenue":1134103440,"operatingIncome":658966142},"2025-03-31":{"revenue":839253664,"operatingIncome":407080808}},"ytd":{"2026-03-31":{"revenue":1134103440,"operatingIncome":658966142,"operatingCashflow":698976265},"2025-03-31":{"revenue":839253664,"operatingIncome":407080808,"operatingCashflow":625573672}}},
+    {"document":"2330-2026Q2.pdf","incomePage":5,"cashflowPage":8,"quarters":{"2026-06-30":{"revenue":1270380250,"operatingIncome":766602651},"2025-06-30":{"revenue":933791869,"operatingIncome":463423638}},"ytd":{"2026-06-30":{"revenue":2404483690,"operatingIncome":1425568793,"operatingCashflow":1482341242},"2025-06-30":{"revenue":1773045533,"operatingIncome":870504446,"operatingCashflow":1122637757}}},
+    {"document":"2330-2026Q3.pdf","incomePage":5,"cashflowPage":8,"quarters":{"2026-09-30":{"revenue":1494243284,"operatingIncome":876445164},"2025-09-30":{"revenue":989918318,"operatingIncome":500684818}},"ytd":{"2026-09-30":{"revenue":3898726974,"operatingIncome":2302013957,"operatingCashflow":2402116725},"2025-09-30":{"revenue":2762963851,"operatingIncome":1371189264,"operatingCashflow":1549466838}}}
+  ]
+}

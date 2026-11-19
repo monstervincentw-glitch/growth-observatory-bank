@@ -1,0 +1,80 @@
+{
+  "source": "performance-data/primary/TW/ledgers/2026-11-16.json",
+  "sourceSha256": "f57804da4277be98a41ec46409e64bd67556a8c2b23b4dab4b216f683ca332dd",
+  "symbols": {
+    "2383": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "6223": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "2368": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "2330": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "3081": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "2408": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "2344": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "2337": {
+      "priority": 1,
+      "role": "TRADED_IN_WINDOW",
+      "orders": [
+        {
+          "date": "2026-11-12",
+          "symbol": "2337",
+          "action": "BUY",
+          "signal_date": "2026-11-11"
+        }
+      ]
+    },
+    "3017": {
+      "priority": 1,
+      "role": "TRADED_IN_WINDOW",
+      "orders": [
+        {
+          "date": "2026-11-12",
+          "symbol": "3017",
+          "action": "SELL",
+          "signal_date": "2026-11-11"
+        }
+      ]
+    },
+    "2308": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "5274": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    },
+    "3533": {
+      "priority": 2,
+      "role": "HELD_IN_PUBLISHED_WINDOW_LEDGER",
+      "orders": []
+    }
+  }
+}
