@@ -38,7 +38,8 @@ function pulseResearchPipeline(){
   });
   if(!wanted.length)return;
   const book=SpreadsheetApp.openById(MP_BOOK);
-  const snapshot=verifyEnvelope_(book.getSheetByName('bank_snapshot').getDataRange().getValues());
+  const envelopeRows=Sheets.Spreadsheets.Values.get(MP_BOOK,'bank_snapshot!A1:E300',{valueRenderOption:'UNFORMATTED_VALUE'}).values;
+  const snapshot=verifyEnvelope_(envelopeRows);
   const states=gnRead(book.getSheetByName('pipeline_status'));
   let pending=false,completed=false;const wakes=[];
   for(const {market,day} of wanted){
