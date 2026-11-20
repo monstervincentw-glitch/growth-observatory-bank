@@ -20,7 +20,7 @@ from monitor import portfolio_reviews, review_holding, data_too_old
 from oauth_messages import oauth_error_message
 from portfolio_admin import STRATEGIES, condition_timeline, weekday_gaps
 from research import latest_research
-from quotes import reference_valuation
+from quotes import reference_valuation, valuation_curve_rows
 from storage import PortfolioSheets, sheets_client
 
 st.set_page_config(page_title="我的投資組合｜私人版", page_icon="🔐",
@@ -539,7 +539,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
         st.subheader("資產與績效")
         graph_heading, period_picker = st.columns([3.5, 1], vertical_alignment="center")
         with graph_heading:
-            st.markdown("**每日收盤淨值走勢**")
+            st.markdown("**帳戶淨值走勢**")
         with period_picker:
             period = st.selectbox(
                 "績效區間", ["近 30 天", "近 90 天", "近 1 年", "全部"],
@@ -547,9 +547,8 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 label_visibility="collapsed",
             )
 
-        # Only plot verified dates from the initial, owner-authenticated sheet snapshot.
         nav_rows = [row for row in nav_cache if row["portfolio_id"] == portfolio["id"]]
-        valid = [row for row in nav_rows if row.get("date") and row.get("nav") not in (None, "")]
+        valid = valuation_curve_rows(nav_rows, valued, valuation_info, portfolio["id"], transactions)
         if valid:
             latest_date = max(date.fromisoformat(row["date"]) for row in valid)
             days = {"近 30 天": 30, "近 90 天": 90, "近 1 年": 365}.get(period)
@@ -558,15 +557,15 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
             ])
             if shown:
                 curve = pd.DataFrame([
-                    {"date": pd.to_datetime(row["date"]), "nav": float(row["nav"])}
+                    {"date": pd.to_datetime(row["date"]), "nav": float(row["nav"]),
+                     "source": row.get("source", "歷史紀錄"), "kind": row["kind"]}
                     for row in shown
                 ]).sort_values("date")
                 lower = float(curve["nav"].min())
                 upper = float(curve["nav"].max())
                 padding = max((upper - lower) * .25, upper * .005, 1)
                 chart = alt.Chart(curve).mark_line(
-                    color="#b28b53", strokeWidth=3, point=alt.OverlayMarkDef(
-                        color="#b28b53", filled=True, size=88)
+                    color="#b28b53", strokeWidth=3,
                 ).encode(
                     x=alt.X("date:T", title=None,
                             axis=alt.Axis(format="%m/%d", labelAngle=0, grid=False)),
@@ -574,13 +573,21 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                             scale=alt.Scale(domain=[max(0, lower - padding), upper + padding], zero=False),
                             axis=alt.Axis(format=",.0f", tickCount=5, grid=True)),
                     tooltip=[
-                        alt.Tooltip("date:T", title="收盤日", format="%Y-%m-%d"),
+                        alt.Tooltip("date:T", title="報價日", format="%Y-%m-%d"),
                         alt.Tooltip("nav:Q", title="淨值", format=",.2f"),
+                        alt.Tooltip("source:N", title="來源"),
+                        alt.Tooltip("kind:N", title="類型"),
                     ],
                 ).properties(height=305)
-                st.altair_chart(chart, use_container_width=True, theme=None)
-                st.caption("截至 " + latest_date.isoformat()
-                           + " · 僅含已核驗的交易日；縱軸為局部縮放，以利辨識日間變化。")
+                points_chart = chart.mark_point(color="#b28b53", filled=True, size=88).encode(
+                    shape=alt.Shape("kind:N", title="資料類型",
+                                    scale=alt.Scale(domain=["歷史紀錄", "Google備援估值", "研究行情估值"],
+                                                    range=["circle", "diamond", "square"]),
+                                    legend=alt.Legend(orient="bottom")))
+                st.altair_chart(chart + points_chart, use_container_width=True, theme=None)
+                latest_kind = max(shown, key=lambda row: row["date"])["kind"]
+                st.caption("截至 " + latest_date.isoformat() + " · 最新點：" + latest_kind
+                           + "；縱軸為局部縮放，以利辨識日間變化。")
             gaps = weekday_gaps([row["date"] for row in valid])
             if gaps:
                 st.warning("以下日期仍待核對：" + "、".join(gaps))
@@ -632,7 +639,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
             st.markdown('<div class="asset-stat-grid">' + cards + '</div>', unsafe_allow_html=True)
         st.caption("估值來源：" + valuation_info["source"] + " · 策略研究日：" + market_asof)
         if valuation_info["fallback"]:
-            st.caption("市值與損益採較新 Google 延遲報價作參考估值；上方曲線保留已核對的收盤淨值。")
+            st.caption("市值與損益採較新 Google 延遲報價作參考估值；上方曲線已接上最新參考估值，來源標於資料點。")
         else:
             st.caption("最新淨值由私人帳本與已驗證收盤價計算；圖表為已保存的歷史淨值。")
         st.caption("累計報酬率並非標準 TWR。")

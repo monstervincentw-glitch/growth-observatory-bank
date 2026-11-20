@@ -65,3 +65,35 @@ def reference_valuation(account, block, rows, market, today=None):
              'missing_prices': [], 'realized': account['realized']},
             {'source': 'Google Finance 延遲報價（參考估值）',
              'date': quote_day, 'fallback': True})
+
+
+def valuation_curve_rows(history, valued, info, portfolio_id, transactions=()):
+    """Connect the currently displayed valuation to the chart, without backfill.
+
+    Keep stored closes immutable. The last point carries its real source and
+    cannot describe a day before any transaction used by the current account.
+    """
+    from copy import deepcopy
+    rows = [deepcopy(r) for r in history
+            if r.get('portfolio_id') == portfolio_id and r.get('date')
+            and r.get('nav') not in (None, '')]
+    for row in rows:
+        row['kind'] = '歷史紀錄'
+    day = info.get('date')
+    try:
+        date.fromisoformat(day)
+        nav = money(valued['nav']) if valued.get('nav') is not None else None
+    except (ValueError, TypeError):
+        return sorted(rows, key=lambda r: r['date'])
+    later_trade = any(str(t.get('trade_date') or str(t.get('at') or '')[:10]) > day
+                      for t in transactions if t.get('portfolio_id') == portfolio_id)
+    latest = max((r['date'] for r in rows), default='')
+    if nav is not None and nav >= 0 and not valued.get('missing_prices') and day > latest and not later_trade:
+        row = dict.fromkeys(['cash', 'equity_value', 'cumulative_pnl', 'liabilities',
+                             'daily_pnl', 'daily_return', 'twr', 'note'], '')
+        row.update({'portfolio_id': portfolio_id, 'date': day, 'nav': str(nav),
+                    'cash': str(valued['cash']), 'equity_value': str(valued['market_value']),
+                    'source': info['source'],
+                    'kind': 'Google備援估值' if info.get('fallback') else '研究行情估值'})
+        rows.append(row)
+    return sorted(rows, key=lambda r: r['date'])

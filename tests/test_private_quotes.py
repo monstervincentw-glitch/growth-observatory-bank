@@ -103,3 +103,37 @@ def test_quote_schema_mismatch_and_formula_tickers_fail_without_writes():
         store.live_quotes(['MU'])
     with pytest.raises(ValueError):
         store.live_quotes(['=IMPORTXML("bad")'])
+
+
+def test_curve_connects_latest_mark_without_mutating_history():
+    from quotes import valuation_curve_rows
+    history = [{'portfolio_id':'p','date':'2026-11-18','nav':'17573.80','source':'saved'}]
+    v = {'nav':Decimal('17335.18'),'cash':Decimal('874.41'),
+         'market_value':Decimal('16460.77'),'missing_prices':[]}
+    info = {'date':'2026-11-19','fallback':True,'source':'Google Finance'}
+    rows = valuation_curve_rows(history,v,info,'p')
+    assert [(r['date'],r['nav']) for r in rows] == [
+        ('2026-11-18','17573.80'),('2026-11-19','17335.18')]
+    assert rows[-1]['kind'] == 'Google備援估值' and rows[-1]['source'] == 'Google Finance'
+    assert len(history) == 1 and 'kind' not in history[0]
+
+
+def test_curve_never_overwrites_saved_date_or_adds_incomplete_point():
+    from quotes import valuation_curve_rows
+    h = [{'portfolio_id':'p','date':'2026-11-19','nav':'100','source':'saved'}]
+    v = {'nav':200,'cash':0,'market_value':200,'missing_prices':[]}
+    info = {'date':'2026-11-19','fallback':True,'source':'Google Finance'}
+    assert valuation_curve_rows(h,v,info,'p')[0]['nav'] == '100'
+    info['date'] = '2026-11-20'
+    v['nav'] = None
+    assert len(valuation_curve_rows(h,v,info,'p')) == 1
+
+
+def test_curve_respects_later_trades_and_portfolio_isolation():
+    from quotes import valuation_curve_rows
+    h = [{'portfolio_id':'other','date':'2026-11-19','nav':'100','source':'saved'}]
+    v = {'nav':200,'cash':0,'market_value':200,'missing_prices':[]}
+    info = {'date':'2026-11-19','fallback':True,'source':'Google Finance'}
+    tx = [{'portfolio_id':'p','trade_date':'2026-11-20'}]
+    assert valuation_curve_rows(h,v,info,'p',tx) == []
+    assert len(valuation_curve_rows(h,v,info,'p',[])) == 1
