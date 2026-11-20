@@ -11,10 +11,12 @@ import {evaluate} from '../engine/rules.ts';
 import {envelope} from '../engine/project.mjs';
 const writer=await readFile(new URL('../apps-script/Writer.gs',import.meta.url),'utf8');
 const workflow=await readFile(new URL('../.github/workflows/research-update.yml',import.meta.url),'utf8');
-test('market schedules retain original slots and two finite US backups; no five-minute full update',()=>{
- const crons=[...workflow.matchAll(/cron: '([^']+)'/g)].map(m=>m[1]);
- assert.deepEqual(crons,['17 22 * * 1-5','17 23 * * 1-5','17 0 * * 2-6','30 8 * * 1-5','30 9 * * 1-5','30 10 * * 1-5','27 13 * * 1-5']);
- assert.ok(workflow.includes('group: research-publish'));assert.ok(workflow.includes('cancel-in-progress: false'));
+test('manual research backup cannot duplicate the Google-triggered daily writer',()=>{
+ assert.match(workflow,/  workflow_dispatch:/);
+ assert.doesNotMatch(workflow,/^  schedule:/m);
+ assert.doesNotMatch(workflow,/^  push:/m);
+ assert.ok(workflow.includes('group: research-publish'));
+ assert.ok(workflow.includes('cancel-in-progress: false'));
 });
 test('US cutoff handles winter and summer time',()=>{
  assert.equal(latestClosedDate('US',new Date('2026-11-19T22:17:00+08:00')),'2026-11-18');
