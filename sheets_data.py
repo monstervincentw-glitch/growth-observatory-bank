@@ -67,7 +67,7 @@ class SnapshotReader:
                     pass
             candidates = [(source, fetch)]
             if fallback is not None:
-                candidates.append(("sheets", fallback))
+                candidates.append(("github" if source == "sheets" else "sheets", fallback))
             for label, load in candidates:
                 try:
                     rows = load()
