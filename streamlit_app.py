@@ -115,20 +115,8 @@ def markets(market, block, signal_available, latest_quotes=None):
     stocks = block["stocks"]
     quotes = (latest_quotes or {}).get("quotes", {})
     macro = block["macro"]
-    if latest_quotes and latest_quotes.get("status") == "REFERENCE_QUOTES_COMPLETE":
-        st.caption(f"Google 行情 {latest_quotes['day']} · {len(quotes)} 檔"
-                   f" · 策略資料 {macro['marketAsOf']}；財報與訊號日期獨立顯示。")
     states = {stock["key"]: candidate_status(stock, macro, signal_available)
               for stock in stocks}
-
-    ready_count = sum(state["buy_ready"] for state in states.values())
-    exit_count = sum(state["exit_watch"] for state in states.values())
-    funding = {"red": "紅燈", "non_red": "非紅燈", "unknown": "待確認"}.get(
-        macro.get("decision"), "待確認")
-    st.caption(f"主策略符合個股與資金進場條件 {ready_count} 檔 · "
-               f"基本面轉弱需檢查 {exit_count} 檔 · 全球資金 {funding}")
-    st.caption("市場觀測使用最新正式發布的行情與已取得財報，供接下來的買賣判斷。"
-               "候選不代表帳戶已下單；持股出場仍須核對實際持倉、進場時財報與交易規則。")
 
     # The global funding dashboard is always visible above every bank page.
     # This control only opens the diagnostic values without duplicating the cards.
@@ -240,7 +228,6 @@ def markets(market, block, signal_available, latest_quotes=None):
             readable_table(visible_rows[list(dict.fromkeys(main_columns + detail_columns))],
                            label="即時市場觀測完整明細")
         csv_button("匯出全部篩選結果 CSV", rows, f"{market}-market-watch.csv", f"export-{market}")
-        st.caption("切換「單檔圖表」可查看個股走勢與評分；本頁只顯示 10 檔，匯出仍包含全部篩選結果。")
         return
 
     stock = st.selectbox(
@@ -252,9 +239,6 @@ def markets(market, block, signal_available, latest_quotes=None):
     if rank:
         st.write(f"**#{rank['rank']}　{rank['score']:.2f} 分** · "
                  f"同業 {rank['detail']['industrySize']} 檔")
-    st.caption(f"財報期 {f.get('latest_period') or '待核對'} · "
-               f"首次／最近取得 {stamp(stock.get('financialObservedAt'))} · "
-               f"行情來源 {stock.get('priceSource') or '待核對'}")
 
     # Keep the chart at the beginning of the single-stock workspace.
     if stock["history"]:
@@ -265,18 +249,19 @@ def markets(market, block, signal_available, latest_quotes=None):
     else:
         st.info("目前沒有可供繪製的歷史行情，請查看資料取得狀態。")
 
-    if stock.get("sourceWarning") or stock.get("sourceError"):
-        st.warning(stock.get("sourceWarning") or stock["sourceError"])
     state = states[stock["key"]]
     st.write(f"**進場條件：** {state['entry_label']}　"
              f"**持股出場檢查：** {state['exit_label']}")
-    if state["reasons"]:
-        st.caption("｜".join(state["reasons"]))
     technical = stock["features"]
-    st.caption(f"126 日回撤 {percent(technical.get('drawdown_126'))} · "
-               f"63 日相對報酬 {percent(technical.get('relative_63'))} · "
-               f"可用交易日 {technical.get('history_sessions','—')}")
-    with st.expander("評分因子、資料版本與完整風險說明"):
+    with st.expander("評分因子、資料版本與完整風險說明", expanded=False):
+        st.caption(f"財報期 {f.get('latest_period') or '待核對'} · "
+                   f"首次／最近取得 {stamp(stock.get('financialObservedAt'))} · "
+                   f"行情來源 {stock.get('priceSource') or '待核對'}")
+        if state["reasons"]:
+            st.caption("｜".join(state["reasons"]))
+        st.caption(f"126 日回撤 {percent(technical.get('drawdown_126'))} · "
+                   f"63 日相對報酬 {percent(technical.get('relative_63'))} · "
+                   f"可用交易日 {technical.get('history_sessions','—')}")
         if rank:
             table([{
                 "因子": FACTORS[p["key"]],
@@ -790,15 +775,8 @@ def sheets_pipeline_status():
         return None, None, str(error)[:200]
 
 
-def update_status(state, quote=None):
+def update_status(state, quote=None, block=None, signal_available=False):
     """Keep public market health concise; put diagnostics behind an expander."""
-    for market, info in state["markets"].items():
-        label = "美股" if market == "US" else "台股"
-        status = "更新異常" if info.get("reason") else "成功"
-        if quote and quote["market"] == market:
-            st.caption(f"{label}行情 {quote['day']} · 研究批次 {info.get('date') or '待核對'}")
-        else:
-            st.caption(f"{label}研究批次 {info.get('date') or '待核對'} · 發布 {stamp(info.get('lastSuccessAt'))} · {status}")
     summaries = []
     for market, info in state["markets"].items():
         label = "美股" if market == "US" else "台股"
@@ -812,14 +790,41 @@ def update_status(state, quote=None):
                 summaries.append(f"{label}資料待驗證；沿用 {last_date}")
             else:
                 summaries.append(f"{label}資料待驗證；沿用 {last_date}")
-    if summaries:
-        st.caption("⚠️ " + "｜".join(summaries))
     sheet_batch, sheet_checksum, sync_error = sheets_pipeline_status()
-    if sync_error:
-        st.caption("⚠️ Sheets 同步查核失敗：" + sync_error)
-    elif sheet_batch != state.get("batch") or sheet_checksum != state.get("checksum"):
-        st.caption("⚠️ GitHub → Sheets 尚未同步最新批次；網站沿用目前通過檢查的批次。")
     with st.expander("資料更新狀態與錯誤明細", expanded=False):
+        if summaries:
+            st.caption("⚠️ " + "｜".join(summaries))
+        if sync_error:
+            st.caption("⚠️ Sheets 同步查核失敗：" + sync_error)
+        elif sheet_batch != state.get("batch") or sheet_checksum != state.get("checksum"):
+            st.caption("⚠️ Sheets 尚未同步目前顯示批次；網站沿用通過檢查的批次。")
+        st.caption(f"資料來源 {source} · 研究批次 {batch}")
+        if data:
+            st.caption(f"歷史回測封存 {data['historyThrough']}")
+        else:
+            st.warning("全球資金溫度資料目前無法驗證，請勿將未知狀態視為未觸發。")
+        if block:
+            macro = block["macro"]
+            states = {stock["key"]: candidate_status(stock, macro, signal_available)
+                      for stock in block["stocks"]}
+            ready_count = sum(state["buy_ready"] for state in states.values())
+            exit_count = sum(state["exit_watch"] for state in states.values())
+            funding = {"red": "紅燈", "non_red": "非紅燈", "unknown": "待確認"}.get(
+                macro.get("decision"), "待確認")
+            st.caption(f"主策略符合個股與資金進場條件 {ready_count} 檔 · "
+                       f"基本面轉弱需檢查 {exit_count} 檔 · 全球資金 {funding}")
+            st.caption("市場觀測使用最新正式發布的行情與已取得財報，供接下來的買賣判斷。"
+                       "候選不代表帳戶已下單；持股出場仍須核對實際持倉、進場時財報與交易規則。")
+
+            if quote:
+                st.caption(f"Google 行情 {quote['day']} · {len(quote.get('quotes', {}))} 檔 · 策略資料 {macro['marketAsOf']}")
+            if macro.get("researchEstimates"):
+                st.caption("通膨含幾何插值研究估算（ESTIMATED_INTERPOLATED）；詳見資金數據。")
+            st.caption("切換「單檔圖表」可查看個股走勢與評分；匯出包含全部篩選結果。")
+            for stock in block["stocks"]:
+                issue = stock.get("sourceWarning") or stock.get("sourceError")
+                if issue:
+                    st.warning(f"{stock['symbol']}：{issue}")
         st.caption(f"GitHub → Sheets：{'吻合' if sheet_batch == state.get('batch') and sheet_checksum == state.get('checksum') else '待同步'} · Sheets 批次 {sheet_batch or '讀取失敗'}")
         for market, info in state["markets"].items():
             label = "美股" if market == "US" else "台股"
@@ -934,25 +939,16 @@ def market_page():
     # historical backtest context. Keep it prominent ONLY on this page.
     if data is not None:
         funding_dashboard(data["markets"][market]["macro"])
-    else:
-        st.warning("全球資金溫度資料目前無法驗證，請勿將未知狀態視為未觸發。")
     # Load the two independent public files concurrently.
     with ThreadPoolExecutor(max_workers=2) as pool:
         attempts=pool.submit(runner_attempts)
         prices=pool.submit(market_prices,market)
         state=current_update_state(attempts.result())
         quote=prices.result()
-    update_status(state,quote)
-    if block_estimates := (data or {}).get("markets", {}).get(market, {}).get("macro", {}).get("researchEstimates"):
-        st.caption("通膨含幾何插值研究估算（ESTIMATED_INTERPOLATED）；詳見資金數據。")
-    if data is None:
+    block = (data or {}).get("markets", {}).get(market)
+    update_status(state, quote, block, state["markets"][market]["usable"])
+    if block is None:
         return
-    block = data["markets"][market]
-    if market == "TW":
-        shown = (quote or {}).get("day") or "待核對"
-        research_day = block["macro"]["marketAsOf"]
-        st.caption(f"台股最新行情 {shown} · 最新市場研究批次 {research_day} · "
-                   "以已取得的最新股價、財報與資金條件監測進出場。")
     markets(market, block, state["markets"][market]["usable"], quote)
 
 
@@ -992,9 +988,8 @@ with st.container(key="bank-content"):
         status, refresh = st.columns([5, 1], vertical_alignment="center")
     with status:
         if data:
-            status_line(source, data["markets"]["US"]["macro"]["marketAsOf"],
-                        data["markets"]["TW"]["macro"]["marketAsOf"], data["historyThrough"])
-            st.caption(f"研究批次 {batch}")
+            st.caption(f"美股更新至 {data['markets']['US']['macro']['marketAsOf']}"
+                       f"　·　台股更新至 {data['markets']['TW']['macro']['marketAsOf']}")
         else:
             st.caption("公開研究日期待核對，歷史回測仍可查看。")
     refresh.button("重新讀取資料", on_click=clear_research_caches)
