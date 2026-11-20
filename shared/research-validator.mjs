@@ -59,7 +59,7 @@ export function validateResearch(snapshot, clock = new Date(), expected = {}) {
           stock.priceValidation?.cutoff === cutoff && e?.fresh === true), msg+' 行情不完整或交易日不一致');
       ensure(date(f?.latest_period) && f.latest_period <= priceDate && typeof f.fundamental_release_key === 'string' &&
         f.fundamental_release_key.startsWith(f.latest_period+'|') &&
-        (market === 'US' ? date(f.max_input_filed) && age(priceDate,f.max_input_filed) >= 2 :
+        (market === 'US' ? date(f.max_input_filed) && age(f.date_basis === 'LIVE_OBSERVED_SEC' ? day(new Date(stock.financialObservedAt),'America/New_York') : priceDate,f.max_input_filed) >= (f.date_basis === 'LIVE_OBSERVED_SEC' ? 0 : 2) :
           !f.max_input_filed || (date(f.max_input_filed) && f.max_input_filed <= priceDate)) &&
         (f.financial_status !== 'ok' || ['revenue_growth','quarterly_growth','operating_margin','cfo_margin'].every(k => finite(f[k]))),
         msg+' 財報期別、欄位或版本無效');
