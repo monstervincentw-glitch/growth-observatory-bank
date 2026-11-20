@@ -858,6 +858,19 @@ def update_status(state, quote=None):
 def current_update_state(loaded=None):
     attempts, issue = loaded if loaded is not None else runner_attempts()
     entry = {"snapshot": data, "batch": batch, "checksum": research_state["checksum"]} if data else None
+    # A newer shared Sheets publication supersedes old GitHub runner metadata.
+    attempts = dict(attempts)
+    if data and research_state["source"] == "sheets":
+        for market, block in data["markets"].items():
+            published_at = block["macro"]["lastMarketPublishedAt"]
+            if published_at > attempts.get(market, {}).get("at", ""):
+                attempts[market] = {
+                    "market": market, "status": "published", "at": published_at,
+                    "expected": len(block["stocks"]), "succeeded": len(block["stocks"]),
+                    "updated": len(block["stocks"]), "failed": 0, "notAttempted": 0,
+                    "us_close": data["markets"]["US"]["macro"]["marketAsOf"],
+                    "tw_close": data["markets"]["TW"]["macro"]["marketAsOf"],
+                    "batch": batch, "errors": [], "affected": []}
     # A successful price-only run preserves the previous strategy batch.
     for market, attempt in attempts.items():
         if attempt["status"] == "quotes_only":
