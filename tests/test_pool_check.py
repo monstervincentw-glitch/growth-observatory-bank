@@ -6,7 +6,7 @@ from pathlib import Path
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-SPEC = importlib.util.spec_from_file_location('pool_check', ROOT / 'shared/pool_check.py')
+SPEC = importlib.util.spec_from_file_location('pool_check', ROOT / 'portfolio_portal/pool_check.py')
 pool = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pool)
 STAMP = '2026-11-21T00:00:00+00:00'

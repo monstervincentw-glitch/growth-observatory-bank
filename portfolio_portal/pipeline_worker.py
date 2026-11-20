@@ -186,7 +186,7 @@ def run_cycle(client, node, seed):
     book = client.open_by_key(BOOK)
     # Check the saved cohort independently of quote refresh. A completed close
     # must not suppress the daily membership audit. No second scheduler/writer.
-    from shared.pool_check import audit, envelope as pool_envelope
+    from pool_check import audit, envelope as pool_envelope
     checked_entry = decode_envelope(book.values_get("bank_snapshot!A1:E300").get("values", []))
     audited = audit(checked_entry["snapshot"], now())
     if audited is not None:
