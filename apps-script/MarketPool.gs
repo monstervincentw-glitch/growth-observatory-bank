@@ -18,7 +18,7 @@ function mpBuild(market,day,live,official,at){
     const matches=live.filter(r=>r.market===market&&String(r.symbol)===s.symbol);
     if(matches.length!==1){missing.push(s.symbol);continue;}
     const q=matches[0],stamp=String(q.quote_time||''),p=mpNumber(q.price),currency=market==='US'?'USD':'TWD';
-    const t=stamp.slice(11,19),nearClose=market==='US'?t>='15:59:00'&&t<='16:10:00':t>='13:25:00'&&t<='13:40:00';
+    const t=stamp.slice(11,19),nearClose=market==='US'?gnNearUsClose(stamp,day):t>='13:25:00'&&t<='13:40:00';
     if(q.status==='OK'&&p&&q.currency===currency&&stamp.slice(0,10)===day&&nearClose){
       quotes[s.symbol]={close:p,priceDate:day,currency,source:'GOOGLEFINANCE',observedAt:at};
     }else{
