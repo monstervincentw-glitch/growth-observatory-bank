@@ -120,6 +120,8 @@ def main():
     secure = create_auth_config()
     if secure:
         import threading
+        from pipeline_worker import start_pipeline
+        start_pipeline()
         threading.Thread(target=monitor_loop, daemon=True).start()
     mode = "app.py" if secure else "setup_landing.py"
     port=os.environ.get("PORT","10000")

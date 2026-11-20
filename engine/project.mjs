@@ -39,8 +39,9 @@ function stockView(i) {
       parts:(r.detail?.parts||[]).filter(p=>factors.includes(p.key)).map(p=>pick(p,['key','weight','value','percentile']))
     }}:null};
 }
-function macroView(m) {
+export function macroView(m) {
   return {...pick(m,publicFields.macro),
+    dataBasis:m.dataBasis??'OFFICIAL_VINTAGE',researchEstimates:m.researchEstimates??[],
     categoryStates:pick(m.categoryStates,macroCategories),
     scoreRange:Array.isArray(m.scoreRange)?m.scoreRange.slice(0,2):null,
     seriesMeta:Object.fromEntries(series.map(k=>[k,pick(m.seriesMeta?.[k],['observationDate','vintageDate','publicationAt','availableBy','acquiredAt'])])),

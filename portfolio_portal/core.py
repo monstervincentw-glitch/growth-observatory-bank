@@ -272,21 +272,16 @@ def nav_extension(transactions, portfolio_id, existing_rows, session_date, nav, 
 
 
 def entry_eligible(stock):
+    """Same current-observation entry gate as the bank's shared candidates view.
+
+    Historical filing-time eligibility remains in the historical engines.
+    The caller checks the portfolio funding state before allocating.
+    """
     e = stock.get("evaluation") or {}
-    ok = bool(stock.get("integrity") and not stock.get("sourceError")
-              and not stock.get("marketEvent") and stock.get("researchRank")
-              and e.get("fundamental") and e.get("tradable") and e.get("fresh")
-              and e.get("filingVerified") is True
-              and stock.get("financial", {}).get("financial_status") == "ok")
-    if not ok:
-        return False
-    # primary is the published main-strategy flag. When funding is already true,
-    # a false primary means another official gate failed.
-    if e.get("funding") is True and e.get("primary") is False:
-        return False
-    if "primary" in e and e.get("funding") is not True and e.get("primary") is not True:
-        return e.get("primary") is True
-    return True
+    return bool(stock.get("integrity") and not stock.get("sourceError")
+                and not stock.get("marketEvent") and stock.get("researchRank")
+                and e.get("fundamental") and e.get("tradable") and e.get("fresh")
+                and stock.get("financial", {}).get("financial_status") == "ok")
 
 
 def _rank_score(stock):

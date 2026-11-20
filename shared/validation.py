@@ -147,9 +147,14 @@ def health(entry, source, issue=None, now=None, expected=None, attempts=None):
         failure = attempt.get("unresolvedFailure") or attempt
         failed = failure.get("status") == "failed" and (
             not block or as_time(failure["at"]) > as_time(block["macro"]["lastMarketPublishedAt"]))
+        local = now.astimezone(TAIPEI)
+        deadline = ((market == "US" and local.weekday() in (1,2,3,4,5) and (local.hour, local.minute) >= (8,30))
+                    or (market == "TW" and local.weekday() < 5 and (local.hour, local.minute) >= (19,0)))
+        attempt_at = as_time(attempt["at"]).astimezone(TAIPEI) if attempt.get("at") else None
+        missed = deadline and (attempt_at is None or attempt_at.date() < local.date())
         detail = failure.get("detail") if failed else None
         reason = issue or (("市場發布失敗，保留前批" + (f"｜{detail[:400]}" if isinstance(detail, str) and detail else ""))
-                           if failed else "行情已過期或落後應有交易日" if stale else None)
+                           if failed else "今日自動排程逾時，尚未留下執行紀錄" if missed else "行情已過期或落後應有交易日" if stale else None)
         result[market] = dict(date=cutoff, stale=stale, reason=reason,
                               lastSuccessAt=block["macro"].get("lastMarketPublishedAt") if block else None,
                               expected=attempt.get("expected", MARKETS[market]),
