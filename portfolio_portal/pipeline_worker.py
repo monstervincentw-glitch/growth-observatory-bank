@@ -142,12 +142,56 @@ def latest_finance(runtime, market, day, seed):
     for url in ("https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci",
                 "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci"):
         rows.extend(get_json(url))
-    return finance_versions(rows)
+    tracked = set(seed["TW"]["financialVersions"])
+    rows = [r for r in rows if str(r.get("公司代號", r.get("SecuritiesCompanyCode", ""))).strip() in tracked]
+    versions = finance_versions(rows)
+    # Income-period equality alone cannot detect cash-flow corrections. Reuse
+    # the project's existing official material-announcement feeds as a version
+    # change signal, then let the original financial provider refresh the data.
+    checked = runtime.get("financialCheckedAt", seed["TW"].get("financialCheckedAt", ""))
+    notices = []
+    for url in ("https://openapi.twse.com.tw/v1/opendata/t187ap04_L",
+                "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap04_O"):
+        notices.extend(get_json(url))
+    changed = {}
+    for row in notices:
+        symbol = str(row.get("公司代號", row.get("SecuritiesCompanyCode", ""))).strip()
+        title = str(row.get("主旨", row.get("主旨 ", "")))
+        if symbol not in tracked or not any(word in title for word in ("財務報告", "財報", "現金流量", "重編")):
+            continue
+        raw_day = str(row.get("發言日期", "")).replace("/", "").replace("-", "")
+        if len(raw_day) == 7:
+            raw_day = str(int(raw_day[:3]) + 1911) + raw_day[3:]
+        raw_time = str(row.get("發言時間", "00:00:00")).replace(":", "").zfill(6)
+        try:
+            instant = datetime.strptime(raw_day + raw_time, "%Y%m%d%H%M%S").replace(
+                tzinfo=ZoneInfo("Asia/Taipei")).astimezone(timezone.utc).isoformat()
+        except ValueError:
+            raise ValueError("官方財報公告時間格式異常：" + symbol)
+        if instant > checked:
+            changed.setdefault(symbol, []).append(instant + "|" + title)
+    for symbol, version in versions.items():
+        saved = runtime.get("financialVersions", {}).get(symbol, {})
+        notice = saved.get("notice", "")
+        if symbol in changed:
+            notice = hashlib.sha256("|".join(sorted(changed[symbol])).encode()).hexdigest()
+        version["notice"] = notice
+        if notice:
+            version["token"] += "|" + notice
+    return versions
 
 
 def run_cycle(client, node, seed):
     from research import decode_envelope
     book = client.open_by_key(BOOK)
+    rows = book.values_get("market_latest!A1:I3").get("values", [])
+    if not rows:
+        return
+    quotes = {row[0]: json.loads(row[8]) for row in rows[1:] if len(row) == 9 and row[8]}
+    current_entry = decode_envelope(book.values_get("bank_snapshot!A1:E300").get("values", []))
+    if all(batch["day"] <= current_entry["snapshot"]["markets"][market]["macro"]["marketAsOf"]
+           for market, batch in quotes.items()):
+        return  # No history downloads, checkpoint reads, or source requests after success.
     tab(book, "pipeline_runtime", RUNTIME)
     tab(book, "pipeline_status", STATUS, 20)
     stored = book.values_get("pipeline_runtime!A1:E500").get("values", [RUNTIME])
@@ -156,10 +200,6 @@ def run_cycle(client, node, seed):
         if not checkpoints[market].get("bars"):
             archived = get_json(seed[market]["historySeed"])
             checkpoints[market]["bars"] = {symbol: q["bars"] for symbol, q in archived["quotes"].items()}
-    rows = book.values_get("market_latest!A1:I3").get("values", [])
-    if not rows:
-        return
-    quotes = {row[0]: json.loads(row[8]) for row in rows[1:] if len(row) == 9 and row[8]}
     for market in ("US", "TW"):
         if market not in quotes:
             continue
@@ -192,7 +232,7 @@ def run_cycle(client, node, seed):
                 source, target = Path(directory) / "input.json", Path(directory) / "output.json"
                 source.write_text(json.dumps(payload))
                 environment = dict(os.environ, NODE_USE_ENV_PROXY="1")
-                result = subprocess.run([node, str(ROOT / "engine/pipeline-job.mjs"), str(source), str(target)],
+                result = subprocess.run([node, "--max-old-space-size=192", str(ROOT / "engine/pipeline-job.mjs"), str(source), str(target)],
                                         cwd=ROOT, env=environment, capture_output=True, text=True, timeout=600)
                 if result.returncode:
                     raise RuntimeError((result.stderr or result.stdout)[-1500:])
@@ -210,7 +250,9 @@ def run_cycle(client, node, seed):
             status("RUNNING", "publishing")
             padded = outcome["rows"] + [["", "", "", "", ""]] * (300 - len(outcome["rows"]))
             write_rows(book, "bank_snapshot!A1:E300", padded)
-            state.update(outcome["runtime"], officialDay=day, attempts=state["attempts"], nextRetry=0)
+            checked_at = (seed["TW"].get("financialCheckedAt") if market == "TW" and seed["officialDay"] == day else now())
+            state.update(outcome["runtime"], officialDay=day, financialCheckedAt=checked_at,
+                         attempts=state["attempts"], nextRetry=0)
             write_rows(book, "pipeline_runtime!A1:E500", pack(checkpoints))
             status("COMPLETE", "published", outcome=outcome)
             print(json.dumps({"pipeline": "published", "market": market, "day": day,

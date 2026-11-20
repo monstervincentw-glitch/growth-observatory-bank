@@ -39,8 +39,9 @@ export async function calculate(input, progress = () => {}) {
   const context = {market, cutoff: batch.day, benchmarks, macro, createdAt: now};
   const stocks = [], bars = {}, financialVersions = {};
   let reused = 0, changed = 0;
-  for (let offset = 0; offset < before.stocks.length; offset += 3) {
-    const results = await Promise.all(before.stocks.slice(offset, offset + 3).map(async old => {
+  const groupSize = market === 'US' ? 1 : 3; // SEC facts stay within the existing free service's memory.
+  for (let offset = 0; offset < before.stocks.length; offset += groupSize) {
+    const results = await Promise.all(before.stocks.slice(offset, offset + groupSize).map(async old => {
       const inactive = confirmedInactive(old, batch.day);
       if (inactive) return inactive;
       // Daily version comparison, not a repeat financial audit. Preserve all
