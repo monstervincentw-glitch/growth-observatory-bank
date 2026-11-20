@@ -29,6 +29,7 @@ let observations;
 
 try{
   const context=await makeContext(market,undefined,false,report);
+  if(before.macro.poolCheck)context.macro.poolCheck=before.macro.poolCheck;
   replayContext=context;
   const before=old.markets[market];
   if(context.cutoff<before.macro.marketAsOf)throw Error('基準行情日期倒退，保留前批');

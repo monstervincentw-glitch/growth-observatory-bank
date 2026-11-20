@@ -20,6 +20,7 @@ from monitor import portfolio_reviews, review_holding, data_too_old
 from oauth_messages import oauth_error_message
 from portfolio_admin import STRATEGIES, condition_timeline, weekday_gaps
 from research import latest_research
+from shared.pool_check import render_checks
 from quotes import reference_valuation, valuation_curve_rows, pool_reference_valuation
 from google_market_quotes import fetch_google_quotes
 from storage import PortfolioSheets, sheets_client
@@ -947,6 +948,7 @@ st.caption("美股更新至 " + str(snapshot["markets"]["US"]["macro"].get("mark
            + "　·　台股更新至 " + str(snapshot["markets"]["TW"]["macro"].get("marketAsOf") or "未知"))
 update_details = st.expander("資料更新狀態與錯誤明細", expanded=False)
 with update_details:
+    render_checks(st, snapshot)
     st.caption("研究來源：" + research_source)
     st.caption("研究批次：" + str(entry["batch"]))
     for message in data_update_messages + list(research_issues):

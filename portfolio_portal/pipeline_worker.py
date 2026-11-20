@@ -184,6 +184,20 @@ def latest_finance(runtime, market, day, seed):
 def run_cycle(client, node, seed):
     from research import decode_envelope
     book = client.open_by_key(BOOK)
+    # Check the saved cohort independently of quote refresh. A completed close
+    # must not suppress the daily membership audit. No second scheduler/writer.
+    from shared.pool_check import audit, envelope as pool_envelope
+    checked_entry = decode_envelope(book.values_get("bank_snapshot!A1:E300").get("values", []))
+    audited = audit(checked_entry["snapshot"], now())
+    if audited is not None:
+        rows = pool_envelope(audited)
+        incoming = decode_envelope(rows)
+        latest = decode_envelope(book.values_get("bank_snapshot!A1:E300").get("values", []))
+        if latest["checksum"] != checked_entry["checksum"]:
+            raise RuntimeError("股票池檢核期間已有較新批次，等下次接續")
+        write_rows(book, "bank_snapshot!A1:E300", rows + [["", "", "", "", ""]] * (300 - len(rows)))
+        print(json.dumps({"pool_check": {market: incoming["snapshot"]["markets"][market]["macro"]["poolCheck"]["status"]
+                                       for market in ("US", "TW")}}), flush=True)
     rows = book.values_get("market_latest!A1:I3").get("values", [])
     if not rows:
         return

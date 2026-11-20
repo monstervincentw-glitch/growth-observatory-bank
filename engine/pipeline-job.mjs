@@ -33,6 +33,7 @@ export async function calculate(input, progress = () => {}) {
   progress({stage: 'macro'});
   // Same original macro rules, including the already approved CPI overlay.
   const macro = await refreshMacro(batch.day, undefined, market, false, undefined, true);
+  if (before.macro.poolCheck) macro.poolCheck = before.macro.poolCheck;
   const now = new Date().toISOString();
   macro.marketComplete = true;
   macro.lastMarketPublishedAt = now;
