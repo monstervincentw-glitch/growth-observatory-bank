@@ -42,7 +42,8 @@ function pulseResearchPipeline(){
   const states=gnRead(book.getSheetByName('pipeline_status'));
   let pending=false,completed=false;const wakes=[];
   for(const {market,day} of wanted){
-    if(snapshot.markets[market].macro.marketAsOf>=day){properties.setProperty('PR_DONE_'+market,day);completed=true;continue;}
+    const liveReady=market!=='US'||snapshot.markets.US.stocks.filter(stock=>!stock.marketEvent).every(stock=>stock.financial.date_basis==='LIVE_OBSERVED_SEC');
+    if(snapshot.markets[market].macro.marketAsOf>=day&&liveReady){properties.setProperty('PR_DONE_'+market,day);completed=true;continue;}
     const state=states.find(row=>row.market===market&&row.session_date===day);
     if(state&&state.status==='FAILED'&&Number(state.attempts)>=3){properties.setProperty('PR_DONE_'+market,day);continue;}
     const key='PR_WAKE_'+market,previous=JSON.parse(properties.getProperty(key)||'{}');
@@ -56,3 +57,5 @@ function pulseResearchPipeline(){
   const response=UrlFetchApp.fetch('https://growth-portfolio-private-v1.onrender.com/_stcore/health',{muteHttpExceptions:true});
   console.log(JSON.stringify({pipelineWakeStatus:response.getResponseCode(),pending:true}));
 }
+
+function continueLatestFinancialPipeline(){PropertiesService.getScriptProperties().deleteProperty('PR_DONE_US');return pulseResearchPipeline();}
