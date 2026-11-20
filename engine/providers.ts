@@ -179,7 +179,7 @@ export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,mark
   catch(error){return unavailableMacro(cutoff,asof,raw,error,new Date(),cpiVintage,liveResearch);}
  }catch(error){throw Object.assign(error instanceof Error?error:new Error(String(error)),{requiredMacroVintageDate:asof,requiredCpiVintageDate:cpiVintage,marketCloseDate:cutoff});}
 }
-export interface RefreshContext{market:Market;cutoff:string;benchmarks:Record<string,Bar[]>;marketDates?:string[];macro:Macro;createdAt:string;}
+export interface RefreshContext{market:Market;cutoff:string;benchmarks:Record<string,Bar[]>;marketDates?:string[];macro:Macro;createdAt:string;liveFinancial?:boolean;}
 export async function makeContext(market:Market,supplied?:MacroSeriesInput,allowMacroUnavailable=false,diagnostic?:(type:string,symbol:string|null)=>Diagnostic,liveResearch=false):Promise<RefreshContext>{
  const closed=latestClosedDate(market);const benchmarks:Record<string,Bar[]>={};let cutoff=closed,marketDates:string[]|undefined;
  if(market==='US'){for(const name of ['QQQ','SOXX','IGV'])benchmarks[name]=await yahoo(name,'US',closed,diagnostic?.('benchmark',name));cutoff=benchmarks.QQQ.at(-1)!.date;}
@@ -210,7 +210,7 @@ export function confirmedInactive(instrument:Instrument,cutoff:string):Instrumen
 export async function refreshInstrument(old:Instrument,context:RefreshContext,reuseFinancial=false,cachedBars:Bar[]=[],diagnostic?:(type:string)=>Diagnostic,retainQuoteOnFinancialError=false):Promise<Instrument & {_bars?:Bar[],_financialError?:string}>{
  const inactive=confirmedInactive(old,context.cutoff);if(inactive)return inactive;
  if(context.cutoff<old.priceDate)throw new Error(`更新截止日${context.cutoff}落後既有收盤${old.priceDate}，拒絕覆寫較新的資料`);
- if(sameCloseReusable(old,context.cutoff))return{...old,sourceError:null,lastAttemptAt:new Date().toISOString(),sourceWarning:old.sourceError?`保留同一收盤日已成功驗證快照；前次重抓異常：${old.sourceError}`:old.sourceWarning,priceValidation:{cutoff:context.cutoff,validatedAt:old.priceValidation?.validatedAt||old.observedAt,mode:'same_close_snapshot'}};
+ if(sameCloseReusable(old,context.cutoff)&&!(old.market==='US'&&context.liveFinancial))return{...old,sourceError:null,lastAttemptAt:new Date().toISOString(),sourceWarning:old.sourceError?`保留同一收盤日已成功驗證快照；前次重抓異常：${old.sourceError}`:old.sourceWarning,priceValidation:{cutoff:context.cutoff,validatedAt:old.priceValidation?.validatedAt||old.observedAt,mode:'same_close_snapshot'}};
  let bars:Bar[]=[],priceSource='Yahoo',primaryError='';
  try{bars=await yahoo(old.ticker,old.market,context.cutoff,diagnostic?.('quote'));}catch(e){primaryError=e instanceof Error?e.message:String(e);}
  if(primaryError||bars.at(-1)?.date!==context.cutoff){
@@ -237,7 +237,7 @@ export async function refreshInstrument(old:Instrument,context:RefreshContext,re
  let financialAudit:ReturnType<typeof captureFinMindIncome>|undefined;
  if(!reuseFinancial){
   try{
-  if(old.market==='US')financial=secFinancial(await readJSON(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(old.cik).padStart(10,'0')}.json`,{'User-Agent':'GrowthObservatory/1.0 personal financial research'},diagnostic?.('financial')),bars.at(-1)!.date);
+  if(old.market==='US')financial=secFinancial(await readJSON(`https://data.sec.gov/api/xbrl/companyfacts/CIK${String(old.cik).padStart(10,'0')}.json`,{'User-Agent':'GrowthObservatory/1.0 personal financial research'},diagnostic?.('financial')),context.liveFinancial?iso(ms(new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date()))+2*dayms):bars.at(-1)!.date);
   else{const start=iso(ms(context.cutoff)-1400*dayms);const [income,cash]=await finishRequests([finmind('TaiwanStockFinancialStatements',old.symbol,start,context.cutoff,diagnostic?.('financial')),finmind('TaiwanStockCashFlowsStatement',old.symbol,start,context.cutoff,diagnostic?.('financial'))] as const);financialAudit=captureFinMindIncome(income,old.symbol,new Date().toISOString());financial=twFinancial(income,cash,bars.at(-1)!.date);}
   }catch(error){
    const message='財報來源：'+(error instanceof Error?error.message:String(error));
@@ -245,6 +245,7 @@ export async function refreshInstrument(old:Instrument,context:RefreshContext,re
    financialError=message;
   }
  }
+ if(old.market==='US'&&context.liveFinancial)financial.date_basis='LIVE_OBSERVED_SEC';
  if(old.market==='TW'&&old.financial.filingEvidence?.releaseKey===financial.fundamental_release_key)
   financial.filingEvidence=old.financial.filingEvidence;
  const same=financial.latest_period===old.financial.latest_period&&['revenue_growth','operating_margin','cfo_margin'].every(k=>{const a=(financial as any)[k],b=(old.financial as any)[k];return a===b||(finite(a)&&finite(b)&&Math.abs(a-b)<1e-9);});

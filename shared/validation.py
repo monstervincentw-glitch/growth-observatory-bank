@@ -91,7 +91,7 @@ def validate(snapshot, now=None, expected=None):
                     f"{key} 行情不完整或交易日不一致")
             period, filed = f.get("latest_period"), f.get("max_input_filed")
             require(as_date(period) <= as_date(price) and f["fundamental_release_key"].startswith(period + "|")
-                    and ((as_date(price) - as_date(filed)).days >= 2 if market == "US" else
+                    and (((as_time(stock["financialObservedAt"]).astimezone(ZoneInfo("America/New_York")).date() if f.get("date_basis") == "LIVE_OBSERVED_SEC" else as_date(price)) - as_date(filed)).days >= (0 if f.get("date_basis") == "LIVE_OBSERVED_SEC" else 2) if market == "US" else
                          not filed or as_date(filed) <= as_date(price))
                     and (f["financial_status"] != "ok" or all(number(f.get(k)) for k in
                          ("revenue_growth", "quarterly_growth", "operating_margin", "cfo_margin"))),

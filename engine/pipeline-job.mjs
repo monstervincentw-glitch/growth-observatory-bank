@@ -23,7 +23,7 @@ export async function calculate(input, progress = () => {}) {
   const {market, batch, prior, runtime} = input;
   const before = prior.snapshot.markets[market];
   checkQuotes(input, before);
-  if (batch.day === before.macro.marketAsOf) return {unchanged: true};
+  if (batch.day === before.macro.marketAsOf && !input.refreshFinancial) return {unchanged: true};
   const names = market === 'TW' ? ['0052'] : ['QQQ', 'SOXX', 'IGV'];
   const benchmarks = {};
   for (const name of names) {
@@ -36,7 +36,7 @@ export async function calculate(input, progress = () => {}) {
   const now = new Date().toISOString();
   macro.marketComplete = true;
   macro.lastMarketPublishedAt = now;
-  const context = {market, cutoff: batch.day, benchmarks, macro, createdAt: now};
+  const context = {market, cutoff: batch.day, benchmarks, macro, createdAt: now, liveFinancial: true};
   const stocks = [], bars = {}, financialVersions = {};
   let reused = 0, changed = 0;
   const groupSize = market === 'US' ? 1 : 3; // SEC facts stay within the existing free service's memory.

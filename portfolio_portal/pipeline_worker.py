@@ -189,7 +189,9 @@ def run_cycle(client, node, seed):
         return
     quotes = {row[0]: json.loads(row[8]) for row in rows[1:] if len(row) == 9 and row[8]}
     current_entry = decode_envelope(book.values_get("bank_snapshot!A1:E300").get("values", []))
-    if all(batch["day"] <= current_entry["snapshot"]["markets"][market]["macro"]["marketAsOf"]
+    needs_us_live = any(not stock.get("marketEvent") and stock["financial"].get("date_basis") != "LIVE_OBSERVED_SEC"
+                        for stock in current_entry["snapshot"]["markets"]["US"]["stocks"])
+    if not needs_us_live and all(batch["day"] <= current_entry["snapshot"]["markets"][market]["macro"]["marketAsOf"]
            for market, batch in quotes.items()):
         return  # No history downloads, checkpoint reads, or source requests after success.
     tab(book, "pipeline_runtime", RUNTIME)
@@ -207,7 +209,8 @@ def run_cycle(client, node, seed):
         entry = decode_envelope(book.values_get("bank_snapshot!A1:E300").get("values", []))
         day, state = batch["day"], checkpoints.setdefault(market, seed[market])
         cutoff = entry["snapshot"]["markets"][market]["macro"]["marketAsOf"]
-        if day <= cutoff:
+        refresh_financial = market == "US" and needs_us_live
+        if day <= cutoff and not refresh_financial:
             continue
         if state.get("attemptDay") != day:
             state.update(attemptDay=day, attempts=0, nextRetry=0)
@@ -227,7 +230,7 @@ def run_cycle(client, node, seed):
         try:
             versions = latest_finance(state, market, day, seed)
             payload = {"market": market, "batch": batch, "prior": {"snapshot": entry["snapshot"]},
-                       "runtime": state, "financialVersions": versions}
+                       "runtime": state, "financialVersions": versions, "refreshFinancial": refresh_financial}
             with tempfile.TemporaryDirectory(prefix="daily-research-") as directory:
                 source, target = Path(directory) / "input.json", Path(directory) / "output.json"
                 source.write_text(json.dumps(payload))
