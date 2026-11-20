@@ -40,15 +40,19 @@ function pulseResearchPipeline(){
   const book=SpreadsheetApp.openById(MP_BOOK);
   const snapshot=verifyEnvelope_(book.getSheetByName('bank_snapshot').getDataRange().getValues());
   const states=gnRead(book.getSheetByName('pipeline_status'));
-  let pending=false,completed=false;
+  let pending=false,completed=false;const wakes=[];
   for(const {market,day} of wanted){
     if(snapshot.markets[market].macro.marketAsOf>=day){properties.setProperty('PR_DONE_'+market,day);completed=true;continue;}
     const state=states.find(row=>row.market===market&&row.session_date===day);
     if(state&&state.status==='FAILED'&&Number(state.attempts)>=3){properties.setProperty('PR_DONE_'+market,day);continue;}
-    pending=true;
+    const key='PR_WAKE_'+market,previous=JSON.parse(properties.getProperty(key)||'{}');
+    const count=previous.day===day?Number(previous.count||0):0;
+    if(count>=24){properties.setProperty('PR_DONE_'+market,day);continue;}
+    wakes.push({key,day,count:count+1});pending=true;
   }
   if(completed)syncPipelineLegacy(book);
   if(!pending)return;
+  for(const item of wakes)properties.setProperty(item.key,JSON.stringify({day:item.day,count:item.count}));
   const response=UrlFetchApp.fetch('https://growth-portfolio-private-v1.onrender.com/_stcore/health',{muteHttpExceptions:true});
   console.log(JSON.stringify({pipelineWakeStatus:response.getResponseCode(),pending:true}));
 }
