@@ -54,8 +54,8 @@ def snapshot():
         account = st.secrets.get("google_service_account")
     except FileNotFoundError:
         account = None
-    entry, state = verified_research_reader().read(lambda: research_publication()["rows"],
-        source="github", fallback=lambda: fetch_rows(csv_url, account))
+    entry, state = verified_research_reader().read(lambda: fetch_rows(csv_url, account),
+        source="sheets", fallback=lambda: research_publication()["rows"])
     return entry["snapshot"] if entry else None, state
 
 @st.cache_data(show_spinner=False)
@@ -795,7 +795,10 @@ def update_status(state, quote=None):
     for market, info in state["markets"].items():
         label = "美股" if market == "US" else "台股"
         status = "更新異常" if info.get("reason") else "成功"
-        st.caption(f"{label}最後成功收盤 {info.get('date') or '待核對'} · 更新 {stamp(info.get('lastSuccessAt'))} · {status}")
+        if quote and quote["market"] == market:
+            st.caption(f"{label}行情 {quote['day']} · 研究批次 {info.get('date') or '待核對'}")
+        else:
+            st.caption(f"{label}研究批次 {info.get('date') or '待核對'} · 發布 {stamp(info.get('lastSuccessAt'))} · {status}")
     summaries = []
     for market, info in state["markets"].items():
         label = "美股" if market == "US" else "台股"
@@ -815,16 +818,19 @@ def update_status(state, quote=None):
     if sync_error:
         st.caption("⚠️ Sheets 同步查核失敗：" + sync_error)
     elif sheet_batch != state.get("batch") or sheet_checksum != state.get("checksum"):
-        st.caption("⚠️ GitHub → Sheets 尚未同步最新批次；網站使用 GitHub 已驗證資料。")
+        st.caption("⚠️ GitHub → Sheets 尚未同步最新批次；網站沿用目前通過檢查的批次。")
     with st.expander("資料更新狀態與錯誤明細", expanded=False):
         st.caption(f"GitHub → Sheets：{'吻合' if sheet_batch == state.get('batch') and sheet_checksum == state.get('checksum') else '待同步'} · Sheets 批次 {sheet_batch or '讀取失敗'}")
         for market, info in state["markets"].items():
             label = "美股" if market == "US" else "台股"
             count = lambda value: "—" if value is None else value
-            st.markdown(f"**{label}**｜最後成功收盤 {info.get('date') or '待核對'} · 資料時間 {stamp(info.get('lastSuccessAt'))}")
+            st.markdown(f"**{label}**｜研究批次 {info.get('date') or '待核對'} · 發布時間 {stamp(info.get('lastSuccessAt'))}")
             expected = info.get("expected")
             if not info.get("reason") and info.get("succeeded") == 0 and info.get("failed") == 0 and info.get("notAttempted") == expected:
-                st.caption("同一收盤日或休市，沒有新資料需要處理；不是全部股票更新失敗。")
+                if quote and quote["market"] == market and quote["day"] > (info.get("date") or ""):
+                    st.caption("新行情已接入；研究批次仍沿用上述日期。")
+                else:
+                    st.caption("這筆紀錄沒有處理新研究批次；不代表今天休市或沒有新行情。")
             else:
                 st.caption(f"預期 {count(expected)} · 成功 {count(info.get('succeeded'))} · 失敗 {count(info.get('failed'))} · 未處理 {count(info.get('notAttempted'))}")
             if quote and quote["market"]==market:
