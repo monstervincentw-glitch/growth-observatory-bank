@@ -41,6 +41,7 @@ function stockView(i) {
 }
 export function macroView(m) {
   return {...pick(m,publicFields.macro),
+    ...(m.poolCheck ? {poolCheck:m.poolCheck} : {}),
     dataBasis:m.dataBasis??'OFFICIAL_VINTAGE',researchEstimates:m.researchEstimates??[],
     categoryStates:pick(m.categoryStates,macroCategories),
     scoreRange:Array.isArray(m.scoreRange)?m.scoreRange.slice(0,2):null,

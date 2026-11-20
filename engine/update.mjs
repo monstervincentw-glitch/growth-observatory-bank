@@ -41,6 +41,7 @@ try{
     attempt.detail='同一收盤日已完整發布；未呼叫股價、財報、FRED/ALFRED，也未重算研究池。';
   }else{
   const context=await makeContext(market,undefined,false,report,true);
+  if(before.macro.poolCheck)context.macro.poolCheck=before.macro.poolCheck;
   replayContext=context;
   if(context.cutoff<before.macro.marketAsOf)throw Error('基準行情日期倒退，保留前批');
   if(!['vintage_verified','macro_incomplete'].includes(context.macro.status)||

@@ -17,6 +17,7 @@ from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout
                          readable_table, sidebar_brand, status_line, strategy_comparison, trend_chart)
 from sheets_data import BASE, SnapshotReader, fetch_rows, read_gzip
 from shared.validation import health
+from shared.pool_check import render_checks
 from shared.candidates import DIVERGENCE, SCOPES, candidate_status, in_scope
 from taiwan_fund_research import render as render_taiwan_fund_research
 from performance_view import Reader as PerformanceReader, fetch as fetch_performance, overlay as overlay_performance
@@ -794,6 +795,8 @@ def update_status(state, quote=None, block=None, signal_available=False):
                 summaries.append(f"{label}資料待驗證；沿用 {last_date}")
     sheet_batch, sheet_checksum, sync_error = sheets_pipeline_status()
     with st.expander("資料更新狀態與錯誤明細", expanded=False):
+        if data:
+            render_checks(st, data)
         if summaries:
             st.caption("⚠️ " + "｜".join(summaries))
         if sync_error:
