@@ -20,7 +20,8 @@ from monitor import portfolio_reviews, review_holding, data_too_old
 from oauth_messages import oauth_error_message
 from portfolio_admin import STRATEGIES, condition_timeline, weekday_gaps
 from research import latest_research
-from quotes import reference_valuation, valuation_curve_rows
+from quotes import reference_valuation, valuation_curve_rows, pool_reference_valuation
+from google_market_quotes import fetch_google_quotes
 from storage import PortfolioSheets, sheets_client
 
 st.set_page_config(page_title="我的投資組合｜私人版", page_icon="🔐",
@@ -486,18 +487,27 @@ def render_stock_monitor(portfolio, valued, reviews, macro, transitions):
 
 
 
+@st.cache_data(ttl=180, show_spinner=False)
+def pool_quote_snapshot(market):
+    return fetch_google_quotes(market)
+
+
 def render_dashboard(store, portfolio, transactions, block, entry_batch, transitions, nav_cache):
     account = compute_account(transactions, portfolio["id"])
     research_valued = portfolio_value(account, block)
     valued = research_valued
     valuation_info = {"date": block["macro"].get("marketAsOf") or "未知",
                       "source": "研究收盤行情", "fallback": False}
-    if portfolio["market"] == "US":
-        try:
-            quote_rows = live_quote_snapshot(tuple(sorted(account["positions"])))
-            valued, valuation_info = reference_valuation(account, block, quote_rows, "US")
-        except Exception:
-            st.warning("Google 備援報價暫時無法讀取，保留研究行情估值。")
+    try:
+        valued, valuation_info = pool_reference_valuation(
+            account, block, pool_quote_snapshot(portfolio["market"]), portfolio["market"])
+    except (OSError, ValueError, TypeError, KeyError):
+        if portfolio["market"] == "US":
+            try:
+                quote_rows = live_quote_snapshot(tuple(sorted(account["positions"])))
+                valued, valuation_info = reference_valuation(account, block, quote_rows, "US")
+            except Exception:
+                st.warning("Google 行情暫時無法讀取，保留研究行情估值。")
     macro = block["macro"]
     market_asof = macro.get("marketAsOf") or ""
     contributed = contributions_through(transactions, portfolio["id"], date.today().isoformat())

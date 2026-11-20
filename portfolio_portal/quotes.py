@@ -97,3 +97,34 @@ def valuation_curve_rows(history, valued, info, portfolio_id, transactions=()):
                     'kind': 'Google備援估值' if info.get('fallback') else '研究行情估值'})
         rows.append(row)
     return sorted(rows, key=lambda r: r['date'])
+
+def pool_reference_valuation(account, block, batch, market, today=None):
+    """Value the held subset from one complete pool batch; preserve signal inputs."""
+    from google_market_quotes import validate_quotes
+    b = validate_quotes(batch, market)
+    today = today or datetime.now(timezone.utc).date()
+    day = b["day"]
+    stocks = {s["symbol"]: s for s in block["stocks"]}
+    if (day < block["macro"]["marketAsOf"]
+            or not 0 <= (today - date.fromisoformat(day)).days <= 4
+            or any(s not in b["quotes"] or stocks.get(s, {}).get("marketEvent")
+                   for s in account["lots"])):
+        return portfolio_value(account, block), {
+            "source": "研究收盤行情", "date": block["macro"]["marketAsOf"], "fallback": False}
+    items, total = [], Decimal("0")
+    for symbol, lots in account["lots"].items():
+        price = money(b["quotes"][symbol]["close"])
+        qty = sum((lot["quantity"] for lot in lots), Decimal("0"))
+        cost = sum((lot["quantity"] * lot["unit_cost"] for lot in lots), Decimal("0"))
+        value = qty * price
+        total += value
+        items.append({"symbol": symbol, "quantity": qty, "price": price,
+                      "value": value, "cost": cost, "pnl": value - cost, "lots": lots,
+                      "stock": stocks.get(symbol, {"symbol": symbol, "integrity": False})})
+    return ({"cash": account["cash"], "market_value": total,
+             "nav": account["cash"] + total, "holdings": items, "missing_prices": [],
+             "realized": account["realized"]},
+            {"source": "Google 全池行情（含櫃買官方補齊）" if market == "TW"
+                       else "Google Finance 全池行情（參考估值）",
+             "date": day, "fallback": True})
+

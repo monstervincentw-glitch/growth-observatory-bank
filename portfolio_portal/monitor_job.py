@@ -44,6 +44,9 @@ def run():
     # Use only a full, confirmed same-session quote for every held security.
     for p in portfolios:
         market=p["market"]
+        # Google Apps Script owns US NAV writes; keep one writer per market.
+        if market == "US":
+            continue
         block=snapshot["markets"][market]
         asof=block["macro"]["marketAsOf"]
         if data_too_old(asof):
