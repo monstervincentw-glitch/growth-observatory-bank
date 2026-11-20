@@ -115,6 +115,8 @@ def markets(market, block, signal_available, latest_quotes=None):
     stocks = block["stocks"]
     quotes = (latest_quotes or {}).get("quotes", {})
     macro = block["macro"]
+    funding = {"red": "紅燈", "non_red": "非紅燈", "unknown": "待確認"}.get(
+        macro.get("decision"), "待確認")
     states = {stock["key"]: candidate_status(stock, macro, signal_available)
               for stock in stocks}
 
