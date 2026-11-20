@@ -140,6 +140,38 @@ class PortfolioSheets:
         with self._lock:
             return self._rows(self.ledger_tab, LEDGER_HEADERS)
 
+    def live_quotes(self, symbols):
+        """One bounded read per quote-cache window, private USD reference marks."""
+        import re
+        from quotes import QUOTE_HEADERS
+        symbols = sorted(set(symbols))
+        if any(not re.fullmatch(r"[A-Z0-9][A-Z0-9.-]{0,19}", symbol) for symbol in symbols):
+            raise ValueError("Invalid US quote ticker")
+        with self._lock:
+            raw = self.book.values_get("'live_quotes'!A1:F200").get("values", [])
+            if not raw or raw[0] != QUOTE_HEADERS:
+                raise ValueError("私人報價表尚未設定或標頭不符")
+            rows = self._decode_rows(raw[1:], QUOTE_HEADERS)
+            existing = {row["symbol"] for row in rows}
+            added = []
+            for symbol in symbols:
+                if symbol in existing:
+                    continue
+                n = len(raw) + len(added) + 1
+                if n > 200:
+                    raise ValueError("私人報價表已滿，保留研究估值")
+                added.append([symbol, symbol,
+                    f'=IFERROR(GOOGLEFINANCE(B{n},"price"),"")',
+                    f'=IFERROR(TEXT(GOOGLEFINANCE(B{n},"tradetime"),"yyyy-mm-dd hh:mm:ss"),"")',
+                    f'=IFERROR(GOOGLEFINANCE(B{n},"currency"),"")',
+                    f'=IF(AND(ISNUMBER(C{n}),C{n}>0,D{n}<>"",E{n}="USD"),"OK","PENDING")'])
+            if added:
+                self.book.values_append("'live_quotes'!A:F",
+                    params={"valueInputOption": "USER_ENTERED", "insertDataOption": "INSERT_ROWS"},
+                    body={"values": added})
+            # New formulas may still be calculating. Use them on the next cache read.
+            return rows
+
     def historical_positions(self, portfolio_id):
         """Owner-confirmed per-ticker closing snapshot, distinct from live quotes."""
         with self._lock:
@@ -442,3 +474,4 @@ class PortfolioSheets:
             if sum(x["id"]==record["id"] for x in saved)!=1:
                 raise RuntimeError("Google Sheet 寫入確認失敗，請先查詢交易紀錄，勿重複提交")
             return record
+

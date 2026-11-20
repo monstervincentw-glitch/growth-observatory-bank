@@ -20,6 +20,7 @@ from monitor import portfolio_reviews, review_holding, data_too_old
 from oauth_messages import oauth_error_message
 from portfolio_admin import STRATEGIES, condition_timeline, weekday_gaps
 from research import latest_research
+from quotes import reference_valuation
 from storage import PortfolioSheets, sheets_client
 
 st.set_page_config(page_title="我的投資組合｜私人版", page_icon="🔐",
@@ -487,7 +488,16 @@ def render_stock_monitor(portfolio, valued, reviews, macro, transitions):
 
 def render_dashboard(store, portfolio, transactions, block, entry_batch, transitions, nav_cache):
     account = compute_account(transactions, portfolio["id"])
-    valued = portfolio_value(account, block)
+    research_valued = portfolio_value(account, block)
+    valued = research_valued
+    valuation_info = {"date": block["macro"].get("marketAsOf") or "未知",
+                      "source": "研究收盤行情", "fallback": False}
+    if portfolio["market"] == "US":
+        try:
+            quote_rows = live_quote_snapshot(tuple(sorted(account["positions"])))
+            valued, valuation_info = reference_valuation(account, block, quote_rows, "US")
+        except Exception:
+            st.warning("Google 備援報價暫時無法讀取，保留研究行情估值。")
     macro = block["macro"]
     market_asof = macro.get("marketAsOf") or ""
     contributed = contributions_through(transactions, portfolio["id"], date.today().isoformat())
@@ -501,9 +511,9 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
     if nav_now is not None and contributed > 0:
         returns = (nav_now - contributed) / contributed
     reviews = {}
-    for holding in valued["holdings"]:
+    for holding in research_valued["holdings"]:
         reviews[holding["symbol"]] = shown_review(holding, portfolio["strategy"], macro, market_asof)
-    for symbol in valued["missing_prices"]:
+    for symbol in research_valued["missing_prices"]:
         reviews[symbol] = {"status": "無法判定", "reasons": [],
                            "unknown": ["無法判定：沒有同日可驗證收盤價"],
                            "baseline": {}, "latest": {}, "change": {}}
@@ -600,7 +610,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 f'<span class="ccy">{safe_html(portfolio["currency"])}</span></div>'
                 f'<div class="gain">累計損益 {safe_html(pnl_signed)}'
                 f' · 報酬率 {safe_html(return_display)}</div>'
-                f'<div class="stamp">最後行情日 {safe_html(market_asof or "未知")}</div>'
+                f'<div class="stamp">估值報價日 {safe_html(valuation_info["date"])}</div>'
                 '</div>', unsafe_allow_html=True
             )
         with stats_col:
@@ -620,8 +630,12 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 for label, number in metrics
             )
             st.markdown('<div class="asset-stat-grid">' + cards + '</div>', unsafe_allow_html=True)
-        st.caption("最新淨值由私人帳本與已驗證收盤價計算；圖表為已保存的歷史淨值。"
-                   "累計報酬率並非標準 TWR。")
+        st.caption("估值來源：" + valuation_info["source"] + " · 策略研究日：" + market_asof)
+        if valuation_info["fallback"]:
+            st.caption("市值與損益採較新 Google 延遲報價作參考估值；上方曲線保留已核對的收盤淨值。")
+        else:
+            st.caption("最新淨值由私人帳本與已驗證收盤價計算；圖表為已保存的歷史淨值。")
+        st.caption("累計報酬率並非標準 TWR。")
         if valued["missing_prices"]:
             st.warning("這些持股尚無可驗證收盤價，資產與權重不估算："
                        + "、".join(valued["missing_prices"]))
@@ -662,7 +676,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                     "公司名稱": (holding["stock"].get("name") or holding["symbol"]),
                     "股數": f"{holding['quantity']:.4f}",
                     "平均成本": money_text(avg),
-                    "最新收盤價": money_text(holding["price"]),
+                    "估值價格": money_text(holding["price"]),
                     "市值": money_text(holding["value"]),
                     "未實現損益": money_text(holding["pnl"]),
                     "報酬率": "待確認" if ret is None else f"{ret:+.2%}",
@@ -672,7 +686,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
             for symbol in valued["missing_prices"]:
                 rows.append({
                     "股票代號": symbol, "公司名稱": symbol, "股數": "待確認", "平均成本": "待確認",
-                    "最新收盤價": "待確認", "市值": "待確認", "未實現損益": "待確認",
+                    "估值價格": "待確認", "市值": "待確認", "未實現損益": "待確認",
                     "報酬率": "待確認", "組合權重": "待確認", "監控狀態": "無法判定",
                 })
             st.dataframe(rows, hide_index=True, use_container_width=True)
@@ -723,7 +737,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 if data_too_old(market_asof):
                     result = {"status": "市場研究資料已過期，暫停新增買入", "candidates": []}
                 else:
-                    result = buy_plan(account, valued, block, variant)
+                    result = buy_plan(account, research_valued, block, variant)
                 st.write("主策略 " + variant + "｜" + result["status"])
                 if result["candidates"]:
                     st.dataframe([
@@ -737,7 +751,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
         if data_too_old(market_asof):
             divergence = {"status": "市場研究資料已過期，暫停背離買入", "candidates": [], "hold_rule": ""}
         else:
-            divergence = divergence_plan(account, valued, block)
+            divergence = divergence_plan(account, research_valued, block)
         st.write("背離長抱｜" + divergence["status"])
         st.caption(divergence.get("hold_rule") or "")
         if divergence["candidates"]:
@@ -782,6 +796,12 @@ def private_store():
 def research_snapshot():
     client = sheets_client(dict(st.secrets["google_service_account"]))
     return latest_research(client)
+
+
+@st.cache_data(ttl=120, max_entries=8, show_spinner=False)
+def live_quote_snapshot(symbols):
+    # Owner guard has run before any call; no holdings or secrets enter public research.
+    return private_store().live_quotes(symbols)
 
 
 @st.cache_data(ttl=180, max_entries=3, show_spinner=False)
@@ -865,9 +885,11 @@ except Exception as exc:
 try:
     entry, research_source, research_issues = research_snapshot()
 except Exception as exc:
-    st.error("銀行版研究資料無法讀取或驗證；不會依過期行情產生新交易建議。")
-    st.caption(public_error(exc))
-    st.stop()
+    st.warning("研究來源暫時無法取得；仍可用私人 Sheets 報價查看持股參考估值。")
+    entry = {"batch": "unavailable", "snapshot": {"markets": {
+        m: {"stocks": [], "macro": {"marketAsOf": "1970-01-01", "decision": "unknown"}}
+        for m in ("US", "TW")}}}
+    research_source, research_issues = "暫無研究資料", []
 
 snapshot = entry["snapshot"]
 try:
@@ -942,6 +964,7 @@ with st.sidebar:
                    str(snapshot["markets"]["TW"]["macro"].get("marketAsOf") or "未知"))
         if st.button("重新讀取研究與組合資料", use_container_width=True):
             research_snapshot.clear()
+            live_quote_snapshot.clear()
             cached_portfolio_records.clear()
             st.rerun()
         if st.button("登出", use_container_width=True):
@@ -958,3 +981,4 @@ try:
 except Exception as exc:
     st.error("這個組合目前無法完成對帳或顯示，已停止分析：" + public_error(exc))
     st.stop()
+
