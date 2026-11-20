@@ -507,7 +507,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 quote_rows = live_quote_snapshot(tuple(sorted(account["positions"])))
                 valued, valuation_info = reference_valuation(account, block, quote_rows, "US")
             except Exception:
-                st.warning("Google 行情暫時無法讀取，保留研究行情估值。")
+                update_details.warning("Google 行情暫時無法讀取，保留研究行情估值。")
     macro = block["macro"]
     market_asof = macro.get("marketAsOf") or ""
     contributed = contributions_through(transactions, portfolio["id"], date.today().isoformat())
@@ -529,8 +529,8 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                            "baseline": {}, "latest": {}, "change": {}}
 
     st.title(portfolio["name"])
-    st.caption(portfolio["market"] + " · 策略 " + portfolio["strategy"] + " · " + portfolio["currency"]
-               + " · " + (portfolio.get("note") or "無備註"))
+    update_details.caption(portfolio["market"] + " · 策略 " + portfolio["strategy"] + " · " + portfolio["currency"]
+                           + " · " + (portfolio.get("note") or "無備註"))
 
     with st.container(border=True):
         show_funding(macro)
@@ -596,13 +596,13 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                                     legend=alt.Legend(orient="bottom")))
                 st.altair_chart(chart + points_chart, use_container_width=True, theme=None)
                 latest_kind = max(shown, key=lambda row: row["date"])["kind"]
-                st.caption("截至 " + latest_date.isoformat() + " · 最新點：" + latest_kind
+                update_details.caption("截至 " + latest_date.isoformat() + " · 最新點：" + latest_kind
                            + "；縱軸為局部縮放，以利辨識日間變化。")
             gaps = weekday_gaps([row["date"] for row in valid])
             if gaps:
-                st.warning("以下日期仍待核對：" + "、".join(gaps))
+                update_details.warning("以下日期仍待核對：" + "、".join(gaps))
         else:
-            st.info("尚無已核對的歷史淨值；沒有使用推測行情補值。")
+            update_details.info("尚無已核對的歷史淨值；沒有使用推測行情補值。")
 
         st.divider()
 
@@ -647,14 +647,14 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                 for label, number in metrics
             )
             st.markdown('<div class="asset-stat-grid">' + cards + '</div>', unsafe_allow_html=True)
-        st.caption("估值來源：" + valuation_info["source"] + " · 策略研究日：" + market_asof)
+        update_details.caption("估值來源：" + valuation_info["source"] + " · 策略研究日：" + market_asof)
         if valuation_info["fallback"]:
-            st.caption("市值與損益採較新 Google 延遲報價作參考估值；上方曲線已接上最新參考估值，來源標於資料點。")
+            update_details.caption("市值與損益採較新 Google 延遲報價作參考估值；上方曲線已接上最新參考估值，來源標於資料點。")
         else:
-            st.caption("最新淨值由私人帳本與已驗證收盤價計算；圖表為已保存的歷史淨值。")
-        st.caption("累計報酬率並非標準 TWR。")
+            update_details.caption("最新淨值由私人帳本與已驗證收盤價計算；圖表為已保存的歷史淨值。")
+        update_details.caption("累計報酬率並非標準 TWR。")
         if valued["missing_prices"]:
-            st.warning("這些持股尚無可驗證收盤價，資產與權重不估算："
+            update_details.warning("這些持股尚無可驗證收盤價，資產與權重不估算："
                        + "、".join(valued["missing_prices"]))
         with st.expander("歷史淨值、資料來源與績效算法", expanded=False):
             if valid:
@@ -890,19 +890,21 @@ def is_sheets_quota_error(exc):
 try:
     store = private_store()
 except Exception as exc:
-    if is_sheets_quota_error(exc):
-        st.error("Google Sheets 讀取次數暫時超過每分鐘額度，私人組合目前無法載入。")
-        st.caption("這不是 Google 授權或試算表設定失效；請約一分鐘後再重新整理。不要為此更換服務帳號或重建試算表。")
-    else:
-        st.error("私人 Google Sheets 無法連線或驗證設定。")
-        st.caption("請在 Render 檢查私人試算表與服務帳號權限，勿在聊天室張貼密鑰。")
-        st.caption(public_error(exc))
+    with st.expander("資料更新狀態與錯誤明細", expanded=False):
+        if is_sheets_quota_error(exc):
+            st.error("Google Sheets 讀取次數暫時超過每分鐘額度，私人組合目前無法載入。")
+            st.caption("這不是 Google 授權或試算表設定失效；請約一分鐘後再重新整理。不要為此更換服務帳號或重建試算表。")
+        else:
+            st.error("私人 Google Sheets 無法連線或驗證設定。")
+            st.caption("請在 Render 檢查私人試算表與服務帳號權限，勿在聊天室張貼密鑰。")
+            st.caption(public_error(exc))
     st.stop()
 
+data_update_messages = []
 try:
     entry, research_source, research_issues = research_snapshot()
 except Exception as exc:
-    st.warning("研究來源暫時無法取得；仍可用私人 Sheets 報價查看持股參考估值。")
+    data_update_messages.append("研究來源暫時無法取得；仍可用私人 Sheets 報價查看持股參考估值。")
     entry = {"batch": "unavailable", "snapshot": {"markets": {
         m: {"stocks": [], "macro": {"marketAsOf": "1970-01-01", "decision": "unknown"}}
         for m in ("US", "TW")}}}
@@ -918,13 +920,14 @@ except Exception as exc:
     if is_sheets_quota_error(exc) and "_last_good_private_snapshot" in st.session_state:
         private_data = st.session_state["_last_good_private_snapshot"]
         st.session_state["_private_stale"] = True
-        st.warning("Google Sheets 暫時達到讀取額度。現在顯示上次成功讀取的私人資料（僅供檢視，暫停所有寫入）。")
+        data_update_messages.append("Google Sheets 暫時達到讀取額度。現在顯示上次成功讀取的私人資料（僅供檢視，暫停所有寫入）。")
     else:
-        st.error("讀取私人交易紀錄失敗，禁止建立建議或寫入新資料。")
-        if is_sheets_quota_error(exc):
-            st.caption("Google Sheets 每分鐘讀取次數已達上限，請稍後重新整理；交易及歷史淨值沒有被刪除。")
-        else:
-            st.caption(public_error(exc))
+        with st.expander("資料更新狀態與錯誤明細", expanded=False):
+            st.error("讀取私人交易紀錄失敗，禁止建立建議或寫入新資料。")
+            if is_sheets_quota_error(exc):
+                st.caption("Google Sheets 每分鐘讀取次數已達上限，請稍後重新整理；交易及歷史淨值沒有被刪除。")
+            else:
+                st.caption(public_error(exc))
         st.stop()
 
 portfolios = private_data["portfolios"]
@@ -932,17 +935,22 @@ archived = private_data["archived"]
 transactions = private_data["transactions"]
 transitions = private_data["transitions"]
 nav_cache = private_data["nav"]
-for alert in private_data["warnings"]:
-    st.warning(alert)
+data_update_messages.extend(private_data["warnings"])
 if st.session_state.get("_private_stale"):
-    st.error("私人交易及組合變更目前暫停；僅顯示上次已成功載入的快取內容。")
+    data_update_messages.append("私人交易及組合變更目前暫停；僅顯示上次已成功載入的快取內容。")
 live_reviews = portfolio_reviews(portfolios, transactions, snapshot, entry["batch"])
 
 urgent = [row for row in live_reviews if row["status"] == "觸發出場條件"]
 pending = [row for row in live_reviews if row["status"] in ("資料待確認", "無法判定")]
 
-for message in research_issues:
-    st.warning(message)
+st.caption("美股更新至 " + str(snapshot["markets"]["US"]["macro"].get("marketAsOf") or "未知")
+           + "　·　台股更新至 " + str(snapshot["markets"]["TW"]["macro"].get("marketAsOf") or "未知"))
+update_details = st.expander("資料更新狀態與錯誤明細", expanded=False)
+with update_details:
+    st.caption("研究來源：" + research_source)
+    st.caption("研究批次：" + str(entry["batch"]))
+    for message in data_update_messages + list(research_issues):
+        st.warning(message)
 
 active_ids = {item["id"] for item in portfolios}
 if "portal_view" not in st.session_state or (
@@ -970,15 +978,9 @@ with st.sidebar:
         st.caption("尚未建立投資組合。")
     if urgent:
         st.error("⚠️ 出場訊號：" + "、".join(row["symbol"] for row in urgent[:8]))
-    with st.expander("資料來源與帳戶", expanded=False):
+    with st.expander("帳戶", expanded=False):
         st.caption("已授權私人登入")
         st.caption(owner_email)
-        st.caption("研究來源：" + research_source)
-        st.caption("研究批次：" + str(entry["batch"]))
-        st.caption("美股行情日：" +
-                   str(snapshot["markets"]["US"]["macro"].get("marketAsOf") or "未知"))
-        st.caption("台股行情日：" +
-                   str(snapshot["markets"]["TW"]["macro"].get("marketAsOf") or "未知"))
         if st.button("重新讀取研究與組合資料", use_container_width=True):
             research_snapshot.clear()
             live_quote_snapshot.clear()
@@ -996,6 +998,6 @@ block = snapshot["markets"][portfolio["market"]]
 try:
     render_dashboard(store, portfolio, transactions, block, entry["batch"], transitions, nav_cache)
 except Exception as exc:
-    st.error("這個組合目前無法完成對帳或顯示，已停止分析：" + public_error(exc))
+    update_details.error("這個組合目前無法完成對帳或顯示，已停止分析：" + public_error(exc))
     st.stop()
 
