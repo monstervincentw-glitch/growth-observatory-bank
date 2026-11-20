@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
+from google_market_quotes import fetch_google_quotes
 
 from bank_layout import (event_drawdown_chart, funding_dashboard, header, layout_style,
                          readable_table, sidebar_brand, status_line, strategy_comparison, trend_chart)
@@ -114,6 +115,9 @@ def markets(market, block, signal_available, latest_quotes=None):
     stocks = block["stocks"]
     quotes = (latest_quotes or {}).get("quotes", {})
     macro = block["macro"]
+    if latest_quotes and latest_quotes.get("status") == "REFERENCE_QUOTES_COMPLETE":
+        st.caption(f"Google 行情 {latest_quotes['day']} · {len(quotes)} 檔"
+                   f" · 策略資料 {macro['marketAsOf']}；財報與訊號日期獨立顯示。")
     states = {stock["key"]: candidate_status(stock, macro, signal_available)
               for stock in stocks}
 
@@ -329,16 +333,23 @@ def fetch_published(path):
 
 @st.cache_data(ttl=90, show_spinner=False)
 def market_prices(market):
+    # Google acquisition is independent of GitHub Actions; keep the newer fallback.
+    candidates = []
+    try:
+        candidates.append(fetch_google_quotes(market))
+    except (OSError, ValueError, TypeError, KeyError):
+        pass
     try:
         payload=fetch_bank_json("research-data",f"market-prices/{market}/latest.json",200_000)
-        if payload["schema"]!=1 or payload["market"]!=market or payload["status"] not in ("PRICES_VERIFIED","PARTIAL_PRICES"):
-            return None
-        if any(row["priceDate"]!=payload["day"] or not isinstance(row["close"],(int,float)) or row["close"]<=0
-               for row in payload["quotes"].values()):
-            return None
-        return payload
+        if (payload["schema"]==1 and payload["market"]==market
+                and payload["status"] in ("PRICES_VERIFIED","PARTIAL_PRICES")
+                and all(row["priceDate"]==payload["day"]
+                        and isinstance(row["close"],(int,float)) and row["close"]>0
+                        for row in payload["quotes"].values())):
+            candidates.append(payload)
     except (OSError, ValueError, TypeError, KeyError):
-        return None
+        pass
+    return max(candidates, key=lambda item:item["day"], default=None)
 
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -817,7 +828,7 @@ def update_status(state, quote=None):
             else:
                 st.caption(f"預期 {count(expected)} · 成功 {count(info.get('succeeded'))} · 失敗 {count(info.get('failed'))} · 未處理 {count(info.get('notAttempted'))}")
             if quote and quote["market"]==market:
-                st.caption(f"已驗證行情 {quote['day']} · {len(quote['quotes'])} 檔")
+                st.caption(f"{'Google 行情觀測' if quote.get('status') == 'REFERENCE_QUOTES_COMPLETE' else '已驗證行情'} {quote['day']} · {len(quote['quotes'])} 檔")
             if not info.get("reason"):
                 continue
             errors = info.get("errors") or []
