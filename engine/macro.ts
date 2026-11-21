@@ -3,6 +3,7 @@ import type {Macro,MacroDecision,RiskFlag} from './types.ts';
 
 
 export const MACRO_RULE = 'grouped-2of3-20261111-tristate';
+export const LIVE_MACRO_POLICY = 'post-release-20261121';
 export const SERIES = ['CPIAUCSL','FEDFUNDS','DFII10','NFCI'] as const;
 export type Series = typeof SERIES[number];
 export type MacroSeriesInput = {vintageDate:string;series:Record<string,string>;cpiVintageDate?:string};
@@ -25,6 +26,15 @@ export function dateOffset(day:string,offset:number){
  * At either market's close only the preceding New York calendar day is complete.
  */
 export const macroCutoff = (marketCloseDate:string) => dateOffset(marketCloseDate,-1);
+// The daily live worker runs after the US data release window. Historical
+// replay keeps macroCutoff; live observations record their actual acquisition.
+export function liveMacroVintage(marketCloseDate:string,clock=new Date()){
+ const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',hourCycle:'h23'}).formatToParts(clock);
+ const value=(kind:string)=>parts.find(p=>p.type===kind)!.value;
+ const day=`${value('year')}-${value('month')}-${value('day')}`;
+ const available=Number(value('hour'))>=17?day:dateOffset(day,-1);
+ return available<marketCloseDate?available:marketCloseDate;
+}
 const validDate=(date:string)=>/^\d{4}-\d{2}-\d{2}$/.test(date)&&Number.isFinite(Date.parse(date+'T12:00:00Z'))&&dateOffset(date,0)===date;
 
 export function parseFredCsv(series:Series,asof:string,csv:string):Snapshot{
@@ -48,7 +58,7 @@ export function parseFredCsv(series:Series,asof:string,csv:string):Snapshot{
  return {vintage,rows};
 }
 
-function evidence(snapshots:Partial<Record<Series,Snapshot>>,asof:string,timestamp:string){
+function evidence(snapshots:Partial<Record<Series,Snapshot>>,asof:string,timestamp:string,liveResearch=false){
  const present=SERIES.filter(s=>snapshots[s]);
  return {
   series_vintage_dates:Object.fromEntries(present.map(s=>[s,snapshots[s]!.vintage])),
@@ -56,7 +66,7 @@ function evidence(snapshots:Partial<Record<Series,Snapshot>>,asof:string,timesta
    const snapshot=snapshots[s]!,observationDate=snapshot.rows.at(-1)!.date;
    const release=s==='CPIAUCSL'?confirmedCpiReleases[observationDate]:undefined;
    return [s,{observationDate,vintageDate:snapshot.vintage,publicationAt:release?.at??null,publicationSource:release?.source,
-    availableBy:release?.at??dateOffset(asof,1)+' 00:00 America/New_York（保守日期界線）',acquiredAt:timestamp}];
+    availableBy:release?.at??(liveResearch?timestamp:dateOffset(asof,1)+' 00:00 America/New_York（保守日期界線）'),acquiredAt:timestamp}];
   }))
  };
 }
@@ -70,7 +80,7 @@ export function decideFunding(categories:NonNullable<Macro['categoryStates']>){
 }
 
 function calculateMacro(cutoff:string,asof:string,raw:Record<string,string>,clock:Date,cpiVintage:string,transportError?:unknown,liveResearch=false):Macro{
- if(asof!==macroCutoff(cutoff))throw new Error('總經快照截止日無效');
+ if(asof!==(liveResearch?liveMacroVintage(cutoff,clock):macroCutoff(cutoff)))throw new Error('總經快照截止日無效');
  const snapshots:Partial<Record<Series,Snapshot>>={},issues:string[]=[];
  for(const s of SERIES){
   try{snapshots[s]=parseFredCsv(s,s==='CPIAUCSL'?cpiVintage:asof,raw[s]);}
@@ -120,13 +130,14 @@ function calculateMacro(cutoff:string,asof:string,raw:Record<string,string>,cloc
  const timestamp=clock.toISOString();
  const problems=[...new Set([...issues,...(transportError?[transportError instanceof Error?transportError.message:String(transportError)]:[])])];
  return {status:full?'vintage_verified':'macro_incomplete',ruleVersion:MACRO_RULE,marketAsOf:cutoff,macro_vintage_date:asof,observedAt:timestamp,calculatedAt:timestamp,
+  ...(liveResearch?{liveMacroPolicy:LIVE_MACRO_POLICY}:{}),
   macro_stress:full?scoreRange[0]:null,categoryStates,decision,scoreRange,
   legacyStress:[real,policy,conditions,inflation].some(x=>x===null)?undefined:real!+policy!+conditions!+inflation!,
   categories:full?{rates:rates===1,conditions:conditions===1,inflation:inflation===1}:undefined,
   researchEstimates:overlay.estimates,dataBasis:overlay.estimates.length?'RESEARCH_ESTIMATED':'OFFICIAL_VINTAGE',
   sourceError:problems.length?problems.join('；'):undefined,cpi_yoy:yoy,cpi_3m_annualized:annual,
   real_yield:last('DFII10')?.value??null,real_yield_90d_change:realDelta,fed_funds:last('FEDFUNDS')?.value??null,fed_funds_90d_change:policyDelta,
-  financial_conditions:fc??null,financial_conditions_90d_change:fcDelta,...evidence(snapshots,asof,timestamp)
+  financial_conditions:fc??null,financial_conditions_90d_change:fcDelta,...evidence(snapshots,asof,timestamp,liveResearch)
  };
 }
 

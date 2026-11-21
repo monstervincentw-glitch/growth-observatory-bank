@@ -23,6 +23,17 @@ STATUS = ["market", "session_date", "status", "stage", "completed", "expected", 
 RUNTIME = ["scope", "part", "parts", "sha256", "payload"]
 START_LOCK = threading.Lock()
 STARTED = False
+LIVE_MACRO_POLICY = "post-release-20261121"
+
+
+def macro_refresh_required(macro, clock=None):
+    """Local date comparison only; a successful batch makes no source request."""
+    from datetime import timedelta
+    local = (clock or datetime.now(timezone.utc)).astimezone(ZoneInfo("America/New_York"))
+    available = local.date() if local.hour >= 17 else local.date() - timedelta(days=1)
+    target = min(macro["marketAsOf"], available.isoformat())
+    return (macro.get("liveMacroPolicy") != LIVE_MACRO_POLICY or
+            macro.get("macro_vintage_date", "") < target)
 
 
 def now():
@@ -206,16 +217,13 @@ def run_cycle(client, node, seed):
     needs_us_live = any(not stock.get("marketEvent") and stock["financial"].get("date_basis") != "LIVE_OBSERVED_SEC"
                         for stock in current_entry["snapshot"]["markets"]["US"]["stocks"])
     if not needs_us_live and all(batch["day"] <= current_entry["snapshot"]["markets"][market]["macro"]["marketAsOf"]
+           and not macro_refresh_required(current_entry["snapshot"]["markets"][market]["macro"])
            for market, batch in quotes.items()):
         return  # No history downloads, checkpoint reads, or source requests after success.
     tab(book, "pipeline_runtime", RUNTIME)
     tab(book, "pipeline_status", STATUS, 20)
     stored = book.values_get("pipeline_runtime!A1:E500").get("values", [RUNTIME])
     checkpoints = unpack(stored) if len(stored) > 1 else {m: dict(seed[m]) for m in ("US", "TW")}
-    for market in ("US", "TW"):
-        if not checkpoints[market].get("bars"):
-            archived = get_json(seed[market]["historySeed"])
-            checkpoints[market]["bars"] = {symbol: q["bars"] for symbol, q in archived["quotes"].items()}
     for market in ("US", "TW"):
         if market not in quotes:
             continue
@@ -224,8 +232,13 @@ def run_cycle(client, node, seed):
         day, state = batch["day"], checkpoints.setdefault(market, seed[market])
         cutoff = entry["snapshot"]["markets"][market]["macro"]["marketAsOf"]
         refresh_financial = market == "US" and needs_us_live
-        if day <= cutoff and not refresh_financial:
+        macro_only = day == cutoff and not refresh_financial and macro_refresh_required(
+            entry["snapshot"]["markets"][market]["macro"])
+        if day <= cutoff and not refresh_financial and not macro_only:
             continue
+        if not macro_only and not state.get("bars"):
+            archived = get_json(seed[market]["historySeed"])
+            state["bars"] = {symbol: q["bars"] for symbol, q in archived["quotes"].items()}
         if state.get("attemptDay") != day:
             state.update(attemptDay=day, attempts=0, nextRetry=0)
         if state.get("attempts", 0) >= 3 or time.time() < state.get("nextRetry", 0):
@@ -240,11 +253,12 @@ def run_cycle(client, node, seed):
                    state.get("nextRetry", 0), (outcome or {}).get("financialReused", ""),
                    (outcome or {}).get("financialRefreshed", ""), (outcome or {}).get("batch", "")]
             write_rows(book, f"pipeline_status!A{2 if market == 'US' else 3}:M{2 if market == 'US' else 3}", [row])
-        status("RUNNING", "daily_update")
+        status("RUNNING", "macro_refresh" if macro_only else "daily_update")
         try:
-            versions = latest_finance(state, market, day, seed)
+            versions = {} if macro_only else latest_finance(state, market, day, seed)
             payload = {"market": market, "batch": batch, "prior": {"snapshot": entry["snapshot"]},
-                       "runtime": state, "financialVersions": versions, "refreshFinancial": refresh_financial}
+                       "runtime": state, "financialVersions": versions, "refreshFinancial": refresh_financial,
+                       "macroOnly": macro_only}
             with tempfile.TemporaryDirectory(prefix="daily-research-") as directory:
                 source, target = Path(directory) / "input.json", Path(directory) / "output.json"
                 source.write_text(json.dumps(payload))
@@ -267,9 +281,12 @@ def run_cycle(client, node, seed):
             status("RUNNING", "publishing")
             padded = outcome["rows"] + [["", "", "", "", ""]] * (300 - len(outcome["rows"]))
             write_rows(book, "bank_snapshot!A1:E300", padded)
-            checked_at = (seed["TW"].get("financialCheckedAt") if market == "TW" and seed["officialDay"] == day else now())
-            state.update(outcome["runtime"], officialDay=day, financialCheckedAt=checked_at,
-                         attempts=state["attempts"], nextRetry=0)
+            if macro_only:
+                state.update(outcome["runtime"], nextRetry=0)
+            else:
+                checked_at = (seed["TW"].get("financialCheckedAt") if market == "TW" and seed["officialDay"] == day else now())
+                state.update(outcome["runtime"], officialDay=day, financialCheckedAt=checked_at,
+                             attempts=state["attempts"], nextRetry=0)
             write_rows(book, "pipeline_runtime!A1:E500", pack(checkpoints))
             status("COMPLETE", "published", outcome=outcome)
             print(json.dumps({"pipeline": "published", "market": market, "day": day,
@@ -282,7 +299,7 @@ def run_cycle(client, node, seed):
             except Exception as error:
                 print(json.dumps({"pipeline_monitor": type(error).__name__}), flush=True)
         except Exception as error:
-            status("FAILED", "daily_update", str(error))
+            status("FAILED", "macro_refresh" if macro_only else "daily_update", str(error))
             print(json.dumps({"pipeline": "failed", "market": market, "day": day,
                               "error": str(error)[:500]}), flush=True)
 

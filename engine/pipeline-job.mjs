@@ -4,6 +4,30 @@ import {yahoo, refreshMacro, refreshInstrument, priceFeatures, confirmedInactive
 import {evaluate, rankInstruments} from './rules.ts';
 import {project, envelope} from './project.mjs';
 import {verifyMarketInputs, requirePublishable} from './publication.mjs';
+import {validateResearch} from '../shared/research-validator.mjs';
+
+export async function refreshMacroOnly(input,fetchMacro=refreshMacro,clock){
+  const {market,batch,prior}=input;
+  const before=prior.snapshot.markets[market];
+  checkQuotes(input,before);
+  if(batch.day!==before.macro.marketAsOf)throw Error('總經補更只能沿用同一完整行情日');
+  const macro=await fetchMacro(batch.day,undefined,market,false,undefined,true);
+  if(macro.status!=='vintage_verified'||macro.decision==='unknown')throw Error('總經補更未取得完整資料，保留原訊號');
+  clock??=new Date();
+  const at=clock.toISOString();
+  macro.marketComplete=true;
+  macro.lastMarketPublishedAt=at;
+  if(before.macro.poolCheck)macro.poolCheck=before.macro.poolCheck;
+  const snapshot=structuredClone(prior.snapshot);
+  snapshot.generatedAt=at;
+  snapshot.markets[market]={...snapshot.markets[market],macro,signalAt:at,
+    stocks:before.stocks.map(stock=>({...stock,evaluation:evaluate(stock,macro,clock)}))};
+  validateResearch(snapshot);
+  const packed=envelope(snapshot);
+  return {schema:1,market,day:batch.day,snapshot,rows:packed.rows,batch:packed.id,
+    checksum:packed.checksum,financialReused:before.stocks.length,financialRefreshed:0,
+    runtime:{},generatedAt:at};
+}
 
 export function checkQuotes(input, before) {
   const {market, batch} = input;
@@ -23,6 +47,7 @@ export async function calculate(input, progress = () => {}) {
   const {market, batch, prior, runtime} = input;
   const before = prior.snapshot.markets[market];
   checkQuotes(input, before);
+  if(input.macroOnly)return refreshMacroOnly(input);
   if (batch.day === before.macro.marketAsOf && !input.refreshFinancial) return {unchanged: true};
   const names = market === 'TW' ? ['0052'] : ['QQQ', 'SOXX', 'IGV'];
   const benchmarks = {};

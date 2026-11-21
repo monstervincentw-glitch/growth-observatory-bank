@@ -1,7 +1,7 @@
 import {monitoredFetch,reportedRateLimit} from './update-diagnostics.mjs';
 import {captureFinMindIncome} from './tw-financial-reconciliation.mjs';
 type Diagnostic = (code:number|string,provider?:string)=>void;
-import {macroCutoff,latestCpiVintage,scoreMacro,unavailableMacro,SERIES,type MacroSeriesInput} from './macro.ts';
+import {macroCutoff,liveMacroVintage,latestCpiVintage,scoreMacro,unavailableMacro,SERIES,type MacroSeriesInput} from './macro.ts';
 export type {MacroSeriesInput} from './macro.ts';
 import type {Instrument,Financial,Market,Macro,Bar} from './types.ts';
 import {finite,days} from './rules.ts';
@@ -158,7 +158,7 @@ export async function readMacroVintage(series:typeof SERIES[number],vintage:stri
  return response.text();
 }
 export async function refreshMacro(cutoff:string,supplied?:MacroSeriesInput,market:Market='US',allowUnavailable=false,diagnostic?:Diagnostic,liveResearch=false):Promise<Macro>{
- const asof=macroCutoff(cutoff),cpiVintage=latestCpiVintage(asof,cutoff,market==='US');
+ const asof=liveResearch?liveMacroVintage(cutoff):macroCutoff(cutoff),cpiVintage=latestCpiVintage(asof,cutoff,market==='US');
  try{
   // An older transport payload cannot override a fresh request for this close.
   let raw:Record<string,string>,transportError:Error|undefined;
