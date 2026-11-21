@@ -55,5 +55,11 @@ test('live research publication does not become historical replay input',async()
       attempt:{status:'published',runId:'test',errors:[]}});
     const us=JSON.parse(await readFile(join(base,'primary-inputs','US','2026-11-13.json'),'utf8'));
     assert.equal(us.status,'RESEARCH_VERIFIED');
+    const liveContext={...context,cutoff:'2026-11-16',macro:{...context.macro,liveMacroPolicy:'post-release-20261121'}};
+    await archiveResearch(base,{market:'US',context:liveContext,batch:'live',bars:{},
+      instruments:[{...observed,market:'US'}],attempt:{status:'published',runId:'live',errors:[]}});
+    const live=JSON.parse(await readFile(join(base,'unverified-primary-inputs','US','2026-11-16.json'),'utf8'));
+    assert.equal(live.status,'LIVE_RESEARCH_ONLY');
+    await assert.rejects(readFile(join(base,'primary-inputs','US','2026-11-16.json')));
   }finally{await rm(base,{recursive:true,force:true})}
 });

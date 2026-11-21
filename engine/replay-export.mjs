@@ -21,12 +21,12 @@ export async function archiveResearch(folder, {market, context, batch, bars, ins
   }]));
   // A published TW live-research batch must NEVER be mistaken for a PIT
   // close-time input. The primary replay accepts only RESEARCH_VERIFIED.
-  const verified=!macro.researchEstimates?.length&&attempt.status==='published'&&(market==='US'||
+  const verified=!macro.liveMacroPolicy&&!macro.researchEstimates?.length&&attempt.status==='published'&&(market==='US'||
     (macro.status==='vintage_verified'&&
      instruments.every(s=>s.marketEvent||s.evaluation.filingVerified)));
   const directory=verified?'primary-inputs':'unverified-primary-inputs';
   const inputStatus=verified?'RESEARCH_VERIFIED':
-    attempt.status==='published'&&(market==='TW'||macro.researchEstimates?.length)?'LIVE_RESEARCH_ONLY':'RESEARCH_REJECTED';
+    attempt.status==='published'&&(market==='TW'||macro.liveMacroPolicy||macro.researchEstimates?.length)?'LIVE_RESEARCH_ONLY':'RESEARCH_REJECTED';
   await save(join(folder,directory,market),cutoff+'.json',{
     schema:1, market, cutoff, batch, observedAt:createdAt, runId:attempt.runId,
     status:inputStatus, errors:attempt.errors,
