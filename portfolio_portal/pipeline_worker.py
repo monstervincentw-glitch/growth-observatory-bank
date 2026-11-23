@@ -214,6 +214,11 @@ def run_cycle(client, node, seed):
         return
     quotes = {row[0]: json.loads(row[8]) for row in rows[1:] if len(row) == 9 and row[8]}
     current_entry = decode_envelope(book.values_get("bank_snapshot!A1:E300").get("values", []))
+    from taiwan_capture import recover_quotes
+    recovered = recover_quotes(book, current_entry["snapshot"]["markets"]["TW"],
+                               quotes.get("TW"), get_json, tab, write_rows)
+    if recovered:
+        quotes["TW"] = recovered
     needs_us_live = any(not stock.get("marketEvent") and stock["financial"].get("date_basis") != "LIVE_OBSERVED_SEC"
                         for stock in current_entry["snapshot"]["markets"]["US"]["stocks"])
     if not needs_us_live and all(batch["day"] <= current_entry["snapshot"]["markets"][market]["macro"]["marketAsOf"]
@@ -241,10 +246,23 @@ def run_cycle(client, node, seed):
             state["bars"] = {symbol: q["bars"] for symbol, q in archived["quotes"].items()}
         if state.get("attemptDay") != day:
             state.update(attemptDay=day, attempts=0, nextRetry=0)
-        if state.get("attempts", 0) >= 3 or time.time() < state.get("nextRetry", 0):
+        if market == "TW":
+            from taiwan_capture import slot_at, next_slot
+            clock = datetime.now(ZoneInfo("Asia/Taipei"))
+            slot = slot_at(clock)
+            slots = state.get("engineSlots", []) if state.get("engineSlotsDay") == day else []
+            if day == clock.date().isoformat() and (not slot or slot in slots):
+                continue
+            if day == clock.date().isoformat():
+                state.update(engineSlotsDay=day, engineSlots=slots + [slot])
+            elif state.get("attempts", 0) >= 3 or time.time() < state.get("nextRetry", 0):
+                continue
+        elif state.get("attempts", 0) >= 3 or time.time() < state.get("nextRetry", 0):
             continue
         state["attempts"] += 1
         state["nextRetry"] = time.time() + 20 * 60
+        if market == "TW" and day == clock.date().isoformat():
+            state["nextRetry"] = next_slot(clock)
         # Persist attempt before doing network work; restarts cannot reset limits.
         write_rows(book, "pipeline_runtime!A1:E500", pack(checkpoints))
         def status(result, stage, error="", outcome=None):
