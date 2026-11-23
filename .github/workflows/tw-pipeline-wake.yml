@@ -1,0 +1,25 @@
+name: 台股原管線晚間補抓喚醒
+on:
+  schedule:
+    # UTC. Existing worker owns capture, retry state, and publication.
+    # Taipei 16:30, 17:30, 18:30, 21:27 on weekdays.
+    - cron: '30 8 * * 1-5'
+    - cron: '30 9 * * 1-5'
+    - cron: '30 10 * * 1-5'
+    - cron: '27 13 * * 1-5'
+  workflow_dispatch:
+permissions: {}
+concurrency:
+  group: tw-pipeline-wake
+  cancel-in-progress: false
+jobs:
+  wake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Wake the existing service without running a second research engine
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --retry 2 --retry-delay 10 \
+            --retry-all-errors --connect-timeout 15 --max-time 90 \
+            https://growth-portfolio-private-v1.onrender.com/_stcore/health
