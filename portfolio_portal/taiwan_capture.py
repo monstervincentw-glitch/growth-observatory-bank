@@ -101,12 +101,14 @@ def recover_quotes(book, block, published, get_json, ensure_tab, write_rows, clo
                    len(batch.get('quotes', {})), len(block['stocks']), detail[:500], at,
                    json.dumps(batch, separators=(',', ':'))]])
     record('RUNNING')  # claim before network work; a restart must not repeat it
+    batch = previous
     try:
         values = book.values_get('market_quotes!A1:H200').get('values', [])
         if not values or values[0] != ['market', 'symbol', 'google_ticker', 'price', 'quote_time', 'currency', 'status', 'exchange']:
             raise ValueError('Google quote headers mismatch')
         live = [dict(zip(values[0], r)) for r in values[1:]]
         batch = merge_quotes(block['stocks'], live, previous, [], day, at)
+        record(batch['status'], ','.join(batch['missing']), batch)
         missing_otc = {s['symbol'] for s in block['stocks'] if s.get('ticker', '').endswith('.TWO')} & set(batch['missing'])
         if missing_otc:
             batch = merge_quotes(block['stocks'], live, batch, get_json(SOURCE), day, at)
@@ -128,6 +130,6 @@ def recover_quotes(book, block, published, get_json, ensure_tab, write_rows, clo
         record('COMPLETE', batch=batch)
         return batch
     except Exception as error:
-        record('FAILED', str(error))
+        record('FAILED', str(error), batch)
         print(json.dumps({'quote_capture': 'failed', 'day': day, 'slot': slot, 'error': str(error)[:300]}), flush=True)
         return published

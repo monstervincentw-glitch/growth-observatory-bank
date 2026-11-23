@@ -81,6 +81,32 @@ class CaptureTests(unittest.TestCase):
         recover_quotes(book, block, published, source, lambda *a: None, save, clock(21, 27))
         self.assertEqual(book.state[0][2], '21:27')
 
+    def test_exchange_failure_preserves_prices_before_the_network_request(self):
+        import json
+        from taiwan_capture import HEADERS
+        class Book:
+            def __init__(self):
+                self.state = []
+            def values_get(self, rectangle):
+                if rectangle.startswith('quote_capture_state'):
+                    return {'values': [HEADERS] + self.state}
+                if rectangle.startswith('market_quotes'):
+                    h = ['market', 'symbol', 'google_ticker', 'price', 'quote_time', 'currency', 'status', 'exchange']
+                    return {'values': [h] + [[r.get(k, '') for k in h] for r in LIVE]}
+                raise AssertionError(rectangle)
+        book = Book()
+        def save(book, rectangle, rows):
+            book.state = rows
+        def fail(url):
+            # Simulate the exchange being unavailable after Google prices arrive.
+            self.assertEqual(json.loads(book.state[0][8])['succeeded'], 1)
+            raise ValueError('Exchange temporarily unavailable')
+        block = {'macro': {'marketAsOf': '2026-11-20'}, 'stocks': STOCKS}
+        recover_quotes(book, block, {'day': '2026-11-20'}, fail, lambda *a: None, save, clock(16, 30))
+        saved = json.loads(book.state[0][8])
+        self.assertEqual(saved['quotes']['2330']['close'], 2030)
+        self.assertEqual(book.state[0][3], 'FAILED')
+
 
 if __name__ == '__main__':
     unittest.main()
