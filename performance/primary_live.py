@@ -43,6 +43,7 @@ def load_archive(inputs, market, days):
     for date in days:
         day = str(date.date())
         path = inputs/'observed-primary-inputs'/market/f'{day}.json'
+        if not path.exists() and path.with_suffix('.json.gz').exists():path=path.with_suffix('.json.gz')
         if not path.exists():
             path = folder/f'{day}.json'
         if not path.exists() and market=='TW':
@@ -57,7 +58,7 @@ def load_archive(inputs, market, days):
                 path = candidate
                 historical = True
         if path.exists():
-            data = json.loads(path.read_text())
+            data = json.loads(gzip.decompress(path.read_bytes())) if path.suffix=='.gz' else json.loads(path.read_text())
             if data.get('market')!=market or data.get('cutoff')!=day:
                 raise ValueError(f'{market} {day}: invalid archive identity')
             if historical:

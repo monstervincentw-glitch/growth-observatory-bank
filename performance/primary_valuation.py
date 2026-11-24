@@ -19,7 +19,8 @@ def history_for(block, observations, anchor, maximum):
         if quote.get('priceDate')!=observations['day'] or quote.get('priceValidation',{}).get('cutoff')!=quote['priceDate']:
             continue
         newer = {bar['date']:bar['adjClose'] for bar in quote['bars'] if anchor<=bar['date']<=maximum}
-        if anchor in newer and observations['day'] in newer:
+        if (anchor in newer and observations['day'] in newer
+                and not any(d > observations['day'] for d in series.get(symbol, {}))):
             series[symbol] = newer
     return series
 

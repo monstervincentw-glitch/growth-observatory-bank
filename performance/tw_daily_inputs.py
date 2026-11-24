@@ -135,7 +135,7 @@ def recover_sessions(inputs, output, release, sessions, anchor, *, cfg):
         grouped = None
     for date in sessions.insert(0,anchor):
         day = str(date.date())
-        if any((inputs/folder/'TW'/f'{day}.json').exists() for folder in
+        if any(any((inputs/folder/'TW'/f'{day}{suffix}').exists() for suffix in ('.json','.json.gz')) for folder in
                ('observed-primary-inputs','primary-inputs')):
             report['existing'].append(day)
             continue

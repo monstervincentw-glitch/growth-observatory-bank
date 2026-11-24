@@ -1,15 +1,24 @@
 name: 銀行版每日績效續算
 on:
   workflow_run:
-    workflows: ["收盤研究更新"]
+    workflows: ["收盤研究更新", "台股原管線晚間補抓喚醒"]
     types: [completed]
     branches: [main]
+  schedule:
+    - cron: '17 22 * * 1-5'
+    - cron: '17 23 * * 1-5'
+    - cron: '17 0 * * 2-6'
+    - cron: '35 8,9,10 * * 1-5'
+    - cron: '32 13 * * 1-5'
   workflow_dispatch:
   push:
     branches: [main]
     paths:
       - performance/conditional_curve.py
       - performance/primary_valuation.py
+      - performance/continuation_sync.py
+      - engine/continuation-quotes.mjs
+      - tests/test_continuation_sync.py
       - performance/primary_live.py
       - performance/tw_daily_inputs.py
       - performance/production.py
@@ -27,7 +36,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   publish:
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event_name == 'push' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -37,11 +46,18 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
       - run: pip install -r performance/requirements.txt
       - name: Verify Taiwan close-time input recovery safeguards
         env:
           PYTHONPATH: performance:.
         run: python -m unittest discover -s tests -p 'test_tw_daily_inputs.py' -v
+      - name: Verify Sheets continuation and valuation regression guards
+        env:
+          PYTHONPATH: performance:.
+        run: python -m unittest discover -s tests -p 'test_continuation_sync.py' -v
       - name: Verify source-vintage and subsystem health safeguards
         env:
           PYTHONPATH: performance:.
@@ -57,6 +73,12 @@ jobs:
             git worktree add --detach /tmp/performance-data HEAD
             git -C /tmp/performance-data switch --orphan performance-data
           fi
+      - name: Read completed Sheets batch and archive missing continuation inputs
+        id: sync
+        continue-on-error: true
+        env:
+          PYTHONPATH: performance:.
+        run: python performance/continuation_sync.py /tmp/research-data /tmp/performance-data
       - name: Continue and validate the official accounts
         env:
           PYTHONPATH: .
@@ -65,6 +87,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git -C /tmp/research-data add release.json attempts.json observed-primary-inputs etf-inputs weekly-vintages financial-versions
+          if ! git -C /tmp/research-data diff --cached --quiet; then
+            git -C /tmp/research-data commit -m "Archive Sheets continuation inputs $GITHUB_RUN_ID"
+            git -C /tmp/research-data pull --rebase origin research-data
+            git -C /tmp/research-data push origin HEAD:refs/heads/research-data
+          fi
           git -C /tmp/performance-data add --all
           if ! git -C /tmp/performance-data diff --cached --quiet; then
             git -C /tmp/performance-data commit -m "Publish bank performance run $GITHUB_RUN_ID"
@@ -81,6 +109,9 @@ jobs:
           name: performance-subsystem-status
           path: /tmp/performance-data/status.json
           retention-days: 30
+      - name: Surface source synchronization failure after preserving completed results
+        if: steps.sync.outcome == 'failure'
+        run: exit 1
   subsystem-health:
     name: 績效驗收 / ${{ matrix.scope }}
     needs: publish
