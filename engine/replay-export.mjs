@@ -3,7 +3,7 @@ import {join} from 'node:path';
 import {dateOffset, SERIES} from './macro.ts';
 import {readMacroVintage, yahoo} from './providers.ts';
 
-export const ETF_SYMBOLS = ['AGG','HYG','IEF','JNK','LQD','QQQ','SOXX','SPY','TLT','VOO','VT','XLK','SHY'];
+export const ETF_SYMBOLS = ['AGG','HYG','IEF','JNK','LQD','QQQ','SOXX','SPY','TLT','VOO','VT','XLK','VGT','SHY'];
 
 async function save(folder, file, value) {
   await mkdir(folder, {recursive:true});

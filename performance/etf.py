@@ -15,7 +15,7 @@ from market_inputs import BASE, SOURCE, etf_prices, weekly_macro
 from resume import one_etf
 from run import advisor, advisor_reference, close, js
 
-ETFS = ('AGG','HYG','IEF','JNK','LQD','QQQ','SOXX','SPY','TLT','VOO','VT','XLK')
+ETFS = ('AGG','HYG','IEF','JNK','LQD','QQQ','SOXX','SPY','TLT','VOO','VT','XLK','VGT')
 FROZEN = ('FSPTX','VITAX')
 CODES = (*ETFS,'SHY')
 

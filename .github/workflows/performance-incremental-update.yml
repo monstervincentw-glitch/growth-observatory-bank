@@ -24,6 +24,7 @@ on:
       - performance/production.py
       - performance/live_etf.py
       - performance/etf_vintages.py
+      - performance/vgt_exports.py
       - performance/quality.py
       - performance/engine/equity_ab.py
       - tests/test_tw_daily_inputs.py
@@ -62,6 +63,10 @@ jobs:
         env:
           PYTHONPATH: performance:.
         run: python -m unittest discover -s tests -p 'test_performance_quality.py' -v
+      - name: Verify VGT cohorts and website compatibility
+        env:
+          PYTHONPATH: performance:.
+        run: python -m unittest discover -s tests -p 'test_vgt_integration.py' -v
       - name: Load published research and last performance checkpoint
         run: |
           git fetch --depth=1 origin research-data

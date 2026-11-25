@@ -69,4 +69,7 @@ def overlay(archive,performance):
     if not performance:
         return archive
     keys={(r['symbol'],r['start_year'],r['variant']):r for r in performance['summary']}
-    return {**archive,'advisor':[r|keys.get((r['symbol'],r['start_year'],r['variant']),{}) for r in archive['advisor']]}
+    existing={(r['symbol'],r['start_year'],r['variant']) for r in archive['advisor']}
+    rows=[r|keys.get((r['symbol'],r['start_year'],r['variant']),{}) for r in archive['advisor']]
+    rows.extend(row for key,row in keys.items() if key not in existing)
+    return {**archive,'advisor':rows}

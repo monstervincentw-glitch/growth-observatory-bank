@@ -99,6 +99,13 @@ def main():
             result[market]['valuationThrough']=mark_valuation(args.inputs,release,args.output,market)
         except (OSError, ValueError, TypeError, KeyError) as exc:
             result[market]['valuationError']=str(exc)[:400]
+    # The research workbook mirrors these public CSVs; only new verified ETF
+    # batches change them, with the same dates and values as the website.
+    from vgt_exports import export_vgt
+    try:
+        export_vgt(args.output)
+    except (OSError, ValueError, KeyError) as exc:
+        result['ETF']['vgtExportError']=str(exc)[:400]
     # Preserve valid accounts while making evidence qualifications explicit.
     from quality import audit_tw, qualify_tw
     try:

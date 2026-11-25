@@ -18,7 +18,7 @@ ETF_HEADERS=['batch','symbol','start_year','variant','through','cumulative','cag
  'peak_to_recovery_calendar_days','trough_to_recovery_calendar_days','buy_count','sell_count','transaction_cost_initial_fraction']
 DAY_HEADERS=['batch','symbol','year','plan','date','nav','cash','target_value','shy_value','score','state']
 TRADE_HEADERS=['batch','cohort_symbol','year','plan','date','signal_date','symbol','side','notional_per_initial_dollar','cost_per_initial_dollar']
-EXPECT_COUNTS={'AGG':84,'HYG':80,'IEF':84,'JNK':80,'LQD':84,'QQQ':84,'SOXX':84,'SPY':84,'TLT':84,'VOO':68,'VT':76,'XLK':84}
+EXPECT_COUNTS={'AGG':84,'HYG':80,'IEF':84,'JNK':80,'LQD':84,'QQQ':84,'SOXX':84,'SPY':84,'TLT':84,'VOO':68,'VT':76,'XLK':84,'VGT':84}
 DATE=r'\d{4}-\d{2}-\d{2}'
 
 def rows(columns,records):
@@ -47,7 +47,8 @@ def validate_view(data):
             raise ValueError('Invalid CAGR')
         if row['cumulative']<=-1 or not -1<row['mdd']<=0:
             raise ValueError('Performance value out of range')
-    if counts!=EXPECT_COUNTS or any({v for s,y,v in keys if s==sym and y==year}!=set('ABCD') for sym,year in {(s,y) for s,y,_ in keys}):
+    legacy_counts={k:v for k,v in EXPECT_COUNTS.items() if k!='VGT'}
+    if counts not in (EXPECT_COUNTS,legacy_counts) or any({v for s,y,v in keys if s==sym and y==year}!=set('ABCD') for sym,year in {(s,y) for s,y,_ in keys}):
         raise ValueError('Incomplete ETF cohort set')
     return data
 

@@ -704,6 +704,9 @@ def advisor(research, research_close=None):
         events = [r for r in research["windows"] if
                   r["symbol"] == product and r["start_year"] == cohort
                   and str(r["window"]) == str(event)]
+        if product == "VGT":
+            events = [r for row in selected for r in row.get("stress_windows", [])
+                      if str(r["window"]) == str(event)]
         if events:
             event_drawdown_chart(pd.DataFrame(events), "variant", "window_mdd", WINDOWS[event])
             table([{"方案": r["variant"] + " " + PLANS[r["variant"]],

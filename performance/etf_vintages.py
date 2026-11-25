@@ -24,8 +24,18 @@ def sealed_vintage(inputs, prior, anchor, manifest):
                r.get('source_batch') == feed['batch'] and r.get('input_sha256') == digest
                for r in receipts):
         raise ValueError('ETF sealed source has no matching published SHA-256 receipt')
-    return feed, ledger, dict(path=str(path.relative_to(inputs)), sha256=digest,
-        batch=feed['batch'], observedAt=feed['observedAt'])
+    provenance=dict(path=str(path.relative_to(inputs)), sha256=digest,
+                    batch=feed['batch'], observedAt=feed['observedAt'])
+    if manifest.get('price_additions_sha256'):
+        extra_raw=(prior/'price-additions.json').read_bytes()
+        if sha256(extra_raw).hexdigest()!=manifest['price_additions_sha256']:
+            raise ValueError('ETF added-symbol source checksum mismatch')
+        extra=json.loads(extra_raw)
+        if extra['anchor']!=anchor or set(extra['prices']) & set(feed['prices']):
+            raise ValueError('ETF added-symbol source cannot replace a sealed symbol')
+        feed=feed|{'prices':feed['prices']|extra['prices']}
+        provenance['priceAdditionsSha256']=manifest['price_additions_sha256']
+    return feed, ledger, provenance
 
 
 def reconcile_anchor(symbol, frame, adjusted, mark, anchor, overlap, sealed, ledger):
