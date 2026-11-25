@@ -37,7 +37,8 @@ class Reader:
                 rows=fetch()
                 value=decode(rows)
                 if self.last and (value['through']<self.last['through'] or
-                                  (value['through']==self.last['through'] and value['batch']!=self.last['batch'])):
+                                  (value['through']==self.last['through'] and value['batch']!=self.last['batch']
+                                   and not additive_vgt(self.last,value))):
                     raise ValueError('Performance update out of order')
                 if not self.last or self.last['batch']!=value['batch']:
                     self.path.parent.mkdir(parents=True,exist_ok=True)
@@ -53,6 +54,16 @@ class Reader:
                 return self.last,None
             except Exception as exc:
                 return self.last,f'績效讀取失敗（{type(exc).__name__}），顯示上次已驗證資料或原封存。'
+
+def additive_vgt(previous,current):
+    """Accept same-close onboarding only when every existing result is intact."""
+    key=lambda row:(row['symbol'],row['start_year'],row['variant'])
+    old={key(row):row for row in previous['summary']}
+    new={key(row):row for row in current['summary']}
+    added=set(new)-set(old)
+    expected={('VGT',year,plan) for year in range(2006,2027) for plan in 'ABCD'}
+    return (previous['through']==current['through'] and added==expected
+            and set(old)<=set(new) and all(new[k]==row for k,row in old.items()))
 
 def fetch(sheet_id,account):
     if sheet_id==OFFICIAL_RESEARCH_ID:

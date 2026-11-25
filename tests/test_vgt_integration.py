@@ -11,7 +11,7 @@ import pandas as pd
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'performance'))
 from live_etf import advance,read_state,signals_for
-from performance_view import overlay
+from performance_view import overlay,additive_vgt,Reader
 from publication import decode,validate_view
 from vgt_exports import export_vgt
 
@@ -36,6 +36,19 @@ class VGTIntegrationTest(unittest.TestCase):
         validate_view(legacy)
         incomplete=deepcopy(view);incomplete['summary'].pop()
         with self.assertRaises(ValueError):validate_view(incomplete)
+
+    def test_same_close_addition_accepts_only_unchanged_existing_results(self):
+        _,view,_=read_state(ROOT/'performance/seed')
+        legacy=deepcopy(view);legacy['summary']=[r for r in legacy['summary'] if r['symbol']!='VGT']
+        legacy['batch']='etf-0000000000000000'
+        self.assertTrue(additive_vgt(legacy,view))
+        with TemporaryDirectory() as t:
+            reader=Reader(Path(t)/'release.json');reader.last=legacy
+            from publication import encode
+            actual,error=reader.refresh(lambda:encode(view))
+            self.assertIsNone(error);self.assertEqual(actual,view)
+        modified=deepcopy(view);modified['summary'][0]['cumulative']+=.001
+        self.assertFalse(additive_vgt(legacy,modified))
 
     @unittest.skipUnless(DATA.exists() and INPUTS.exists(),'live fixture only required during migration')
     def test_next_session_red_exits_and_exports_are_idempotent(self):
