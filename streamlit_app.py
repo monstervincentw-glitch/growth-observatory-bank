@@ -622,7 +622,7 @@ def tracking(snapshot_data, baseline):
     st.caption(f"最近訊號計算 {stamp(block['signalAt'])} · {('USD' if market == 'US' else 'TWD')}")
 @st.cache_resource
 def performance_reader():
-    return PerformanceReader(environ.get("PERFORMANCE_CACHE_PATH", "/tmp/growth-bank-performance/release.json"))
+    return PerformanceReader(environ.get("PERFORMANCE_CACHE_PATH", "/tmp/growth-bank-performance-vgt/release.json"))
 
 
 @st.cache_data(ttl=90, show_spinner=False)
@@ -962,8 +962,8 @@ def market_page():
 
 def advisor_page():
     with st.container(horizontal=True, gap="small"):
-        advisor_page = st.segmented_control("顧問風控研究", ["原 14 項 ETF／基金／債券", "台灣可申購共同基金"],
-                                            default="原 14 項 ETF／基金／債券", label_visibility="collapsed",
+        advisor_page = st.segmented_control("顧問風控研究", ["ETF／基金／債券", "台灣可申購共同基金"],
+                                            default="ETF／基金／債券", label_visibility="collapsed",
                                             key="bank-advisor-page")
         if advisor_page == "台灣可申購共同基金":
             fund_view = st.segmented_control("基金研究功能", ["基金查詢", "同期間排名"], default="基金查詢",
