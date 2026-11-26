@@ -20,7 +20,9 @@ def fetch_snapshot():
 
 def eligible_version(versions,day,market):
     close=pd.Timestamp(day+('T13:30:00+08:00' if market=='TW' else 'T16:00:00-05:00'))
-    eligible=[v for v in versions if pd.Timestamp(v['eligibleFrom'])<=close]
+    eligible=[v for v in versions if pd.Timestamp(v['eligibleFrom'])<=close
+              and (market!='US' or (v.get('financial',{}).get('max_input_filed')
+                   and pd.Timestamp(v['financial']['max_input_filed'])<=pd.Timestamp(day)-pd.Timedelta(days=2)))]
     return max(eligible,key=lambda v:(v['period'],v['firstVerifiedAt'])) if eligible else None
 
 def features(bars,benchmark,financial,market):
@@ -40,7 +42,20 @@ def build(inputs,output,rows,entry,quotes):
     attempt=dict(status='published',batch=batch,at=now,detail='Completed shared Sheets batch',runId='sheets-continuation')
     save(inputs/'release.json',dict(snapshot=snapshot,rows=rows,attempt=attempt))
     save(inputs/'attempts.json',{m:dict(attempt,market=m) for m in ['US','TW']})
+    feed=inputs/'etf-inputs'/f"{snapshot['markets']['US']['macro']['marketAsOf']}.json"
+    if feed.exists():
+        data=json.loads(feed.read_text());data['batch']=batch;save(feed,data)
+    errors={}
     for market in ['US','TW']:
+      try:
+        build_market(inputs,output,entry,quotes,market,now,batch)
+      except Exception as exc:
+        errors[market]=str(exc)
+    if errors:raise ValueError(json.dumps(errors))
+    return {m:b['macro']['marketAsOf'] for m,b in snapshot['markets'].items()}
+
+def build_market(inputs,output,entry,quotes,market,now,batch):
+        snapshot=entry['snapshot']
         block=snapshot['markets'][market];cutoff=block['macro']['marketAsOf']
         manifest=output/'primary'/market/'release.json'
         anchor=json.loads(manifest.read_text())['through']
@@ -95,10 +110,6 @@ def build(inputs,output,rows,entry,quotes):
             if not dest.exists() and not dest.with_suffix('.json.gz').exists():
                 dest.parent.mkdir(parents=True,exist_ok=True)
                 dest.with_suffix('.json.gz').write_bytes(gzip.compress(json.dumps(payload,ensure_ascii=False,allow_nan=False,separators=(',',':')).encode(),mtime=0))
-        feed=inputs/'etf-inputs'/f"{snapshot['markets']['US']['macro']['marketAsOf']}.json"
-        if feed.exists():
-            data=json.loads(feed.read_text());data['batch']=batch;save(feed,data)
-    return {m:b['macro']['marketAsOf'] for m,b in snapshot['markets'].items()}
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('inputs',type=Path);p.add_argument('output',type=Path)

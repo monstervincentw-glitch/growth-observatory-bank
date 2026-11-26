@@ -34,7 +34,10 @@ function pulseResearchPipeline(){
   const properties=PropertiesService.getScriptProperties(),clock=new Date();
   const wanted=['US','TW'].flatMap(market=>{
     const day=mpSession(market,clock);
-    return day&&properties.getProperty('PR_DONE_'+market)!==day?[{market,day}]:[];
+    const hm=Utilities.formatDate(clock,'Asia/Taipei','HH:mm');
+    const slots=market==='TW'?['16:30','17:30','18:30','21:27']:['06:17','07:17','08:17'];
+    const slot=slots.filter(value=>value<=hm).pop();
+    return day&&slot?[{market,day,slot}]:[];
   });
   if(!wanted.length)return;
   const book=SpreadsheetApp.openById(MP_BOOK);
@@ -42,19 +45,19 @@ function pulseResearchPipeline(){
   const snapshot=verifyEnvelope_(envelopeRows);
   const states=gnRead(book.getSheetByName('pipeline_status'));
   let pending=false,completed=false;const wakes=[];
-  for(const {market,day} of wanted){
+  for(const {market,day,slot} of wanted){
     const liveReady=market!=='US'||snapshot.markets.US.stocks.filter(stock=>!stock.marketEvent).every(stock=>stock.financial.date_basis==='LIVE_OBSERVED_SEC');
     if(snapshot.markets[market].macro.marketAsOf>=day&&liveReady){properties.setProperty('PR_DONE_'+market,day);completed=true;continue;}
     const state=states.find(row=>row.market===market&&row.session_date===day);
-    if(state&&state.status==='FAILED'&&Number(state.attempts)>=3){properties.setProperty('PR_DONE_'+market,day);continue;}
-    const key='PR_WAKE_'+market,previous=JSON.parse(properties.getProperty(key)||'{}');
-    const count=previous.day===day?Number(previous.count||0):0;
-    if(count>=24){properties.setProperty('PR_DONE_'+market,day);continue;}
-    wakes.push({key,day,count:count+1});pending=true;
+    // Failed attempts are never completion; the next scheduled slot can recover.
+    const key='PR_SLOT_WAKE_'+market,previous=JSON.parse(properties.getProperty(key)||'{}');
+    const count=previous.day===day&&previous.slot===slot?Number(previous.count||0):0;
+    if(count>=12)continue;
+    wakes.push({key,day,slot,count:count+1});pending=true;
   }
   if(completed)syncPipelineLegacy(book);
   if(!pending)return;
-  for(const item of wakes)properties.setProperty(item.key,JSON.stringify({day:item.day,count:item.count}));
+  for(const item of wakes)properties.setProperty(item.key,JSON.stringify({day:item.day,slot:item.slot,count:item.count}));
   const response=UrlFetchApp.fetch('https://growth-portfolio-private-v1.onrender.com/_stcore/health',{muteHttpExceptions:true});
   console.log(JSON.stringify({pipelineWakeStatus:response.getResponseCode(),pending:true}));
 }
