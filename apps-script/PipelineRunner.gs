@@ -37,7 +37,7 @@ function pulseResearchPipeline(){
     const hm=Utilities.formatDate(clock,'Asia/Taipei','HH:mm');
     const slots=market==='TW'?['16:30','17:30','18:30','21:27']:['06:17','07:17','08:17'];
     const slot=slots.filter(value=>value<=hm).pop();
-    return day&&slot?[{market,day,slot}]:[];
+    return day&&slot&&properties.getProperty('PR_VERIFIED_DONE_'+market)!==day?[{market,day,slot}]:[];
   });
   if(!wanted.length)return;
   const book=SpreadsheetApp.openById(MP_BOOK);
@@ -47,7 +47,7 @@ function pulseResearchPipeline(){
   let pending=false,completed=false;const wakes=[];
   for(const {market,day,slot} of wanted){
     const liveReady=market!=='US'||snapshot.markets.US.stocks.filter(stock=>!stock.marketEvent).every(stock=>stock.financial.date_basis==='LIVE_OBSERVED_SEC');
-    if(snapshot.markets[market].macro.marketAsOf>=day&&liveReady){properties.setProperty('PR_DONE_'+market,day);completed=true;continue;}
+    if(snapshot.markets[market].macro.marketAsOf>=day&&liveReady){properties.setProperty('PR_VERIFIED_DONE_'+market,day);completed=true;continue;}
     const state=states.find(row=>row.market===market&&row.session_date===day);
     // Failed attempts are never completion; the next scheduled slot can recover.
     const key='PR_SLOT_WAKE_'+market,previous=JSON.parse(properties.getProperty(key)||'{}');
@@ -62,4 +62,4 @@ function pulseResearchPipeline(){
   console.log(JSON.stringify({pipelineWakeStatus:response.getResponseCode(),pending:true}));
 }
 
-function continueLatestFinancialPipeline(){PropertiesService.getScriptProperties().deleteProperty('PR_DONE_US');return pulseResearchPipeline();}
+function continueLatestFinancialPipeline(){PropertiesService.getScriptProperties().deleteProperty('PR_VERIFIED_DONE_US');return pulseResearchPipeline();}

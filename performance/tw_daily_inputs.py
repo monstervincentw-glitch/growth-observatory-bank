@@ -127,12 +127,19 @@ def recover_sessions(inputs, output, release, sessions, anchor, *, cfg):
     report = dict(schema=1,market='TW',at=datetime.now(timezone.utc).isoformat(),
                   anchor=str(anchor.date()),requested=str(sessions[-1].date()),recovered=[],existing=[],gaps={})
     universe = {s['symbol']:s for s in release['snapshot']['markets']['TW']['stocks']}
-    try:
-        weekly_rows = weekly_history(inputs,sessions[-1])[0]
-        grouped = grouped_macro(weekly_rows,'base').set_index('macro_vintage_date')
-    except (PartialData,ValueError,KeyError,OSError) as error:
-        report['gaps']['macro'] = str(error)
-        grouped = None
+    def already_archived(day):
+        return any(any((inputs/folder/'TW'/f'{day}{suffix}').exists() for suffix in ('.json','.json.gz'))
+                   for folder in ('observed-primary-inputs','primary-inputs'))
+    grouped = None
+    # Completed daily inputs need no recovery or additional US-session macro read.
+    # Taiwan can trade on a US holiday; use the last published US close if needed.
+    if any(not already_archived(str(date.date())) for date in sessions.insert(0,anchor)):
+        try:
+            us_cutoff=release['snapshot']['markets'].get('US',{}).get('macro',{}).get('marketAsOf',str(sessions[-1].date()))
+            weekly_rows = weekly_history(inputs,pd.Timestamp(us_cutoff))[0]
+            grouped = grouped_macro(weekly_rows,'base').set_index('macro_vintage_date')
+        except (PartialData,ValueError,KeyError,OSError) as error:
+            report['gaps']['macro'] = str(error)
     for date in sessions.insert(0,anchor):
         day = str(date.date())
         if any(any((inputs/folder/'TW'/f'{day}{suffix}').exists() for suffix in ('.json','.json.gz')) for folder in
