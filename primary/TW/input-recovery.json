@@ -1,15 +1,17 @@
 {
   "schema": 1,
   "market": "TW",
-  "at": "2026-11-26T08:22:13.528225+00:00",
+  "at": "2026-11-26T13:09:47.690354+00:00",
   "anchor": "2026-11-24",
-  "requested": "2026-11-25",
+  "requested": "2026-11-26",
   "recovered": [],
   "existing": [
-    "2026-11-24"
+    "2026-11-24",
+    "2026-11-25",
+    "2026-11-26"
   ],
   "gaps": {
-    "2026-11-25": "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/research-data/market-observations/TW/2026-11-25.json'"
+    "macro": "Requested cutoff is not a completed US session"
   },
   "status": "WAITING_FOR_VERIFIABLE_INPUTS"
 }
