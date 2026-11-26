@@ -116,7 +116,9 @@ function gnTab(book,name,headers,create) {
 function gnRead(s) {
   if(!s)return [];
   if(s.getLastRow()>10000)throw Error('Pilot row limit; checkpoint needed');
-  return gnRecords(s.getDataRange().getValues().map(row=>row.map(v=>v instanceof Date?Utilities.formatDate(v,s.getParent().getSpreadsheetTimeZone(),'yyyy-MM-dd'):v))); 
+  const zone=String(s.getParent().getSpreadsheetTimeZone()||'Etc/UTC');
+  const timezone=zone==='Etc/GMT'?'Etc/UTC':zone;
+  return gnRecords(s.getDataRange().getValues().map(row=>row.map(v=>v instanceof Date?Utilities.formatDate(v,timezone,'yyyy-MM-dd'):v)));  
 }
 function gnRun(write) {
   const lock=LockService.getScriptLock();if(!lock.tryLock(1000))return {status:'BUSY'};
@@ -248,3 +250,8 @@ function gnPoolQuotes(privateRows,poolRows){
   return us.concat(privateRows.filter(r=>!symbols.has(String(r.symbol))));
 }
 if(typeof module!=='undefined')module.exports.gnPoolQuotes=gnPoolQuotes;
+
+function retryGoogleNav(){
+  PropertiesService.getScriptProperties().deleteProperty("GN_SESSION_US");
+  return captureGoogleNav();
+}

@@ -1,0 +1,10 @@
+const vm=require('node:vm'),fs=require('node:fs'),assert=require('node:assert/strict');
+let zone='Etc/GMT',seen=[];
+const context={Date,console,module:{exports:{}},Utilities:{formatDate:(date,tz,pattern)=>{assert.equal(tz,'Etc/UTC');assert.equal(pattern,'yyyy-MM-dd');seen.push(tz);return date.toISOString().slice(0,10)}}};
+vm.createContext(context);vm.runInContext(fs.readFileSync('apps-script/GoogleNav.gs','utf8'),context);
+const sheet={getLastRow:()=>2,getParent:()=>({getSpreadsheetTimeZone:()=>zone}),getDataRange:()=>({getValues:()=>[['date','nav'],[new Date('2026-11-25T00:00:00Z'),16204.46]]})};
+assert.equal(context.gnRead(sheet)[0].date,'2026-11-25');
+zone=null;assert.equal(context.gnRead(sheet)[0].nav,16204.46);
+zone=new String('Etc/GMT');assert.equal(context.gnRead(sheet)[0].date,'2026-11-25');
+assert.equal(seen.length,3);
+console.log('Private NAV date cells normalize GMT, missing timezone and boxed strings');
