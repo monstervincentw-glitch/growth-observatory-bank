@@ -93,6 +93,7 @@ def compute_account(transactions, portfolio_id):
                 "baseline_version": tx.get("baseline_version", ""),
                 "baseline_verification": tx.get("baseline_verification", ""),
                 "baseline_reason": tx.get("baseline_reason", ""),
+                "baseline_note": tx.get("baseline_note", ""),
                 "ledger_entry_growth": tx.get("ledger_entry_growth", ""),
                 "ledger_entry_margin": tx.get("ledger_entry_margin", ""),
             })
@@ -522,6 +523,7 @@ def exit_review(holding, macro):
                 "source": lot.get("baseline_source") or "",
                 "version": lot.get("baseline_version") or "",
                 "verification": lot.get("baseline_verification") or "",
+                "note": lot.get("baseline_note") or "",
                 "reason": lot.get("baseline_reason") or "",
             },
             "latest": {"growth": "" if growth is None else growth,

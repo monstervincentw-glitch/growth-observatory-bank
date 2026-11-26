@@ -15,7 +15,7 @@ from core import (
     buy_plan, compute_account, contributions_through, divergence_plan,
     funding_decision, modified_dietz, owner_allowed, portfolio_value,
 )
-from entry_basis import apply_official_baselines, resolve_buy_baseline, sync_entry_baselines
+from entry_basis import ACCEPTED, apply_official_baselines, resolve_buy_baseline, sync_entry_baselines
 from monitor import portfolio_reviews, review_holding, data_too_old
 from oauth_messages import oauth_error_message
 from portfolio_admin import STRATEGIES, condition_timeline, weekday_gaps
@@ -454,11 +454,12 @@ def render_stock_monitor(portfolio, valued, reviews, macro, transitions):
                          + " · 變化 " + points(change.get("growth_pp")))
                 st.write("建倉營益率 " + pct(base.get("margin")) + " · 最新 " + pct(latest.get("margin"))
                          + " · 變化 " + points(change.get("margin_pp")))
-                st.caption("財報期 " + (base.get("period") or "無法判定")
-                           + " · 官方申報日 " + (base.get("filed") or "無法判定")
+                st.caption(("建倉前封存觀測基準" if base.get("verification")=="VERIFIED_OBSERVATION" else "官方申報基準") + " · 財報期 " + (base.get("period") or "無法判定")
+                           + " · 官方申報日 " + (base.get("filed") or ("未提供，採建倉前封存觀測" if base.get("verification")=="VERIFIED_OBSERVATION" else "無法判定"))
                            + " · 來源 " + (base.get("source") or "無法判定")
                            + " · 版本 " + ((base.get("version") or "")[:16] or "無法判定")
                            + " · 驗證 " + (base.get("verification") or "無法判定"))
+                if base.get("note"):st.caption(base["note"])
                 if base.get("reason"):
                     st.caption(base["reason"])
                 funding = funding_decision(macro)
@@ -727,7 +728,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
             cash_amount = st.text_input("現金異動金額（存／提）", value="")
             role = st.selectbox("持股類別", ["core", "extra"] if portfolio["strategy"] == "B" else ["core"],
                                 format_func=lambda x: "核心" if x == "core" else "額外")
-            st.caption("新的買入會把建倉當日已正式申報的財報基準寫進稽核表。寫不進去就標無法判定，不會回填今天的財報，也不改舊交易列。")
+            st.caption("新買入會固定保存建倉當時可用的財報基準；官方申報與建倉前封存觀測分別標示，缺少依據時列出原因。")
             note = st.text_input("交易備註", value="")
             if st.form_submit_button("確認並寫入私人 Google Sheets", type="primary", disabled=st.session_state.get("_private_stale", False)):
                 try:
@@ -738,7 +739,7 @@ def render_dashboard(store, portfolio, transactions, block, entry_batch, transit
                     if action == "BUY":
                         basis = resolve_buy_baseline(
                             symbol, tdate.isoformat(), market=portfolio["market"],
-                            payload=_buy_facts(symbol, block), cik=_cik(symbol, block))
+                            payload=_buy_facts(symbol, block), cik=_cik(symbol, block), recorded_at=record["at"])
                         store.append_entry_baselines([{**basis, "portfolio_id": portfolio["id"],
                                                         "ledger_id": record["id"]}])
                     st.success("已寫入交易流水帳。建倉基準寫在稽核表，原始舊列沒有被改寫。")
@@ -843,7 +844,7 @@ def cached_portfolio_records(research_batch):
     # verified baseline. No repeated SEC or Sheets writes on stock-detail clicks.
     official_pairs = {
         (str(b.get("portfolio_id") or ""), str(b.get("ledger_id") or ""))
-        for b in saved_baselines if b.get("verification") == "OFFICIAL_FILING"
+        for b in saved_baselines if b.get("verification") in ACCEPTED
     }
     has_missing = any(
         str(tx.get("action") or "").upper() == "BUY"

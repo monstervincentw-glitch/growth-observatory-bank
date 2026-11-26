@@ -19,6 +19,8 @@ TAGS = {
     "op": ["OperatingIncomeLoss"],
     "cfo": ["NetCashProvidedByUsedInOperatingActivities"],
 }
+from tw_entry_basis import ACCEPTED, OBSERVED
+
 DAY = 86400000
 OFFICIAL = "OFFICIAL_FILING"
 
@@ -172,9 +174,9 @@ def apply_official_baselines(transactions, baselines):
         key = (str(row.get("portfolio_id")), str(row.get("ledger_id")))
         slot = chosen.setdefault(key, {"official": None, "latest": None})
         slot["latest"] = row
-        if (row.get("verification") == OFFICIAL and row.get("revenue_growth") not in (None, "")
+        if (row.get("verification") in ACCEPTED and row.get("revenue_growth") not in (None, "")
                 and row.get("operating_margin") not in (None, "")):
-            slot["official"] = row
+            if slot["official"] is None:slot["official"] = row
     copies = []
     for tx in transactions:
         copied = dict(tx)
@@ -193,7 +195,8 @@ def apply_official_baselines(transactions, baselines):
             copied["baseline_filed"] = official.get("official_published_at") or ""
             copied["baseline_source"] = official.get("source") or ""
             copied["baseline_version"] = official.get("version_id") or ""
-            copied["baseline_verification"] = OFFICIAL
+            copied["baseline_verification"] = official["verification"]
+            copied["baseline_note"] = official.get("detail") or ""
             copied["baseline_reason"] = ""
         else:
             copied["entry_growth"] = ""
@@ -218,11 +221,15 @@ def _cik_index(stocks):
     return found
 
 
-def resolve_buy_baseline(symbol, trade_date, *, market, payload=None, registry_version=None, cik=""):
+def resolve_buy_baseline(symbol, trade_date, *, market, payload=None, registry_version=None, cik="", recorded_at=None):
     """Resolve one buy. payload=None means the caller could not fetch SEC facts."""
     trade_date = str(trade_date)[:10]
     symbol = str(symbol or "").upper()
     late = late_observation_reason(registry_version, trade_date) if registry_version else ""
+    if market == "TW":
+        from tw_entry_basis import load_registry, resolve
+        try:return resolve(symbol,trade_date,registry_version if registry_version is not None else load_registry(),recorded_at)
+        except Exception as error:return _unverified(symbol,trade_date,"","台股封存財報版本讀取失敗："+type(error).__name__)
     if market != "US":
         return _unverified(symbol, trade_date, cik, "台股沒有可回推至建倉日的官方申報時間，不估算財報基準")
     if late and late.startswith("financial-versions"):
@@ -250,10 +257,10 @@ def _unverified(symbol, trade_date, cik, detail):
     }
 
 
-def missing_baseline_rows(transactions, saved, stocks, facts_for_cik):
+def missing_baseline_rows(transactions, saved, stocks, facts_for_cik, tw_registry=None):
     """Audit rows still required. facts_for_cik(cik) returns a payload or raises."""
     official = {(str(row.get("portfolio_id")), str(row.get("ledger_id")))
-                for row in saved or [] if row.get("verification") == OFFICIAL}
+                for row in saved or [] if row.get("verification") in ACCEPTED}
     ciks = _cik_index(stocks)
     rows = []
     for tx in transactions:
@@ -268,6 +275,10 @@ def missing_baseline_rows(transactions, saved, stocks, facts_for_cik):
         if market not in ("US", "TW"):
             market = "US" if symbol in ciks else ""
         cik = ciks.get(symbol, "")
+        if market == "TW":
+            resolved=resolve_buy_baseline(symbol,trade_date,market="TW",registry_version=tw_registry,recorded_at=tx.get("at"))
+            rows.append({**resolved,"portfolio_id":key[0],"ledger_id":key[1]})
+            continue
         if market != "US":
             detail = ("台股沒有可回推至建倉日的官方申報時間，不估算財報基準" if market == "TW"
                       else "交易沒有標明美股或台股，不估算財報基準")

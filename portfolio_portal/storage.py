@@ -267,7 +267,7 @@ class PortfolioSheets:
 
     def append_entry_baselines(self, rows):
         """Append audit baselines. Never updates an existing ledger cell."""
-        from entry_basis import OFFICIAL
+        from entry_basis import OFFICIAL, ACCEPTED
         with self._lock:
             saved = self.entry_baselines()
             known = {(row["portfolio_id"], row["ledger_id"], row["version_id"]) for row in saved}
@@ -278,7 +278,7 @@ class PortfolioSheets:
                 key = (str(row.get("portfolio_id")), str(row.get("ledger_id")), version)
                 if not version or key in known:
                     continue
-                if row.get("verification") == OFFICIAL:
+                if row.get("verification") in ACCEPTED:
                     from core import money
                     money(row.get("revenue_growth"))
                     money(row.get("operating_margin"))
@@ -290,8 +290,8 @@ class PortfolioSheets:
                     "ledger_id": str(row.get("ledger_id") or ""),
                     "symbol": str(row.get("symbol") or "").upper(),
                     "trade_date": str(row.get("trade_date") or "")[:10],
-                    "revenue_growth": str(row.get("revenue_growth") or ""),
-                    "operating_margin": str(row.get("operating_margin") or ""),
+                    "revenue_growth": str(row.get("revenue_growth")) if row.get("revenue_growth") is not None else "",
+                    "operating_margin": str(row.get("operating_margin")) if row.get("operating_margin") is not None else "",
                     "filing_period": str(row.get("filing_period") or ""),
                     "official_published_at": str(row.get("official_published_at") or "")[:10],
                     "source": str(row.get("source") or "")[:300],
@@ -299,7 +299,7 @@ class PortfolioSheets:
                     "verification": str(row.get("verification") or ""),
                     "detail": str(row.get("detail") or "")[:300],
                 })
-                if record["verification"] not in (OFFICIAL, "UNVERIFIED"):
+                if record["verification"] not in (*ACCEPTED, "UNVERIFIED"):
                     raise ValueError("建倉基準驗證狀態無效")
                 fresh.append(record)
                 known.add(key)
