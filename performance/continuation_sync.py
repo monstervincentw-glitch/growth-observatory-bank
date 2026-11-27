@@ -111,6 +111,23 @@ def build_market(inputs,output,entry,quotes,market,now,batch):
                 dest.parent.mkdir(parents=True,exist_ok=True)
                 dest.with_suffix('.json.gz').write_bytes(gzip.compress(json.dumps(payload,ensure_ascii=False,allow_nan=False,separators=(',',':')).encode(),mtime=0))
 
+def bind_completed_etf_batch(inputs,output,entry):
+    """Same-close metadata refresh must retain the verified ETF price archive."""
+    cutoff=entry['snapshot']['markets']['US']['macro']['marketAsOf']
+    manifest=output/'etf/manifest.json'
+    feed=inputs/'etf-inputs'/f'{cutoff}.json'
+    if not manifest.exists() or not feed.exists():return
+    if json.loads(manifest.read_text())['through']!=cutoff:return
+    data=json.loads(feed.read_text())
+    if data.get('status')!='VERIFIED' or data.get('cutoff')!=cutoff:return
+    if data.get('batch')==entry['batch']:return
+    data.setdefault('originalResearchBatch',data['batch'])
+    data['batch']=entry['batch']
+    data['researchBinding']=dict(cutoff=cutoff,snapshotSHA256=entry['checksum'],
+                                 basis='ALREADY_COMPLETED_US_CLOSE_METADATA_REFRESH')
+    save(feed,data)
+
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('inputs',type=Path);p.add_argument('output',type=Path)
     p.add_argument('--runtime');p.add_argument('--snapshot',type=Path);p.add_argument('--node',default='node');a=p.parse_args()
@@ -118,6 +135,7 @@ def main():
     attempt=dict(status='published',batch=entry['batch'],at=entry['snapshot']['generatedAt'],detail='Completed shared Sheets batch',runId='sheets-continuation')
     save(a.inputs/'release.json',dict(snapshot=entry['snapshot'],rows=rows,attempt=attempt))
     save(a.inputs/'attempts.json',{m:dict(attempt,market=m) for m in ['US','TW']})
+    bind_completed_etf_batch(a.inputs,a.output,entry)
     # Same successful close is metadata-only: no quote, financial or FRED requests.
     if all((a.output/'primary'/m/'release.json').exists() and json.loads((a.output/'primary'/m/'release.json').read_text())['through']>=b['macro']['marketAsOf'] for m,b in entry['snapshot']['markets'].items()) and json.loads((a.output/'etf/manifest.json').read_text())['through']>=entry['snapshot']['markets']['US']['macro']['marketAsOf']:return
     import tempfile

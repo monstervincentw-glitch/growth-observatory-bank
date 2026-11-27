@@ -32,3 +32,21 @@ class ContinuationTests(unittest.TestCase):
     with self.assertRaises(ValueError):build(root,root,[],entry,{})
     self.assertEqual([call.args[4] for call in markets.call_args_list],['US','TW'])
    self.assertEqual(json.loads((root/'etf-inputs/2026-11-25.json').read_text())['batch'],'new')
+
+ def test_completed_etf_same_close_batch_refresh_is_metadata_only(self):
+  import json,tempfile
+  from continuation_sync import bind_completed_etf_batch
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp);(root/'etf').mkdir();(root/'etf-inputs').mkdir()
+   (root/'etf/manifest.json').write_text('{"through":"2026-11-25"}')
+   path=root/'etf-inputs/2026-11-25.json'
+   original={'cutoff':'2026-11-25','status':'VERIFIED','batch':'old','prices':{'QQQ':[{'close':100}]},'weeks':['2026-11-20']}
+   path.write_text(json.dumps(original))
+   entry={'batch':'new','checksum':'verified-sha','snapshot':{'markets':{'US':{'macro':{'marketAsOf':'2026-11-25'}}}}}
+   bind_completed_etf_batch(root,root,entry)
+   data=json.loads(path.read_text());self.assertEqual(data['batch'],'new')
+   self.assertEqual(data['originalResearchBatch'],'old');self.assertEqual(data['prices'],original['prices'])
+   self.assertEqual(data['weeks'],original['weeks'])
+   raw=path.read_bytes();bind_completed_etf_batch(root,root,entry);self.assertEqual(path.read_bytes(),raw)
+   original['status']='PARTIAL';original['batch']='old';path.write_text(json.dumps(original))
+   bind_completed_etf_batch(root,root,entry);self.assertEqual(json.loads(path.read_text())['batch'],'old')
