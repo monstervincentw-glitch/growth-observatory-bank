@@ -1,15 +1,14 @@
 {
   "schema": 1,
   "market": "TW",
-  "at": "2026-11-27T19:36:20.435365+00:00",
+  "at": "2026-11-27T22:10:22.936268+00:00",
   "anchor": "2026-11-26",
   "requested": "2026-11-27",
   "recovered": [],
   "existing": [
-    "2026-11-26"
+    "2026-11-26",
+    "2026-11-27"
   ],
-  "gaps": {
-    "2026-11-27": "FileNotFoundError: [Errno 2] No such file or directory: '/tmp/research-data/market-observations/TW/2026-11-27.json'"
-  },
-  "status": "WAITING_FOR_VERIFIABLE_INPUTS"
+  "gaps": {},
+  "status": "COMPLETE"
 }
