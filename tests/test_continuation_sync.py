@@ -50,3 +50,19 @@ class ContinuationTests(unittest.TestCase):
    raw=path.read_bytes();bind_completed_etf_batch(root,root,entry);self.assertEqual(path.read_bytes(),raw)
    original['status']='PARTIAL';original['batch']='old';path.write_text(json.dumps(original))
    bind_completed_etf_batch(root,root,entry);self.assertEqual(json.loads(path.read_text())['batch'],'old')
+
+ def test_same_close_main_refreshes_etf_binding_without_sources(self):
+  import json,tempfile
+  from unittest.mock import patch
+  from continuation_sync import main
+  with tempfile.TemporaryDirectory() as tmp:
+   root=Path(tmp)
+   for market,day in [('US','2026-11-25'),('TW','2026-11-26')]:
+    folder=root/'primary'/market;folder.mkdir(parents=True);(folder/'release.json').write_text(json.dumps({'through':day}))
+   (root/'etf').mkdir();(root/'etf/manifest.json').write_text('{"through":"2026-11-25"}')
+   (root/'etf-inputs').mkdir();feed=root/'etf-inputs/2026-11-25.json'
+   feed.write_text('{"cutoff":"2026-11-25","status":"VERIFIED","batch":"old","prices":{}}')
+   entry={'batch':'new','checksum':'verified-sha','snapshot':{'generatedAt':'2026-11-27T00:00:00Z','markets':{'US':{'macro':{'marketAsOf':'2026-11-25'}},'TW':{'macro':{'marketAsOf':'2026-11-26'}}}}}
+   with patch('sys.argv',['continuation_sync',str(root),str(root)]),patch('continuation_sync.fetch_snapshot',return_value=([],entry)),patch('continuation_sync.subprocess.run') as sources:
+    main();sources.assert_not_called()
+   self.assertEqual(json.loads(feed.read_text())['batch'],'new')
